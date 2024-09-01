@@ -1,8 +1,8 @@
 use std::{io::Result, path::Path};
-
-mod entity;
-use entity::Project;
 use tokio::fs;
+
+pub mod entity;
+use entity::Project;
 
 pub async fn load_data(path: impl AsRef<Path>) -> Result<Project> {
     let res = fs::read_to_string(path).await?;

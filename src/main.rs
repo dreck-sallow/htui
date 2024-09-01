@@ -1,10 +1,13 @@
 use std::{collections::HashMap, str::FromStr};
 
 use clap::Parser;
+use error::AppError;
 use reqwest::header::{self, HeaderName, HeaderValue};
 use serde::Serialize;
 
+mod error;
 mod store;
+mod tui;
 
 #[derive(Parser, Debug)]
 #[command(name = "HTUI")]
@@ -51,34 +54,24 @@ impl From<CliHttpMethod> for reqwest::Method {
     }
 }
 
-// impl From<reqwest::Method> for CliHttpMethod {
-//     fn from(self) -> reqwest::Method {
-//         match self {
-//             CliHttpMethod::Get => reqwest::Method::GET,
-//             CliHttpMethod::Post => reqwest::Method::POST,
-//             CliHttpMethod::Put => reqwest::Method::PUT,
-//             CliHttpMethod::Delete => reqwest::Method::DELETE,
-//             CliHttpMethod::Patch => reqwest::Method::PATCH,
-//             CliHttpMethod::Head => reqwest::Method::HEAD,
-//         }
-//     }
-// }
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
-
-    // 1. url && not method -> Make an GET request to url defined
-    // 2. url && method -> Make an [method] request useing th url defined
 
     if let Some(url) = cli.url {
         let cli_method = cli.method.unwrap_or(CliHttpMethod::Get);
         let headers = match cli.headers {
             Some(ref raw_headers) => {
-                let parsed: HashMap<String, String> = serde_json::from_str(raw_headers).unwrap(); //FIXME: fix the header parsing
+                let parsed: HashMap<String, String> = serde_json::from_str(raw_headers)
+                    .map_err(|_e| AppError::RequestParsing("The headers are bad"))
+                    .unwrap();
 
                 let mut header_map = header::HeaderMap::new();
                 for (key, val) in parsed {
-                    let header_parsed = HeaderName::from_str(&key.to_lowercase()).unwrap(); //FIXME: fix the error parsing
+                    let header_parsed = HeaderName::from_str(&key.to_lowercase())
+                        .map_err(|_e| AppError::RequestParsing("The hadername are bad"))
+                        .unwrap();
+
                     let header_value_parsed = HeaderValue::from_str(&val.to_lowercase()).unwrap(); //FIXME: fix the error parsing
                     header_map.insert(header_parsed, header_value_parsed);
                 }
@@ -103,5 +96,6 @@ async fn main() {
             res.text().await.unwrap()
         );
     }
+    tui::run_app().await.unwrap();
     println!("Launch the TUI application");
 }
