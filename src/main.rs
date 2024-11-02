@@ -1,10 +1,10 @@
-use std::{collections::HashMap, str::FromStr};
+use std::io;
 
 use clap::Parser;
-use error::AppError;
-use reqwest::header::{self, HeaderName, HeaderValue};
+use cli_app::CliAppOptions;
 use serde::Serialize;
 
+mod cli_app;
 mod error;
 mod store;
 mod tui;
@@ -22,7 +22,7 @@ struct Cli {
     method: Option<CliHttpMethod>,
 
     /// Headers used to make the request
-    #[arg(short = 'H', long, value_delimiter = ':')]
+    #[arg(short = 'H', long)]
     headers: Option<String>,
 
     /// Body data used to make the request
@@ -55,47 +55,18 @@ impl From<CliHttpMethod> for reqwest::Method {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> io::Result<()> {
     let cli = Cli::parse();
-
-    if let Some(url) = cli.url {
-        let cli_method = cli.method.unwrap_or(CliHttpMethod::Get);
-        let headers = match cli.headers {
-            Some(ref raw_headers) => {
-                let parsed: HashMap<String, String> = serde_json::from_str(raw_headers)
-                    .map_err(|_e| AppError::RequestParsing("The headers are bad"))
-                    .unwrap();
-
-                let mut header_map = header::HeaderMap::new();
-                for (key, val) in parsed {
-                    let header_parsed = HeaderName::from_str(&key.to_lowercase())
-                        .map_err(|_e| AppError::RequestParsing("The hadername are bad"))
-                        .unwrap();
-
-                    let header_value_parsed = HeaderValue::from_str(&val.to_lowercase()).unwrap(); //FIXME: fix the error parsing
-                    header_map.insert(header_parsed, header_value_parsed);
-                }
-
-                header_map
-            }
-            None => header::HeaderMap::default(),
-        };
-
-        let body = match cli.body {
-            Some(raw_body) => reqwest::Body::from(raw_body),
-            None => reqwest::Body::default(),
-        };
-
-        let client = reqwest::Client::new()
-            .request(cli_method.into(), url)
-            .headers(headers)
-            .body(body);
-        let res = client.send().await.unwrap();
-        return println!(
-            "Make the request with response: {}",
-            res.text().await.unwrap()
-        );
+    if cli.url.is_some() {
+        let options = CliAppOptions::try_from(cli).expect("error for options");
+        cli_app::run_app(options).await
+    } else {
+        run_tui_app().await
     }
-    tui::run_app().await.unwrap();
+}
+
+async fn run_tui_app() -> io::Result<()> {
+    tui::run_app().await?;
     println!("Launch the TUI application");
+    Ok(())
 }

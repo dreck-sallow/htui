@@ -27,9 +27,8 @@ pub async fn run_app() -> io::Result<()> {
 
     loop {
         if let event::Event::Key(key) = event_handler.next().await.unwrap() {
-            match key.code {
-                ratatui::crossterm::event::KeyCode::Char('q') => break,
-                _ => {}
+            if let ratatui::crossterm::event::KeyCode::Char('q') = key.code {
+                break;
             }
         }
 
