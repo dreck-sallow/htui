@@ -5,9 +5,10 @@ use cli_app::CliAppOptions;
 use serde::Serialize;
 
 mod cli_app;
-mod error;
-mod store;
-mod tui;
+// mod error;
+// mod store;
+// mod tui;
+mod tui_app;
 
 #[derive(Parser, Debug)]
 #[command(name = "HTUI")]
@@ -61,12 +62,6 @@ async fn main() -> io::Result<()> {
         let options = CliAppOptions::try_from(cli).expect("error for options");
         cli_app::run_app(options).await
     } else {
-        run_tui_app().await
+        tui_app::run_app().await
     }
-}
-
-async fn run_tui_app() -> io::Result<()> {
-    tui::run_app().await?;
-    println!("Launch the TUI application");
-    Ok(())
 }
