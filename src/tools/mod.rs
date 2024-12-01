@@ -1,6 +1,2 @@
 pub mod cli;
-
-pub mod tui {
-
-    pub fn run() {}
-}
+pub mod tui;
