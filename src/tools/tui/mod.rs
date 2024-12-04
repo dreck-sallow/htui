@@ -1,31 +1,34 @@
-use std::io::{stdout, Result};
+use std::io::Result;
 
-use crossterm::{event::KeyCode, execute, style::Print};
+use app::TuiApp;
+use crossterm::event::KeyCode;
 
+mod app;
 mod tui_manager;
 
 pub async fn run() -> Result<()> {
     let mut tui = tui_manager::TuiManager::new(4.0, 30.0)?;
 
+    let mut tui_app = TuiApp::new();
+
     tui.enter()?;
 
     loop {
-        tui.terminal.draw(|frame| {})?;
-
         if let Some(ev) = tui.next().await {
             match ev {
-                tui_manager::TuiEvent::Tick => {
-                    execute!(stdout(), Print("\ntick\n"))?;
-                }
+                tui_manager::TuiEvent::Tick => {}
                 tui_manager::TuiEvent::Render => {
-                    execute!(stdout(), Print("render"))?;
+                    tui.terminal.draw(|frame| {
+                        tui_app.render(frame).unwrap();
+                    })?;
                 }
                 tui_manager::TuiEvent::Key(k) => match k.code {
                     KeyCode::Esc | KeyCode::Char('q') => {
-                        execute!(stdout(), Print("\n EXIT \n"))?;
                         break;
                     }
-                    _ => {}
+                    _ => {
+                        tui_app.update(k)?;
+                    }
                 },
                 _ => {}
             }
