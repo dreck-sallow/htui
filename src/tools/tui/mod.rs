@@ -4,6 +4,7 @@ use app::TuiApp;
 use crossterm::event::KeyCode;
 
 mod app;
+mod state;
 mod tui_manager;
 
 pub async fn run() -> Result<()> {
