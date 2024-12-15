@@ -2,6 +2,8 @@ use clap::Parser;
 
 //modules
 mod cmd_args;
+mod config;
+mod directory;
 mod tools;
 
 use tools::{cli, tui};
