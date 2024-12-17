@@ -1,16 +1,25 @@
 use std::io::Result;
 
-use app::TuiApp;
+use crate::directory::Directory;
 use crossterm::event::KeyCode;
 
 mod app;
+mod core;
+mod elements;
 mod state;
 mod tui_manager;
 
+use app::{App, AppState};
+
 pub async fn run() -> Result<()> {
+    let directory = Directory::new("com", "dreck-tui", "htui");
+
+    let _config_file_path = directory.config_file_path().unwrap();
+
     let mut tui = tui_manager::TuiManager::new(4.0, 30.0)?;
 
-    let mut tui_app = TuiApp::new();
+    // let mut app_state = AppState::new(CollectionsState::default());
+    let tui_app = App::new(AppState::default());
 
     tui.enter()?;
 
@@ -28,7 +37,7 @@ pub async fn run() -> Result<()> {
                         break;
                     }
                     _ => {
-                        tui_app.update(k)?;
+                        // tui_app.update(k)?;
                     }
                 },
                 _ => {}

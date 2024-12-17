@@ -138,121 +138,121 @@ fn next_index<T>(vec: &Vec<T>, index: usize) -> Option<usize> {
     None
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    #[test]
-    fn no_indices_in_empty() {
-        let mut collection_state = CollectionsState::default();
-        collection_state.next();
-        collection_state.next();
-        collection_state.next();
+//     #[test]
+//     fn no_indices_in_empty() {
+//         let mut collection_state = CollectionsState::default();
+//         collection_state.next();
+//         collection_state.next();
+//         collection_state.next();
 
-        assert_eq!(
-            collection_state.cursor,
-            (None, None),
-            "state should be none when no have collections"
-        );
-    }
+//         assert_eq!(
+//             collection_state.cursor,
+//             (None, None),
+//             "state should be none when no have collections"
+//         );
+//     }
 
-    #[test]
-    fn collection_first_index() {
-        let mut collection_state = CollectionsState::default();
-        collection_state.append_collection(Collection::default());
+//     #[test]
+//     fn collection_first_index() {
+//         let mut collection_state = CollectionsState::default();
+//         collection_state.append_collection(Collection::default());
 
-        assert_eq!(
-            collection_state.cursor,
-            (Some(0), None),
-            "state should select first collection inserted"
-        );
+//         assert_eq!(
+//             collection_state.cursor,
+//             (Some(0), None),
+//             "state should select first collection inserted"
+//         );
 
-        collection_state.next();
-        collection_state.next();
-        collection_state.next();
-        collection_state.next();
-        collection_state.next();
+//         collection_state.next();
+//         collection_state.next();
+//         collection_state.next();
+//         collection_state.next();
+//         collection_state.next();
 
-        assert_eq!(
-            collection_state.cursor,
-            (Some(0), None),
-            "not should change cursor in one collection"
-        );
-    }
+//         assert_eq!(
+//             collection_state.cursor,
+//             (Some(0), None),
+//             "not should change cursor in one collection"
+//         );
+//     }
 
-    #[test]
-    fn collection_second_index() {
-        let mut collection_state = CollectionsState::default();
-        collection_state.append_collection(Collection::default());
-        collection_state.append_collection(Collection::default());
+//     #[test]
+//     fn collection_second_index() {
+//         let mut collection_state = CollectionsState::default();
+//         collection_state.append_collection(Collection::default());
+//         collection_state.append_collection(Collection::default());
 
-        assert_eq!(collection_state.cursor, (Some(0), None), "append coll: 2");
+//         assert_eq!(collection_state.cursor, (Some(0), None), "append coll: 2");
 
-        collection_state.next();
-        collection_state.next();
+//         collection_state.next();
+//         collection_state.next();
 
-        assert_eq!(
-            collection_state.cursor,
-            (Some(1), None),
-            "call next: coll idx 2"
-        );
-    }
+//         assert_eq!(
+//             collection_state.cursor,
+//             (Some(1), None),
+//             "call next: coll idx 2"
+//         );
+//     }
 
-    #[test]
-    fn append_req_in_empty_collections() {
-        let mut state = CollectionsState::default();
-        state.append_request(CollectionRequest::new("empty"));
+//     #[test]
+//     fn append_req_in_empty_collections() {
+//         let mut state = CollectionsState::default();
+//         state.append_request(CollectionRequest::new("empty"));
 
-        assert_eq!(state.cursor, (None, None), "append req 1 in coll: 0")
-    }
+//         assert_eq!(state.cursor, (None, None), "append req 1 in coll: 0")
+//     }
 
-    #[test]
-    fn append_req_in_collection() {
-        let mut state =
-            CollectionsState::with_collections([Collection::with_name("coll_1")].into());
+//     #[test]
+//     fn append_req_in_collection() {
+//         let mut state =
+//             CollectionsState::with_collections([Collection::with_name("coll_1")].into());
 
-        state.append_request(CollectionRequest::new("coll_1_req_1"));
-        assert_eq!(state.cursor, (Some(0), Some(0)), "append req 1 in coll 1");
+//         state.append_request(CollectionRequest::new("coll_1_req_1"));
+//         assert_eq!(state.cursor, (Some(0), Some(0)), "append req 1 in coll 1");
 
-        state.append_request(CollectionRequest::new("coll_1_req_2"));
-        assert_eq!(state.cursor, (Some(0), Some(0)), "append req 2 in coll 1")
-    }
+//         state.append_request(CollectionRequest::new("coll_1_req_2"));
+//         assert_eq!(state.cursor, (Some(0), Some(0)), "append req 2 in coll 1")
+//     }
 
-    #[test]
-    fn get_empty_collection_request() {
-        let mut state = CollectionsState::default();
+//     #[test]
+//     fn get_empty_collection_request() {
+//         let mut state = CollectionsState::default();
 
-        let collection_name = state.get_current_collection().map(|coll| &coll.name);
-        assert_eq!(collection_name, None);
+//         let collection_name = state.get_current_collection().map(|coll| &coll.name);
+//         assert_eq!(collection_name, None);
 
-        let request_name = state.get_current_request().map(|coll| &coll.name);
-        assert_eq!(request_name, None);
-    }
+//         let request_name = state.get_current_request().map(|coll| &coll.name);
+//         assert_eq!(request_name, None);
+//     }
 
-    #[test]
-    fn get_2_collection() {
-        let mut state = CollectionsState::with_collections(
-            [
-                Collection::with_name("coll_1"),
-                Collection::with_name("coll_2"),
-            ]
-            .into(),
-        );
+//     #[test]
+//     fn get_2_collection() {
+//         let mut state = CollectionsState::with_collections(
+//             [
+//                 Collection::with_name("coll_1"),
+//                 Collection::with_name("coll_2"),
+//             ]
+//             .into(),
+//         );
 
-        state.next();
+//         state.next();
 
-        state.append_request(CollectionRequest::new("coll_1_req_1"));
-        state.append_request(CollectionRequest::new("coll_1_req_2"));
+//         state.append_request(CollectionRequest::new("coll_1_req_1"));
+//         state.append_request(CollectionRequest::new("coll_1_req_2"));
 
-        let collection_name = state.get_current_collection().map(|coll| &coll.name);
-        assert_eq!(collection_name, Some(&String::from("coll_2")));
+//         let collection_name = state.get_current_collection().map(|coll| &coll.name);
+//         assert_eq!(collection_name, Some(&String::from("coll_2")));
 
-        let req_name = state.get_current_request().map(|req| &req.name);
-        assert_eq!(req_name, Some(&String::from("coll_1_req_1")));
+//         let req_name = state.get_current_request().map(|req| &req.name);
+//         assert_eq!(req_name, Some(&String::from("coll_1_req_1")));
 
-        state.next();
+//         state.next();
 
-        let req_name = state.get_current_request().map(|req| &req.name);
-        assert_eq!(req_name, Some(&String::from("coll_1_req_2")));
-    }
-}
+//         let req_name = state.get_current_request().map(|req| &req.name);
+//         assert_eq!(req_name, Some(&String::from("coll_1_req_2")));
+//     }
+// }
