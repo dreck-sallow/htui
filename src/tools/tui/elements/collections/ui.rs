@@ -1,12 +1,14 @@
 use ratatui::{
     layout::Rect,
-    style::{Style, Stylize},
-    text::Span,
     widgets::{Block, Borders},
     Frame,
 };
 
-use super::state::{CollectionItem, CollectionState};
+use crate::tools::tui::core::elements::nested_list::ui::{
+    NestedListItemUi, NestedListSubItemUi, NestedListUi,
+};
+
+use super::state::CollectionState;
 
 pub struct CollectionsUi {}
 
@@ -17,14 +19,28 @@ impl CollectionsUi {
     }
 
     pub fn render(frame: &mut Frame, area: Rect, state: &CollectionState) {
-        let tree_block = Block::default()
-            .title(" Collections ")
-            .borders(Borders::ALL);
+        let items: Vec<NestedListItemUi<'_>> = state
+            .list
+            .items
+            .iter()
+            .map(|itm| {
+                NestedListItemUi::new(itm.inner.name.clone()).sub_items(
+                    itm.sub_items
+                        .iter()
+                        .map(|sub_itm| NestedListSubItemUi::new(sub_itm.name.clone()))
+                        .collect(),
+                )
+            })
+            .collect();
 
-        frame.render_widget(tree_block, area);
-    }
+        let nested_list = NestedListUi::new(items)
+            .with_block(
+                Block::default()
+                    .title(" Collections ")
+                    .borders(Borders::ALL),
+            )
+            .with_cursor(state.list.get_cursor().clone());
 
-    pub fn render_collection(collection: &CollectionItem) -> Span {
-        return Span::default().style(Style::new().red().on_red());
+        frame.render_widget(nested_list, area);
     }
 }

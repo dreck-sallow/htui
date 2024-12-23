@@ -3,8 +3,8 @@ use crate::tools::tui::core::utils::{next_index, prev_index};
 use super::cursor::NestedCursor;
 
 pub struct NestedListItem<T, U> {
-    inner: T,
-    sub_items: Vec<U>,
+    pub inner: T,
+    pub sub_items: Vec<U>,
 }
 
 impl<I, S> NestedListItem<I, S> {
@@ -19,10 +19,14 @@ impl<I, S> NestedListItem<I, S> {
 #[derive(Default)]
 pub struct NestedListState<I, S> {
     cursor: NestedCursor,
-    items: Vec<NestedListItem<I, S>>,
+    pub items: Vec<NestedListItem<I, S>>,
 }
 
 impl<I, S> NestedListState<I, S> {
+    pub fn get_cursor(&self) -> &NestedCursor {
+        &self.cursor
+    }
+
     pub fn next(&mut self) {
         match self.cursor.inner() {
             (Some(item_idx), Some(sub_item_idx)) => {

@@ -1,7 +1,7 @@
 pub type Idx = Option<usize>;
 
 /// Datatype used for 1 nested level list
-#[derive(Default, Debug, PartialEq, PartialOrd)]
+#[derive(Default, Clone, Debug, PartialEq, PartialOrd)]
 pub struct NestedCursor(Idx, Idx);
 
 impl NestedCursor {

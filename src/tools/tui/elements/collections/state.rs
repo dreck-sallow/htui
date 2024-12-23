@@ -1,4 +1,4 @@
-use crate::{tools::tui::core::elements::nested_list::NestedListState, tui::core::elements};
+use crate::{tools::tui::core::elements::nested_list::state::NestedListState, tui::core::elements};
 
 #[derive(Default)]
 pub struct CollectionState {
@@ -7,7 +7,7 @@ pub struct CollectionState {
 
 #[derive(Default)]
 pub struct CollectionItem {
-    name: String,
+    pub name: String,
 }
 
 impl CollectionItem {
@@ -21,7 +21,7 @@ impl CollectionItem {
 
 #[derive(Default)]
 pub struct RequestItem {
-    name: String,
+    pub name: String,
 }
 
 impl RequestItem {
