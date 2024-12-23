@@ -26,7 +26,7 @@ impl Directory {
         if let Ok(path) = env::var("HTUI_CONFIG") {
             Ok(PathBuf::from(path))
         } else {
-            return match ProjectDirs::from(&self.qualifier, &self.org, &self.app_name) {
+            return match ProjectDirs::from(self.qualifier, self.org, self.app_name) {
                 Some(p) => Ok(p.config_local_dir().to_path_buf()),
                 None => Err(DirectoryError::NotFounPath),
             };
