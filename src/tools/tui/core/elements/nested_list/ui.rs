@@ -148,6 +148,8 @@ impl Widget for NestedListUi<'_> {
             return;
         }
 
+        // println!("height: {:?}", inner_area.height);
+
         let range_cursor = self.visible_list(inner_area.height as usize);
 
         let init_cursor = range_cursor.0.inner();
@@ -157,11 +159,6 @@ impl Widget for NestedListUi<'_> {
             if let ((Some(init_idx), init_sub_idx), (Some(end_idx), end_sub_idx)) =
                 (init_cursor, end_cursor)
             {
-                // 1. Tomo un slice de los items
-                // 2. comparo los  item indices
-                // 3. Si el incice es del item inicial
-                // 3.1 Verifico si el subindex es none -> renderizo solo el item, else -> tomo un slice de los hijos -> renderizo cada hijo
-
                 let mut current_height = 0;
                 for (i, item) in self
                     .items
@@ -170,27 +167,46 @@ impl Widget for NestedListUi<'_> {
                     .skip(init_idx)
                     .take((end_idx - init_idx).saturating_add(1))
                 {
+                    // println!(
+                    //     "init: {:?}, end: {:?}, index {}",
+                    //     init_cursor, end_cursor, i
+                    // );
                     if i == init_idx {
-                        match init_sub_idx {
-                            Some(sub_idx) => {
-                                for sub_item in item.sub_items.iter().skip(sub_idx) {
-                                    let area = Rect {
-                                        x: inner_area.top() + current_height,
-                                        ..inner_area
-                                    };
-                                    sub_item.content.clone().render(area, buf);
-                                    current_height += 1;
-                                }
-                            }
-                            None => {
-                                let area = Rect {
-                                    x: inner_area.top() + current_height,
-                                    ..inner_area
-                                };
-                                item.content.clone().render(area, buf);
-                                current_height += 1;
-                            }
+                        let area = Rect {
+                            y: inner_area.top() + current_height,
+                            ..inner_area
+                        };
+                        item.content.clone().render(area, buf);
+                        current_height += 1;
+
+                        for sub_item in item.sub_items.iter().skip(init_sub_idx.unwrap_or(0)) {
+                            let area = Rect {
+                                y: inner_area.top() + current_height,
+                                ..inner_area
+                            };
+                            sub_item.content.clone().render(area, buf);
+                            current_height += 1;
                         }
+                        // match init_sub_idx {
+                        //     Some(sub_idx) => {
+                        //         for sub_item in item.sub_items.iter().skip(sub_idx) {
+                        //             let area = Rect {
+                        //                 x: inner_area.top() + current_height,
+                        //                 ..inner_area
+                        //             };
+                        //             sub_item.content.clone().render(area, buf);
+                        //             current_height += 1;
+                        //         }
+                        //     }
+                        //     None => {
+                        //         let area = Rect {
+                        //             x: inner_area.top() + current_height,
+                        //             ..inner_area
+                        //         };
+                        //         item.content.clone().render(area, buf);
+                        //         current_height += 1;
+                        //     }
+                        // }
                     } else if i == end_idx {
                         match end_sub_idx {
                             Some(sub_idx) => {
@@ -198,7 +214,7 @@ impl Widget for NestedListUi<'_> {
                                     item.sub_items.iter().take(sub_idx.saturating_add(1))
                                 {
                                     let area = Rect {
-                                        x: inner_area.top() + current_height,
+                                        y: inner_area.top() + current_height,
                                         ..inner_area
                                     };
                                     sub_item.content.clone().render(area, buf);
@@ -207,12 +223,28 @@ impl Widget for NestedListUi<'_> {
                             }
                             None => {
                                 let area = Rect {
-                                    x: inner_area.top() + current_height,
+                                    y: inner_area.top() + current_height,
                                     ..inner_area
                                 };
                                 item.content.clone().render(area, buf);
                                 current_height += 1;
                             }
+                        }
+                    } else {
+                        let area = Rect {
+                            y: inner_area.top() + current_height,
+                            ..inner_area
+                        };
+                        item.content.clone().render(area, buf);
+                        current_height += 1;
+
+                        for sub_item in item.sub_items.iter() {
+                            let area = Rect {
+                                y: inner_area.top() + current_height,
+                                ..inner_area
+                            };
+                            sub_item.content.clone().render(area, buf);
+                            current_height += 1;
                         }
                     }
                 }

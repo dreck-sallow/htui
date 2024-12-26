@@ -1,25 +1,55 @@
 use std::io::Result;
 
-use crate::directory::Directory;
+use crate::directory;
 use crossterm::event::KeyCode;
 
 mod app;
 mod core;
 mod elements;
 mod state;
+mod store;
 mod tui_manager;
 
 use app::{App, AppState};
+use elements::collections::state::{CollectionItem, CollectionState, RequestItem};
+use store::{project::Project, Store};
 
-pub async fn run() -> Result<()> {
-    let directory = Directory::new("com", "dreck-tui", "htui");
+pub async fn run(project_name: Option<String>) -> Result<()> {
+    let directory = directory::DirectoryV2::from("com", "dreck-htui", "htui").unwrap();
 
-    let _config_file_path = directory.config_file_path().unwrap();
+    let store = Store::new(
+        directory.data_file_path().unwrap(),
+        directory.data_path().clone(),
+    );
+
+    let project = match project_name {
+        Some(name) if !name.is_empty() => store.get_project_by_name(&name).unwrap(),
+        _ => Project::default(),
+    };
 
     let mut tui = tui_manager::TuiManager::new(4.0, 30.0)?;
 
-    // let mut app_state = AppState::new(CollectionsState::default());
-    let tui_app = App::new(AppState::default());
+    let mut collection_state = CollectionState::default();
+
+    for collection in project.collections {
+        let requests: Vec<RequestItem> = collection
+            .requests
+            .iter()
+            .map(|req| RequestItem::new(req.name.clone()))
+            .collect();
+
+        println!(
+            " project {}, items length: {}",
+            collection.name,
+            requests.len()
+        );
+
+        collection_state.add_item(CollectionItem::new(collection.name.clone()), requests);
+    }
+
+    let app_state = AppState::default().with_collections(collection_state);
+
+    let tui_app = App::new(app_state);
 
     tui.enter()?;
 

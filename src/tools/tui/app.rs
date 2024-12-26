@@ -12,6 +12,13 @@ pub struct AppState {
     collections: CollectionState,
 }
 
+impl AppState {
+    pub fn with_collections(mut self, collections: CollectionState) -> Self {
+        self.collections = collections;
+        self
+    }
+}
+
 pub struct App {
     state: AppState,
 }

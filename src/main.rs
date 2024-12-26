@@ -16,7 +16,7 @@ async fn main() {
         let cli_params = cmd_cli_args.try_into().unwrap();
         cli::run(cli_params).await;
     } else {
-        tui::run().await.unwrap();
+        tui::run(cmd_cli_args.project).await.unwrap();
     }
 
     println!("main function");

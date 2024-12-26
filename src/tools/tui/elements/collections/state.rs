@@ -1,8 +1,19 @@
-use crate::{tools::tui::core::elements::nested_list::state::NestedListState, tui::core::elements};
+use crate::tools::tui::core::elements::nested_list::state::{NestedListItem, NestedListState};
 
 #[derive(Default)]
 pub struct CollectionState {
     pub list: NestedListState<CollectionItem, RequestItem>,
+}
+
+impl CollectionState {
+    pub fn add_item(&mut self, item: CollectionItem, sub_items: Vec<RequestItem>) {
+        let nested_item = NestedListItem {
+            inner: item,
+            sub_items,
+        };
+
+        self.list.items.push(nested_item);
+    }
 }
 
 #[derive(Default)]

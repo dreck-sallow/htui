@@ -4,8 +4,9 @@ use ratatui::{
     Frame,
 };
 
-use crate::tools::tui::core::elements::nested_list::ui::{
-    NestedListItemUi, NestedListSubItemUi, NestedListUi,
+use crate::tools::tui::core::elements::nested_list::{
+    cursor::NestedCursor,
+    ui::{NestedListItemUi, NestedListSubItemUi, NestedListUi},
 };
 
 use super::state::CollectionState;
@@ -13,17 +14,13 @@ use super::state::CollectionState;
 pub struct CollectionsUi {}
 
 impl CollectionsUi {
-    // TODO: get the theme config and sert the reference
-    pub fn new() -> Self {
-        Self {}
-    }
-
     pub fn render(frame: &mut Frame, area: Rect, state: &CollectionState) {
         let items: Vec<NestedListItemUi<'_>> = state
             .list
             .items
             .iter()
             .map(|itm| {
+                // println!("sub: {}", itm.sub_items.len());
                 NestedListItemUi::new(itm.inner.name.clone()).sub_items(
                     itm.sub_items
                         .iter()
@@ -36,10 +33,11 @@ impl CollectionsUi {
         let nested_list = NestedListUi::new(items)
             .with_block(
                 Block::default()
-                    .title(" Collections ")
+                    .title(" Collections  title ")
                     .borders(Borders::ALL),
             )
-            .with_cursor(state.list.get_cursor().clone());
+            // .with_cursor(state.list.get_cursor().clone());
+            .with_cursor(NestedCursor::from(0));
 
         frame.render_widget(nested_list, area);
     }

@@ -15,6 +15,9 @@ pub struct CmdArgs {
 
     #[arg(short = 'B', long)]
     pub body: Option<String>,
+
+    #[arg(short = 'p', long)]
+    pub project: Option<String>,
 }
 
 #[derive(Copy, Clone, ValueEnum)]
