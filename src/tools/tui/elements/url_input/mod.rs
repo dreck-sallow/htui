@@ -35,22 +35,9 @@ impl<'a> Element for UrlInput<'a> {
         &mut self,
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
-        state: &Self::State,
+        _state: &Self::State,
     ) {
-        let chunks = Layout::new(
-            ratatui::layout::Direction::Horizontal,
-            [Constraint::Length(10), Constraint::Fill(1)],
-        )
-        .split(area);
-
-        let method_block = Block::new().borders(Borders::ALL);
-
-        let span = Span::from(state.method().to_string());
-
-        frame.render_widget(span, method_block.inner(area));
-        frame.render_widget(method_block, chunks[0]);
-
-        frame.render_widget(&self.text_area, chunks[1]);
+        frame.render_widget(&self.text_area, area);
     }
 
     fn event(&mut self, state: &mut Self::State, key: &crossterm::event::KeyEvent) {
@@ -61,6 +48,7 @@ impl<'a> Element for UrlInput<'a> {
             } => state.set_url("".into()),
             input => {
                 self.text_area.input(input);
+                state.set_url(self.text_area.lines()[0].clone());
             }
         }
     }

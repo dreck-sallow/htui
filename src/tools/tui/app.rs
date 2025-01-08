@@ -11,7 +11,7 @@ use super::{
     elements::{
         collections::{CollectionState, Collections},
         method_selector::{MethodSelector, MethodSelectorState},
-        url_iput::{state::UrlInputState, UrlInput},
+        url_input::{state::UrlInputState, UrlInput},
     },
 };
 
@@ -67,19 +67,20 @@ impl<'a> App<'a> {
         )
         .split(right_chunks[0]);
 
-        // self.url_input
-        //     .render(frame, right_chunks[0], &self.state.url_input);
-
         self.method_selector
             .render(frame, top_right_chunks[0], &self.state.method_selector);
+
+        self.url_input
+            .render(frame, top_right_chunks[1], &self.state.url_input);
 
         Ok(())
     }
 
     pub fn handle(&mut self, event: &KeyEvent) {
         Collections::event(&mut self.state.collections, event);
-        // self.url_input.event(&mut self.state.url_input, event);
         self.method_selector
             .event(&mut self.state.method_selector, event);
+
+        self.url_input.event(&mut self.state.url_input, event);
     }
 }
