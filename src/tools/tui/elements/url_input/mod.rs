@@ -1,7 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Layout},
     style::Style,
-    text::Span,
     widgets::{Block, Borders},
 };
 use state::UrlInputState;
@@ -20,7 +18,7 @@ impl<'a> UrlInput<'a> {
         let mut textarea = TextArea::default();
         textarea.set_style(Style::default());
         textarea.insert_str("http://www.");
-        textarea.set_block(Block::new().borders(Borders::ALL));
+        textarea.set_block(Block::new().borders(Borders::ALL).title("Url"));
 
         Self {
             text_area: textarea,

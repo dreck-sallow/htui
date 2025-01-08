@@ -46,7 +46,7 @@ impl Element for MethodSelector {
         area: ratatui::prelude::Rect,
         state: &Self::State,
     ) {
-        let method_block = Block::new().borders(Borders::ALL);
+        let method_block = Block::new().borders(Borders::ALL).title("Method");
 
         let span = Span::from(state.method().to_string());
 
@@ -77,7 +77,7 @@ impl Element for MethodSelector {
                     .borders(Borders::ALL)
                     .title("Select the method type"),
             )
-            .highlight_symbol(">>")
+            .highlight_symbol("> ")
             .highlight_style(Style::default().yellow());
 
             frame.render_widget(Clear, popup_area);
