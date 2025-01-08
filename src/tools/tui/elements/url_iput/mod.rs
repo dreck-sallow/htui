@@ -32,7 +32,7 @@ impl<'a> Element for UrlInput<'a> {
     type State = UrlInputState;
 
     fn render(
-        &self,
+        &mut self,
         frame: &mut ratatui::Frame,
         area: ratatui::prelude::Rect,
         state: &Self::State,
