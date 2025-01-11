@@ -12,6 +12,7 @@ use ratatui::{
 
 pub use state::*;
 
+use crate::tools::tui::core::elements::nested_list::state_v2::NestedListItem as NestedListItemState;
 use crate::tools::tui::core::elements::nested_list::ui_v2::{NestedList, NestedListItem};
 
 pub struct Collections;
@@ -20,26 +21,31 @@ impl Collections {
     pub fn render(frame: &mut Frame, area: Rect, state: &CollectionState) {
         let items: Vec<NestedListItem> = state
             .list
-            .items_ref()
+            .items()
             .iter()
-            .flat_map(|item| {
-                let parent = NestedListItem::L1 {
-                    text: item.inner.name.clone().into(),
-                };
+            .flat_map(|item| match item {
+                NestedListItemState::Sigle(single) => {
+                    vec![NestedListItem::L1 {
+                        text: single.0.name.clone().into(),
+                    }]
+                }
+                NestedListItemState::Multiple(multiple) => {
+                    let mut list = vec![NestedListItem::L1 {
+                        text: multiple.inner().name.clone().into(),
+                    }];
 
-                let mut list = vec![parent];
+                    list.append(
+                        &mut multiple
+                            .sub_items()
+                            .iter()
+                            .map(|sub_item| NestedListItem::L2 {
+                                text: sub_item.0.name.clone().into(),
+                            })
+                            .collect(),
+                    );
 
-                list.append(
-                    &mut item
-                        .sub_items
-                        .iter()
-                        .map(|sub_item| NestedListItem::L2 {
-                            text: sub_item.name.clone().into(),
-                        })
-                        .collect(),
-                );
-
-                list
+                    list
+                }
             })
             .collect();
 

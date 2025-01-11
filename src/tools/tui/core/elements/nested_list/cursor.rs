@@ -38,6 +38,24 @@ impl NestedCursor {
         self.set_sub_idx(Some(count))
     }
 
+    pub fn reduce_idx(&mut self, n: IdxType) {
+        let new_idx = self
+            .idx()
+            .map(|i| (n <= i).then_some(i.saturating_sub(n)))
+            .flatten();
+
+        self.set_idx(new_idx);
+    }
+
+    pub fn reduce_sub_idx(&mut self, n: IdxType) {
+        let new_sub_idx = self
+            .sub_idx()
+            .map(|i| (n <= i).then_some(i.saturating_sub(n)))
+            .flatten();
+
+        self.set_sub_idx(new_sub_idx);
+    }
+
     pub fn set_idx(&mut self, idx: Idx) {
         match idx {
             Some(i) => {

@@ -1,25 +1,34 @@
 use crate::tools::tui::core::elements::nested_list::{
-    cursor::NestedCursor,
-    state::{NestedListItem, NestedListState},
+    // state::{NestedListItem, NestedListState},
+    item::{NestedListMultiple, NestedListSingle},
+    state_v2::{NestedListItem, NestedListStateV2},
+    NestedCursor,
 };
 
 #[derive(Default)]
 pub struct CollectionState {
-    pub list: NestedListState<CollectionItem, RequestItem>,
+    pub list: NestedListStateV2<RequestItem, CollectionItem>,
 }
 
 impl CollectionState {
     pub fn add_item(&mut self, item: CollectionItem, sub_items: Vec<RequestItem>) {
-        let nested_item = NestedListItem {
-            inner: item,
-            sub_items,
+        let children = {
+            let mut list = Vec::new();
+
+            for req in sub_items {
+                list.push(NestedListSingle(req));
+            }
+
+            list
         };
 
-        self.list.append_item(nested_item);
+        let multiple = NestedListMultiple::new(item).with_children(children);
+
+        self.list.insert(NestedListItem::Multiple(multiple));
     }
 
     pub fn cursor(&self) -> NestedCursor {
-        self.list.get_cursor().clone()
+        self.list.cursor()
     }
 }
 
