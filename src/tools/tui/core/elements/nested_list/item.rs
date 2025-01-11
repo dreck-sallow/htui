@@ -1,8 +1,23 @@
 pub struct NestedListSingle<T>(pub T);
 
+impl<T: Clone> Clone for NestedListSingle<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 pub struct NestedListMultiple<T, S> {
     inner: T,
     children: Vec<NestedListSingle<S>>,
+}
+
+impl<T: Clone, S: Clone> Clone for NestedListMultiple<T, S> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            children: self.children.clone(),
+        }
+    }
 }
 
 impl<T, S> NestedListMultiple<T, S> {
@@ -38,5 +53,13 @@ impl<T, S> NestedListMultiple<T, S> {
         if index <= (self.children.len().saturating_sub(1)) {
             self.children.remove(index);
         }
+    }
+
+    pub fn child(&self, idx: usize) -> &NestedListSingle<S> {
+        &self.children[idx]
+    }
+
+    pub fn add_child(&mut self, item: NestedListSingle<S>) {
+        self.children.push(item);
     }
 }

@@ -31,6 +31,10 @@ impl<S, M> NestedListStateV2<S, M> {
         &self.list
     }
 
+    pub fn items_mut(&mut self) -> &mut Vec<NestedListItem<S, M>> {
+        &mut self.list
+    }
+
     /// Get the current cursor copy
     pub fn cursor(&self) -> NestedCursor {
         self.cursor.clone()
@@ -46,6 +50,12 @@ impl<S, M> NestedListStateV2<S, M> {
 
         if self.cursor == NestedCursor::empty() {
             self.cursor.add_idx(0);
+        }
+    }
+
+    pub fn insert_on_multiple(&mut self, single: NestedListSingle<S>, idx: usize) {
+        if let Some(NestedListItem::Multiple(multiple)) = self.list.get_mut(idx) {
+            multiple.add_child(single);
         }
     }
 

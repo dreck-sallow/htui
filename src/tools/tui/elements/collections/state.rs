@@ -27,12 +27,28 @@ impl CollectionState {
         self.list.insert(NestedListItem::Multiple(multiple));
     }
 
+    pub fn clone_item(&mut self) {
+        if let Some(idx) = self.list.cursor().idx() {
+            match &self.list.items()[*idx] {
+                NestedListItem::Sigle(ref single) => {
+                    self.list.insert(NestedListItem::Sigle(single.clone()))
+                }
+                NestedListItem::Multiple(multiple) => match self.list.cursor().sub_idx() {
+                    Some(sub_idx) => self
+                        .list
+                        .insert_on_multiple(multiple.child(*sub_idx).clone(), *idx),
+                    None => self.list.insert(NestedListItem::Multiple(multiple.clone())),
+                },
+            }
+        }
+    }
+
     pub fn cursor(&self) -> NestedCursor {
         self.list.cursor()
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CollectionItem {
     pub name: String,
 }
@@ -46,7 +62,7 @@ impl CollectionItem {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RequestItem {
     pub name: String,
 }

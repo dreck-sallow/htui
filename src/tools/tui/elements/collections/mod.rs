@@ -73,6 +73,9 @@ impl Collections {
             crossterm::event::KeyCode::Char('d') => {
                 state.list.remove();
             }
+            crossterm::event::KeyCode::Char('c') => {
+                state.clone_item();
+            }
             _ => {}
         }
     }
