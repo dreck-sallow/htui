@@ -70,6 +70,9 @@ impl Collections {
             crossterm::event::KeyCode::Down => {
                 state.list.next();
             }
+            crossterm::event::KeyCode::Char('d') => {
+                state.list.remove();
+            }
             _ => {}
         }
     }

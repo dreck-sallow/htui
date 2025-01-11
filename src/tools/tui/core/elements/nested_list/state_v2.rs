@@ -56,7 +56,7 @@ impl<S, M> NestedListStateV2<S, M> {
                     NestedListItem::Sigle(_) => {
                         self.list.remove(*idx);
 
-                        if *idx > self.cursor.idx().unwrap() {
+                        if *idx >= self.cursor.idx().unwrap() {
                             self.cursor.reduce_idx(1);
                         }
                     }
@@ -64,7 +64,7 @@ impl<S, M> NestedListStateV2<S, M> {
                         None => {
                             self.list.remove(*idx);
 
-                            if *idx > self.cursor.idx().unwrap() {
+                            if *idx >= self.cursor.idx().unwrap() {
                                 self.cursor.reduce_idx(1);
                             }
                         }
