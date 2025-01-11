@@ -1,6 +1,6 @@
 use std::io::Result;
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame,
@@ -12,6 +12,7 @@ use super::{
         collections::{CollectionState, Collections},
         method_selector::{MethodSelector, MethodSelectorState},
         url_input::{state::UrlInputState, UrlInput},
+        ElementType,
     },
 };
 
@@ -31,6 +32,7 @@ impl AppState {
 
 pub struct App<'a> {
     state: AppState,
+    element_show: ElementType,
     url_input: UrlInput<'a>,
     method_selector: MethodSelector,
 }
@@ -42,6 +44,7 @@ impl<'a> App<'a> {
 
         Self {
             state,
+            element_show: ElementType::Collections,
             url_input,
             method_selector,
         }
@@ -77,10 +80,25 @@ impl<'a> App<'a> {
     }
 
     pub fn handle(&mut self, event: &KeyEvent) {
-        Collections::event(&mut self.state.collections, event);
-        self.method_selector
-            .event(&mut self.state.method_selector, event);
+        match event {
+            KeyEvent {
+                code: KeyCode::Tab,
+                kind: KeyEventKind::Press,
+                ..
+            } => self.element_show = self.element_show.next(),
+            KeyEvent {
+                code: KeyCode::BackTab,
+                kind: KeyEventKind::Press,
+                ..
+            } => self.element_show = self.element_show.prev(),
 
-        self.url_input.event(&mut self.state.url_input, event);
+            _ => match self.element_show {
+                ElementType::Collections => Collections::event(&mut self.state.collections, event),
+                ElementType::MethodSelector => self
+                    .method_selector
+                    .event(&mut self.state.method_selector, event),
+                ElementType::UrlInput => self.url_input.event(&mut self.state.url_input, event),
+            },
+        }
     }
 }
