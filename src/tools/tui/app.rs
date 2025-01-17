@@ -1,13 +1,13 @@
 use std::io::Result;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame,
 };
 
 use super::{
-    core::elements::Element,
+    element::Element,
     elements::{
         collections::{CollectionState, Collections},
         method_selector::{MethodSelector, MethodSelectorState},
@@ -35,6 +35,7 @@ pub struct App<'a> {
     element_show: ElementType,
     url_input: UrlInput<'a>,
     method_selector: MethodSelector,
+    collections: Collections,
 }
 
 impl<'a> App<'a> {
@@ -47,6 +48,7 @@ impl<'a> App<'a> {
             element_show: ElementType::Collections,
             url_input,
             method_selector,
+            collections: Collections::new(),
         }
     }
 
@@ -56,7 +58,8 @@ impl<'a> App<'a> {
             .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
             .split(frame.area());
 
-        Collections::render(frame, chunks[0], &self.state.collections);
+        self.collections
+            .render(frame, chunks[0], &self.state.collections);
 
         let right_chunks = Layout::new(
             Direction::Vertical,
@@ -92,13 +95,27 @@ impl<'a> App<'a> {
                 ..
             } => self.element_show = self.element_show.prev(),
 
-            _ => match self.element_show {
-                ElementType::Collections => Collections::event(&mut self.state.collections, event),
-                ElementType::MethodSelector => self
-                    .method_selector
-                    .event(&mut self.state.method_selector, event),
-                ElementType::UrlInput => self.url_input.event(&mut self.state.url_input, event),
-            },
+            _ => {
+                let effect_command = match self.element_show {
+                    ElementType::Collections => {
+                        self.collections.event(event, &mut self.state.collections)
+                    }
+                    ElementType::MethodSelector => self
+                        .method_selector
+                        .event(event, &mut self.state.method_selector),
+                    ElementType::UrlInput => self.url_input.event(event, &mut self.state.url_input),
+                };
+
+                match effect_command {
+                    super::element::EffectCommand::SetRequest { method, url } => {
+                        self.state
+                            .method_selector
+                            .set_method(method.as_str().into());
+                        self.state.url_input.set_url(url.clone());
+                    }
+                    super::element::EffectCommand::Nothing => {}
+                }
+            }
         }
     }
 }

@@ -5,7 +5,7 @@ use ratatui::{
 use state::UrlInputState;
 use tui_textarea::{Input, Key, TextArea};
 
-use crate::tools::tui::core::elements::Element;
+use crate::tools::tui::element::{EffectCommand, Element};
 
 pub mod state;
 
@@ -38,7 +38,11 @@ impl<'a> Element for UrlInput<'a> {
         frame.render_widget(&self.text_area, area);
     }
 
-    fn event(&mut self, state: &mut Self::State, key: &crossterm::event::KeyEvent) {
+    fn event(
+        &mut self,
+        key: &crossterm::event::KeyEvent,
+        state: &mut Self::State,
+    ) -> EffectCommand {
         let input_event: Input = (*key).into();
         match input_event {
             Input {
@@ -49,5 +53,7 @@ impl<'a> Element for UrlInput<'a> {
                 state.set_url(self.text_area.lines()[0].clone());
             }
         }
+
+        EffectCommand::Nothing
     }
 }

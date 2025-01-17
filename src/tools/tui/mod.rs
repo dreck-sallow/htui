@@ -5,6 +5,7 @@ use crossterm::event::KeyCode;
 
 mod app;
 mod core;
+mod element;
 mod elements;
 mod state;
 mod store;
@@ -35,7 +36,7 @@ pub async fn run(project_name: Option<String>) -> Result<()> {
         let requests: Vec<RequestItem> = collection
             .requests
             .iter()
-            .map(|req| RequestItem::new(req.name.clone()))
+            .map(|req| RequestItem::new(req.name.clone(), req.method.clone(), req.url.clone()))
             .collect();
 
         collection_state.add_item(CollectionItem::new(collection.name.clone()), requests);

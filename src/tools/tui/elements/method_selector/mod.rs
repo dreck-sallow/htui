@@ -1,4 +1,4 @@
-use crate::tools::tui::core::elements::Element;
+// use crate::tools::tui::core::elements::Element;
 mod state;
 
 use crossterm::event::KeyCode;
@@ -11,6 +11,8 @@ use ratatui::{
 
 pub use state::MethodSelectorState;
 use state::UrlMethod;
+
+use crate::tools::tui::element::{EffectCommand, Element};
 
 pub struct MethodSelector {
     show_popup: bool,
@@ -85,7 +87,11 @@ impl Element for MethodSelector {
         }
     }
 
-    fn event(&mut self, state: &mut Self::State, key: &crossterm::event::KeyEvent) {
+    fn event(
+        &mut self,
+        key: &crossterm::event::KeyEvent,
+        state: &mut Self::State,
+    ) -> EffectCommand {
         if let KeyCode::Enter = key.code {
             self.show_popup = !self.show_popup;
 
@@ -119,5 +125,7 @@ impl Element for MethodSelector {
                 _ => {}
             }
         }
+
+        EffectCommand::Nothing
     }
 }
