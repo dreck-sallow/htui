@@ -86,49 +86,37 @@ impl<S, M> NestedListStateV2<S, M> {
         self.remove_by_cursor(self.cursor.clone());
     }
 
-    pub fn next_v2<F>(&mut self, checker: F)
+    pub fn next_v2<F>(&mut self, count_itm: F)
     where
         F: Fn(&NestedListItem<S, M>) -> bool,
     {
         if let Some(idx) = self.cursor.idx() {
             let item = &self.list[*idx];
-            let is_skipped = !checker(item);
-
-            #[inline]
-            fn calc_idx<T>(vec: &Vec<T>, i: usize, is_skipped: bool) -> Option<usize> {
-                if is_skipped {
-                    next_index(vec, i).and_then(|next_idx| next_index(vec, next_idx))
-                } else {
-                    next_index(vec, i)
-                }
-            }
 
             match item {
                 NestedListItem::Single(_) => {
-                    if let Some(next_idx) = calc_idx(&self.list, *idx, is_skipped) {
-                        self.cursor.set_idx(Some(next_idx));
-                    }
+                    self.cursor
+                        .set_idx(Some(next_index(&self.list, *idx).unwrap_or(*idx)));
                 }
                 NestedListItem::Group { items, .. } => {
-                    if is_skipped {
-                        if let Some(next_idx) = calc_idx(&self.list, *idx, is_skipped) {
+                    let empty_children = items.is_empty();
+                    let is_last_child = self
+                        .cursor
+                        .sub_idx()
+                        .map_or(false, |sub_idx| sub_idx == items.len().saturating_sub(1));
+
+                    if empty_children | is_last_child | !count_itm(item) {
+                        if let Some(next_idx) = next_index(&self.list, *idx) {
                             self.cursor.set_idx(Some(next_idx));
                         }
                     } else {
-                        let sub_idx_opt = self
-                            .cursor
-                            .sub_idx()
-                            .and_then(|sub_idx| calc_idx(items, sub_idx, checker(&items[sub_idx])));
-
-                        match sub_idx_opt {
-                            Some(_) => todo!(),
-                            None => {
-                                if !items.is_empty() {
-                                    self.cursor.add_sub_idx(1);
-                                } else if let Some(next_idx) = next_index(&self.list, *idx) {
-                                    self.cursor.set_idx(Some(next_idx));
+                        match self.cursor.sub_idx() {
+                            Some(sub_idx) => {
+                                if let Some(next_sub_idx) = next_index(items, *sub_idx) {
+                                    self.cursor.set_sub_idx(Some(next_sub_idx));
                                 }
                             }
+                            None => self.cursor.set_sub_idx(Some(0)),
                         }
                     }
                 }
@@ -136,39 +124,47 @@ impl<S, M> NestedListStateV2<S, M> {
         }
     }
 
-    pub fn prev_v2<F>(&mut self, checker: F)
+    pub fn prev_v2<F>(&mut self, count_itm: F)
     where
         F: Fn(&NestedListItem<S, M>) -> bool,
     {
         if let Some(idx) = self.cursor.idx() {
             let item = &self.list[*idx];
-            let is_skipped = !checker(item);
 
-            #[inline]
-            fn calc_idx(i: usize, is_skipped: bool) -> Option<usize> {
-                if is_skipped {
-                    prev_index(i).and_then(prev_index)
-                } else {
-                    prev_index(i)
+            let prev_cursor = || -> NestedCursor {
+                if let Some(prev_idx) = prev_index(*idx) {
+                    let prev_itm = &self.list[prev_idx];
+                    let is_skipped = !count_itm(prev_itm);
+
+                    return match prev_itm {
+                        NestedListItem::Single(_) => NestedCursor::from(prev_idx),
+                        NestedListItem::Group { items, .. } => {
+                            if is_skipped | items.is_empty() {
+                                NestedCursor::from(prev_idx)
+                            } else {
+                                NestedCursor::from((prev_idx, items.len().saturating_sub(1)))
+                            }
+                        }
+                    };
                 }
-            }
+
+                self.cursor.clone()
+            };
 
             match item {
                 NestedListItem::Single(_) => {
-                    if let Some(prev_idx) = calc_idx(*idx, is_skipped) {
-                        self.cursor.set_idx(Some(prev_idx));
-                    }
+                    self.cursor = prev_cursor();
                 }
-                NestedListItem::Group { items, .. } => match self.cursor.sub_idx() {
+                NestedListItem::Group { .. } => match self.cursor.sub_idx() {
                     Some(sub_idx) => {
-                        if let Some(prev_idx) = calc_idx(*sub_idx, checker(&items[*sub_idx])) {
+                        if let Some(prev_idx) = prev_index(*sub_idx) {
                             self.cursor.set_sub_idx(Some(prev_idx));
+                        } else {
+                            self.cursor.set_idx(Some(*idx));
                         }
                     }
                     None => {
-                        if let Some(prev_idx) = calc_idx(*idx, is_skipped) {
-                            self.cursor.set_idx(Some(prev_idx));
-                        }
+                        self.cursor = prev_cursor();
                     }
                 },
             }
@@ -236,12 +232,10 @@ mod tests {
 
         state.insert(create_single("single 1"));
         next_count(&mut state, 1);
-        // state.next();
         assert_eq!(state.cursor, NestedCursor::from(0));
 
         state.insert(create_single("single 2"));
         next_count(&mut state, 1);
-        // state.next();
         assert_eq!(state.cursor, NestedCursor::from(1));
 
         // prev
@@ -250,8 +244,6 @@ mod tests {
 
         // next 2
         next_count(&mut state, 2);
-        // state.next();
-        // state.next();
 
         state.insert(create_multiple(
             "multiple 1",
@@ -259,44 +251,31 @@ mod tests {
         ));
 
         next_count(&mut state, 1);
-        // state.next();
         assert_eq!(state.cursor, NestedCursor::from(2));
 
         next_count(&mut state, 2);
-        // state.next();
-        // state.next();
         assert_eq!(state.cursor, NestedCursor::from((2, 1)));
 
         next_count(&mut state, 4);
-        // state.next();
-        // state.next();
-        // state.next();
-        // state.next();
         assert_eq!(state.cursor, NestedCursor::from((2, 2)));
 
         state.insert(create_single("single 3"));
         next_count(&mut state, 1);
-        // state.next();
         assert_eq!(state.cursor, NestedCursor::from(3));
 
         prev_count(&mut state, 1);
-        // state.prev();
         assert_eq!(state.cursor, NestedCursor::from((2, 2)));
 
         prev_count(&mut state, 1);
-        // state.prev();
         assert_eq!(state.cursor, NestedCursor::from((2, 1)));
 
         prev_count(&mut state, 1);
-        // state.prev();
         assert_eq!(state.cursor, NestedCursor::from((2, 0)));
 
         prev_count(&mut state, 1);
-        // state.prev();
         assert_eq!(state.cursor, NestedCursor::from(2));
 
         prev_count(&mut state, 1);
-        // state.prev();
         assert_eq!(state.cursor, NestedCursor::from(1));
     }
 }
