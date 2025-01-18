@@ -27,6 +27,22 @@ impl<S, M> NestedListStateV2<S, M> {
         self.cursor.inner()
     }
 
+    pub fn current_inner_mut(&mut self) -> Option<NestedListItemState<&mut S, &mut M>> {
+        self.cursor.idx().map(|idx| match &mut self.list[idx] {
+            NestedListItem::Single(single) => NestedListItemState::Single(single),
+            NestedListItem::Group { inner, items } => match self.cursor.sub_idx() {
+                Some(sub_idx) => {
+                    if let NestedListItem::Single(single) = &mut items[*sub_idx] {
+                        NestedListItemState::Single(single)
+                    } else {
+                        unreachable!()
+                    }
+                }
+                None => NestedListItemState::Group(inner),
+            },
+        })
+    }
+
     pub fn current_inner(&self) -> Option<NestedListItemState<&S, &M>> {
         self.cursor.idx().map(|idx| match &self.list[idx] {
             NestedListItem::Single(single) => NestedListItemState::Single(single),
@@ -42,7 +58,6 @@ impl<S, M> NestedListStateV2<S, M> {
             },
         })
     }
-
     pub fn insert(&mut self, item: NestedListItem<S, M>) {
         self.list.push(item);
 

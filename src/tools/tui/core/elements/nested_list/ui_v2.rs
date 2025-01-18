@@ -11,7 +11,7 @@ use super::cursor::NestedCursor;
 /// Type used for manage flatten ´NestedListItem´ with its sub items
 pub enum NestedListItem<'a> {
     /// Variant used for items level
-    L1 { text: Text<'a> },
+    L1 { text: Text<'a>, is_closed: bool },
 
     /// Variant used for nested level
     L2 { text: Text<'a> },

@@ -42,11 +42,13 @@ impl Element for Collections {
                 NestedLisItemType::Single(single) => {
                     vec![NestedListItem::L1 {
                         text: single.name.clone().into(),
+                        is_closed: false,
                     }]
                 }
                 NestedLisItemType::Group { inner, items } => {
                     let mut list = vec![NestedListItem::L1 {
                         text: inner.name.clone().into(),
+                        is_closed: inner.is_closed,
                     }];
 
                     list.append(
@@ -107,8 +109,12 @@ impl Element for Collections {
         state: &mut Self::State,
     ) -> crate::tools::tui::element::EffectCommand {
         match key.code {
-            crossterm::event::KeyCode::Left => {}
-            crossterm::event::KeyCode::Right => {}
+            crossterm::event::KeyCode::Left => {
+                state.close_group();
+            }
+            crossterm::event::KeyCode::Right => {
+                state.open_group();
+            }
             crossterm::event::KeyCode::Up => {
                 state.prev();
             }

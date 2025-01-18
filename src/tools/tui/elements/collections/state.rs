@@ -1,5 +1,5 @@
 use crate::tools::tui::core::elements::nested_list::{
-    item_v2::NestedListItem, state_v2::NestedListStateV2, NestedCursor,
+    item_v2::{NestedListItem, NestedListItemState}, state_v2::NestedListStateV2, NestedCursor,
 };
 
 #[derive(Default)]
@@ -9,12 +9,31 @@ pub struct CollectionState {
 
 impl CollectionState {
     pub fn next(&mut self) {
-        self.list.next_v2(|_| true);
+        self.list.next_v2(|itm| match itm {
+            NestedListItem::Single(_) => true,
+            NestedListItem::Group { inner, .. } => !inner.is_closed,
+        });
     }
 
     pub fn prev(&mut self) {
-        self.list.prev_v2(|_| true);
+        self.list.prev_v2(|itm| match itm {
+            NestedListItem::Single(_) => true,
+            NestedListItem::Group { inner, .. } => !inner.is_closed,
+        });
     }
+
+    pub fn close_group(&mut self) {
+        if let Some(NestedListItemState::Group(inner)) = self.list.current_inner_mut() {
+            inner.is_closed = true; 
+        }        
+    }
+
+    
+    pub fn open_group(&mut self) {
+        if let Some(NestedListItemState::Group(inner)) = self.list.current_inner_mut() {
+            inner.is_closed = false; 
+        }
+    }    
 
     pub fn add_item(&mut self, item: CollectionItem, sub_items: Vec<RequestItem>) {
         let children = {
@@ -54,6 +73,7 @@ impl CollectionState {
 #[derive(Default, Clone)]
 pub struct CollectionItem {
     pub name: String,
+    pub is_closed: bool
 }
 
 impl CollectionItem {
@@ -61,7 +81,7 @@ impl CollectionItem {
     where
         S: Into<String>,
     {
-        Self { name: name.into() }
+        Self { name: name.into(), is_closed: false }
     }
 }
 
