@@ -80,10 +80,24 @@ impl<'a> NestedList<'a> {
 
         // compute visible list
         let mut current_height = 0;
+        let mut item_parent: Option<&NestedListItem> = None;
         let mut init_cursor = NestedCursor::from(0);
         let mut end_cursor = NestedCursor::empty();
 
         for item in &self.items {
+            match item {
+                NestedListItem::L1 { is_closed, .. } => {
+                    item_parent = is_closed.then_some(item);
+                }
+                NestedListItem::L2 { .. } => {
+                    if let Some(NestedListItem::L1 { is_closed, .. }) = item_parent {
+                        if *is_closed {
+                            continue;
+                        }
+                    }
+                }
+            }
+
             if current_height + item.height() > height
                 && init_cursor <= self.cursor
                 && self.cursor <= end_cursor
@@ -112,7 +126,7 @@ impl<'a> NestedList<'a> {
     fn slice_in_range(
         &self,
         range: (NestedCursor, NestedCursor),
-    ) -> (&[NestedListItem<'a>], Option<usize>) {
+    ) -> (Vec<&NestedListItem<'a>>, Option<usize>) {
         let (start_cursor, end_cursor) = range;
 
         if start_cursor <= end_cursor {
@@ -140,13 +154,43 @@ impl<'a> NestedList<'a> {
                     break;
                 }
             }
-            return (
-                &self.items[start_index..(end_index).saturating_add(1)],
-                selected_index,
-            );
+
+            // Now we need to apply a closed group items
+            let mut list = Vec::new();
+            let mut parent_itm = None;
+            let mut count_closed_items = 0;
+
+            for (i, item) in self.items[start_index..(end_index).saturating_add(1)]
+                .iter()
+                .enumerate()
+            {
+                match item {
+                    NestedListItem::L1 { is_closed, .. } => {
+                        parent_itm = is_closed.then_some(item);
+                        list.push(item);
+                    }
+                    NestedListItem::L2 { .. } => {
+                        if let Some(NestedListItem::L1 { is_closed, .. }) = parent_itm {
+                            if *is_closed {
+                                count_closed_items += 1;
+                                continue;
+                            }
+                        }
+
+                        list.push(item);
+                    }
+                }
+
+                if let Some(index) = selected_index {
+                    if i == index {
+                        selected_index = Some(index.saturating_sub(count_closed_items));
+                    }
+                }
+            }
+            return (list, selected_index);
         }
 
-        (&[], None)
+        (Vec::new(), None)
     }
 }
 
