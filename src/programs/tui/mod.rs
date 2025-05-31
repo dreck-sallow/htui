@@ -1,0 +1,71 @@
+use std::io;
+
+use events::Events;
+use sources::TerminalSource;
+use views::dashboard::DashboardView;
+
+use crate::{
+    paths::Paths,
+    store::{models::ProjectModel, LocalStore, Store, StoreError, StoreResult},
+};
+
+mod events;
+mod sources;
+mod views;
+
+pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
+    let project = load_project(project_name).await.unwrap();
+
+    let mut terminal = ratatui::init();
+
+    let mut events = Events::new();
+    events.add_source(TerminalSource::default());
+
+    events.listen();
+
+    let mut dashboard_view = DashboardView::new();
+    dashboard_view.add_pane_from_project(project);
+
+    terminal.draw(|frame| {
+        dashboard_view.draw(frame);
+    })?;
+
+    loop {
+        if let Some(ev) = events.next_event().await {
+            match ev {
+                events::Event::Input(_key_event) => {
+                    terminal.draw(|frame| {
+                        dashboard_view.draw(frame);
+                    })?;
+                }
+                events::Event::KeyBinding(_key_event, _key_event1) => todo!(),
+                events::Event::Quit => break,
+            }
+        }
+    }
+
+    ratatui::restore();
+
+    Ok(())
+}
+
+async fn load_project(project_name: Option<String>) -> StoreResult<ProjectModel> {
+    let local_store = LocalStore::new(Paths::new("store"));
+
+    if let Some(name) = project_name {
+        let list = local_store.project_list().await?;
+        let found_itm = list.iter().find(|p| p.name == name);
+
+        if let Some(itm) = found_itm {
+            return match local_store.get_project(itm.id.clone()).await {
+                Ok(p) => Ok(p),
+                Err(StoreError::NotFound) => Ok(ProjectModel::new(name)),
+                Err(err) => Err(err),
+            };
+        }
+
+        return Ok(ProjectModel::new(name));
+    }
+
+    Ok(ProjectModel::default())
+}
