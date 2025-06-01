@@ -8,6 +8,7 @@ use ratatui::{
 
 use crate::store::models::ProjectModel;
 
+mod collections;
 mod pane;
 
 pub struct DashboardState {

@@ -29,6 +29,6 @@ async fn main() {
             println!("{} - {}", project.id, project.name);
         }
     } else {
-        tui::run_tui(cli.project).await;
+        tui::run_tui(cli.project).await.unwrap();
     }
 }
