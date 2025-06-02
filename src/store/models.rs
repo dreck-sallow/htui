@@ -13,7 +13,7 @@ pub fn time_as_id() -> String {
         .to_string()
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct ProjectModel {
     id: String,
     name: String,
@@ -53,7 +53,7 @@ impl Default for ProjectModel {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct CollectionsModel {
     id: String,
     name: String,
@@ -80,7 +80,7 @@ impl CollectionsModel {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RequestModel {
     id: String,
     name: String,

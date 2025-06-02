@@ -15,6 +15,7 @@ mod views;
 
 pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     let project = load_project(project_name).await.unwrap();
+    // println!("project: {:?}", project);
 
     let mut terminal = ratatui::init();
 
@@ -33,7 +34,8 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     loop {
         if let Some(ev) = events.next_event().await {
             match ev {
-                events::Event::Input(_key_event) => {
+                events::Event::Input(key_event) => {
+                    dashboard_view.handle_key(key_event);
                     terminal.draw(|frame| {
                         dashboard_view.draw(frame);
                     })?;

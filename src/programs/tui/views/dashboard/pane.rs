@@ -1,3 +1,4 @@
+use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     text::Span,
@@ -6,7 +7,7 @@ use ratatui::{
 
 use crate::store::models::ProjectModel;
 
-use super::collections::CollectionsView;
+use super::{collections::CollectionsView, upsert_item::UpsertItemView};
 
 pub struct PaneState {
     project: ProjectModel,
@@ -21,6 +22,7 @@ impl PaneState {
 pub struct PaneView {
     state: PaneState,
     collections_view: CollectionsView,
+    upsert_item_view: UpsertItemView,
 }
 
 impl PaneView {
@@ -34,6 +36,7 @@ impl PaneView {
         Self {
             state: PaneState::new(project),
             collections_view,
+            upsert_item_view: UpsertItemView::new(),
         }
     }
 
@@ -49,5 +52,11 @@ impl PaneView {
         self.collections_view
             .render(self.project(), frame, areas[0]);
         frame.render_widget(Span::from("Hello world!"), areas[1]);
+        self.upsert_item_view.draw(frame);
+    }
+
+    pub fn handle_key_event(&mut self, key: KeyEvent) {
+        self.collections_view.handle_key(key);
+        self.upsert_item_view.handle_key(key);
     }
 }

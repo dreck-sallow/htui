@@ -1,3 +1,4 @@
+use crossterm::event::KeyEvent;
 use pane::PaneView;
 use ratatui::{
     layout::{Constraint, Layout},
@@ -10,6 +11,7 @@ use crate::store::models::ProjectModel;
 
 mod collections;
 mod pane;
+mod upsert_item;
 
 pub struct DashboardState {
     panes: Vec<PaneView>,
@@ -64,6 +66,12 @@ impl DashboardView {
         // Draw the current selected pane
         if let Some(pane) = self.0.current_pane_mut() {
             pane.draw(frame, areas[1]);
+        }
+    }
+
+    pub fn handle_key(&mut self, key: KeyEvent) {
+        if let Some(pane) = self.0.current_pane_mut() {
+            pane.handle_key_event(key);
         }
     }
 }
