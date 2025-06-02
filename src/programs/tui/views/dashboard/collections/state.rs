@@ -125,8 +125,12 @@ impl<Identifier: PartialEq + Eq> CollectionsState<Identifier> {
                 .first()
                 .and_then(|(_, children)| (!children.is_empty()).then_some((0, 0))),
             Idx::Parent(i) => {
-                let (_coll, children) = &self.items[i];
-                (!children.is_empty()).then_some((i, 0))
+                if self.opened.contains(&i) {
+                    let (_coll, children) = &self.items[i];
+                    (!children.is_empty()).then_some((i, 0))
+                } else {
+                    None
+                }
             }
             Idx::Child(i, sub_i) => {
                 let (_coll, children) = &self.items[i];
@@ -156,7 +160,8 @@ impl<Identifier: PartialEq + Eq> CollectionsState<Identifier> {
     pub fn prev_collection(&mut self) {
         let idx = match self.idx {
             Idx::None => None,
-            Idx::Parent(i) | Idx::Child(i, _) => (i > 0).then_some(i - 1),
+            Idx::Parent(i) => (i > 0).then(|| i - 1),
+            Idx::Child(i, _) => Some(i),
         };
 
         if let Some(i) = idx {
@@ -167,14 +172,14 @@ impl<Identifier: PartialEq + Eq> CollectionsState<Identifier> {
     pub fn prev_request(&mut self) {
         let idx = match self.idx {
             Idx::None => None,
-            Idx::Parent(i) => {
-                if let Some((_, children)) = self.items.get(i - 1) {
-                    (!children.is_empty()).then_some((i, children.len() - 1))
-                } else {
-                    None
-                }
-            }
-            Idx::Child(i, sub_i) => (sub_i > 0).then_some((i, sub_i - 1)),
+            Idx::Parent(i) => i
+                .checked_sub(1)
+                .and_then(|prev_i| self.opened.contains(&prev_i).then_some(prev_i))
+                .and_then(|prev_i| Some((prev_i, &self.items[prev_i])))
+                .and_then(|(prev_i, (_, children))| {
+                    (!children.is_empty()).then_some((prev_i, children.len() - 1))
+                }),
+            Idx::Child(i, sub_i) => (sub_i > 0).then(|| (i, sub_i - 1)),
         };
 
         if let Some((i, sub_i)) = idx {
