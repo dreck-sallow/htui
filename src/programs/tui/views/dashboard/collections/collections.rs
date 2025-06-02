@@ -1,15 +1,15 @@
-// use tui_tree_widget::Tree;
-
 use std::collections::HashSet;
 
 use ratatui::{
     layout::Rect,
+    style::Style,
     text::Span,
     widgets::{Block, Widget},
 };
 
 use super::state::Idx;
 
+#[derive(Debug)]
 pub struct Item<'a> {
     label: Span<'a>,
     children: Vec<Item<'a>>,
@@ -28,12 +28,28 @@ impl<'a> Item<'a> {
     }
 }
 
-#[derive(Default)]
 pub struct Collections<'a, 'b> {
     items: Vec<Item<'a>>,
     block: Option<Block<'b>>,
+    highlight_style: Style,
+    open_symbol: &'static str,
+    close_symbol: &'static str,
     openeds: HashSet<usize>,
     idx: Idx,
+}
+
+impl<'a, 'b> Default for Collections<'a, 'b> {
+    fn default() -> Self {
+        Self {
+            items: Vec::new(),
+            block: None,
+            highlight_style: Style::default(),
+            open_symbol: "\u{25bc} ",
+            close_symbol: "\u{25b6} ",
+            openeds: HashSet::default(),
+            idx: Idx::None,
+        }
+    }
 }
 
 impl<'a, 'b> Collections<'a, 'b> {
@@ -57,6 +73,11 @@ impl<'a, 'b> Collections<'a, 'b> {
         self
     }
 
+    pub fn set_highlight_style(mut self, style: Style) -> Self {
+        self.highlight_style = style;
+        self
+    }
+
     fn get_page_items(
         &self,
         height: usize,
@@ -71,7 +92,7 @@ impl<'a, 'b> Collections<'a, 'b> {
         let mut count_height = 0;
 
         for (i, item) in self.items.iter().enumerate() {
-            end = Idx::Parent(0);
+            end = Idx::Parent(i);
 
             count_height += 1;
 
@@ -81,6 +102,7 @@ impl<'a, 'b> Collections<'a, 'b> {
                 } else {
                     start = end.clone();
                 }
+                count_height = 0;
             }
 
             // NOTE: Only walk over children when the parent is opened
@@ -130,30 +152,144 @@ impl<'a, 'b> Widget for Collections<'a, 'b> {
 
         let mut acc_area = Rect { height: 1, ..area };
 
+        fn is_selected(idx: Idx, cursor: (usize, Option<usize>)) -> bool {
+            match idx {
+                Idx::None => false,
+                Idx::Parent(i) => (cursor.0 == i) && cursor.1.is_none(),
+                Idx::Child(i, sub_i) => {
+                    (cursor.0 == i)
+                        && cursor
+                            .1
+                            .map(|cursor_sub_i| cursor_sub_i == sub_i)
+                            .unwrap_or_default()
+                }
+            }
+        }
+
+        let blank_symbol = "  ";
+
         if let Some((start, end)) = self.get_page_items(area.height as usize) {
-            (&self.items[start.0].label).render(acc_area, buf);
+            let symbol = if self.openeds.contains(&start.0) {
+                self.open_symbol
+            } else {
+                self.close_symbol
+            };
+            let (x, _) = buf.set_stringn(
+                acc_area.x,
+                acc_area.y,
+                symbol,
+                symbol.len(),
+                self.items[start.0].label.style,
+            );
+            let mut render_area = acc_area.clone();
+            render_area.x = x;
+
+            (&self.items[start.0].label).render(render_area, buf);
+            if is_selected(self.idx, start) {
+                buf.set_style(acc_area, self.highlight_style);
+            }
             acc_area.y += 1;
 
-            if let Some(sub_i) = start.1 {
-                for itm in self.items[start.0].children.get(sub_i..).unwrap() {
-                    (&itm.label).render(acc_area, buf);
+            if self.openeds.contains(&start.0) {
+                for (sub_i, itm) in self.items[start.0].children[start.1.unwrap_or(0)..]
+                    .iter()
+                    .enumerate()
+                {
+                    let (x, _) = buf.set_stringn(
+                        acc_area.x,
+                        acc_area.y,
+                        blank_symbol,
+                        blank_symbol.len(),
+                        itm.label.style,
+                    );
+                    let mut render_area = acc_area.clone();
+                    render_area.x = x;
+
+                    (&itm.label).render(render_area, buf);
+
+                    if is_selected(self.idx, (start.0, Some(sub_i))) {
+                        buf.set_style(acc_area, self.highlight_style);
+                    }
                     acc_area.y += 1;
                 }
             }
 
             for i in (start.0 + 1)..(end.0 + 1) {
-                (&self.items[i].label).render(acc_area, buf);
+                let symbol = if self.openeds.contains(&i) {
+                    self.open_symbol
+                } else {
+                    self.close_symbol
+                };
+
+                let (x, _) = buf.set_stringn(
+                    acc_area.x,
+                    acc_area.y,
+                    symbol,
+                    symbol.len(),
+                    self.items[i].label.style,
+                );
+                let mut render_area = acc_area.clone();
+                render_area.x = x;
+
+                (&self.items[i].label).render(render_area, buf);
+
+                if is_selected(self.idx, (i, None)) {
+                    buf.set_style(acc_area, self.highlight_style);
+                }
                 acc_area.y += 1;
 
                 if self.openeds.contains(&i) {
-                    let end_list = end.1.unwrap_or(self.items[i].children.len());
+                    let end_list = end.1.unwrap_or(self.items[i].children.len() - 1);
 
-                    for itm in &self.items[i].children[0..end_list] {
-                        (&itm.label).render(acc_area, buf);
+                    for (sub_i, itm) in self.items[i].children[0..(end_list + 1)].iter().enumerate()
+                    {
+                        let (x, _) = buf.set_stringn(
+                            acc_area.x,
+                            acc_area.y,
+                            blank_symbol,
+                            blank_symbol.len(),
+                            itm.label.style,
+                        );
+                        let mut render_area = acc_area.clone();
+                        render_area.x = x;
+
+                        (&itm.label).render(render_area, buf);
+                        if is_selected(self.idx, (i, Some(sub_i))) {
+                            buf.set_style(acc_area, self.highlight_style);
+                        }
                         acc_area.y += 1;
                     }
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_opened() {
+        let mut parent_a = Item::new("parent_a");
+        parent_a.add_child(Item::new("child a_a"));
+        parent_a.add_child(Item::new("child a_b"));
+        // parent_a.add_child(Item::new("child a_c"));
+
+        let mut parent_b = Item::new("parent_b");
+        parent_b.add_child(Item::new("child b_a"));
+        // parent_b.add_child(Item::new("child b_b"));
+        // parent_b.add_child(Item::new("child b_c"));
+        // parent_b.add_child(Item::new("child b_d"));
+
+        let collections = Collections::default()
+            .set_items(vec![parent_a, parent_b])
+            .set_openeds(HashSet::from([0, 1]))
+            .set_idx(Idx::Child(0, 0));
+
+        assert_eq!(
+            collections.get_page_items(49),
+            Some(((0, None), (1, Some(0))))
+        );
     }
 }

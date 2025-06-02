@@ -1,7 +1,7 @@
 use std::{collections::HashSet, ops::Not};
 
 /// Specific enum index type for only 1 level or nesting
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum Idx {
     #[default]
     None,
