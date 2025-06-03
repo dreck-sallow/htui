@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub enum UpsertMethod {
     CreateRequest,
     CreateCollection,
@@ -14,6 +15,10 @@ impl UpsertItemState {
         Self {
             method: UpsertMethod::CreateRequest,
         }
+    }
+
+    pub fn method(&self) -> UpsertMethod {
+        self.method.clone()
     }
 
     pub fn set_method(&mut self, method: UpsertMethod) {

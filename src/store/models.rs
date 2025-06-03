@@ -40,6 +40,24 @@ impl ProjectModel {
     pub fn collections(&self) -> &[CollectionsModel] {
         &self.collections
     }
+
+    pub fn add_collection(&mut self, collection: CollectionsModel) {
+        self.collections.push(collection);
+    }
+
+    pub fn add_request_by_i(&mut self, i: usize, request: RequestModel) {
+        if let Some(coll) = self.collections.get_mut(i) {
+            coll.requests.push(request);
+        }
+    }
+
+    pub fn collection_by_idx(&self, i: usize) -> Option<&CollectionsModel> {
+        self.collections.get(i)
+    }
+
+    pub fn request_by_idx(&self, (i, sub_i): (usize, usize)) -> Option<&RequestModel> {
+        self.collections.get(i).and_then(|c| c.requests.get(sub_i))
+    }
 }
 
 impl Default for ProjectModel {

@@ -9,8 +9,12 @@ use ratatui::{
 
 use crate::store::models::ProjectModel;
 
+mod action;
 mod collections;
+mod focus;
 mod pane;
+mod pane_state;
+mod request_builder;
 mod upsert_item;
 
 pub struct DashboardState {

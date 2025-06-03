@@ -236,10 +236,12 @@ impl<'a, 'b> Widget for Collections<'a, 'b> {
                 if is_selected(self.idx, (i, None)) {
                     buf.set_style(acc_area, self.highlight_style);
                 }
+
                 acc_area.y += 1;
 
-                if self.openeds.contains(&i) {
-                    let end_list = end.1.unwrap_or(self.items[i].children.len() - 1);
+                let current_len = self.items[i].children.len();
+                if self.openeds.contains(&i) && current_len > 0 {
+                    let end_list = end.1.unwrap_or(current_len - 1);
 
                     for (sub_i, itm) in self.items[i].children[0..(end_list + 1)].iter().enumerate()
                     {

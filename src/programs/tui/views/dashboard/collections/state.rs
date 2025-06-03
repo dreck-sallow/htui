@@ -107,6 +107,13 @@ impl<Identifier: PartialEq + Eq> CollectionsState<Identifier> {
         }
     }
 
+    pub fn add_request_on_current(&mut self, request: Identifier) {
+        match self.idx {
+            Idx::None => {}
+            Idx::Parent(i) | Idx::Child(i, _) => self.items[i].1.push(request),
+        }
+    }
+
     pub fn next_collection(&mut self) {
         let idx = match self.idx {
             Idx::None => self.items.is_empty().not().then_some(0),
@@ -177,7 +184,7 @@ impl<Identifier: PartialEq + Eq> CollectionsState<Identifier> {
                 .and_then(|prev_i| self.opened.contains(&prev_i).then_some(prev_i))
                 .and_then(|prev_i| Some((prev_i, &self.items[prev_i])))
                 .and_then(|(prev_i, (_, children))| {
-                    (!children.is_empty()).then_some((prev_i, children.len() - 1))
+                    (!children.is_empty()).then(|| (prev_i, children.len() - 1))
                 }),
             Idx::Child(i, sub_i) => (sub_i > 0).then(|| (i, sub_i - 1)),
         };
