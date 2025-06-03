@@ -53,12 +53,20 @@ impl PaneView {
             .spacing(1)
             .split(area);
 
-        self.collections_view
-            .render(self.project(), frame, areas[0]);
+        self.collections_view.render(
+            self.project(),
+            frame,
+            areas[0],
+            self.state
+                .is_element_focus(super::focus::ElementFocus::Collections),
+        );
 
-        self.request_builder_view.draw(frame, areas[1]);
-
-        // frame.render_widget(Span::from("Hello world!"), areas[1]);
+        self.request_builder_view.draw(
+            frame,
+            areas[1],
+            self.state
+                .is_element_focus(super::focus::ElementFocus::RequestBuilder),
+        );
 
         if let Some(overlay_focus) = self.state.overlay_focus() {
             match overlay_focus {
@@ -83,7 +91,9 @@ impl PaneView {
                     self.collections_view
                         .handle_key(key, &mut self.state, &mut acc_actions)
                 }
-                super::focus::ElementFocus::RequestBuilder => todo!(),
+                super::focus::ElementFocus::RequestBuilder => {
+                    self.request_builder_view.handle_key(key, &mut self.state)
+                }
                 super::focus::ElementFocus::ResponseViewer => todo!(),
             }
         }

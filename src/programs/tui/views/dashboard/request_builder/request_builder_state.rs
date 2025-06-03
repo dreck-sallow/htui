@@ -8,6 +8,14 @@ pub enum ViewTab {
     Body,
 }
 
+#[derive(PartialEq, Eq)]
+pub enum Focus {
+    Method,
+    UrlInput,
+    Tabs,
+    TabContent,
+}
+
 impl Display for ViewTab {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -20,6 +28,7 @@ impl Display for ViewTab {
 pub struct RequestBuilderState {
     pub method: &'static str,
     view_tab: ViewTab,
+    focus: Focus,
 }
 
 impl RequestBuilderState {
@@ -27,6 +36,7 @@ impl RequestBuilderState {
         Self {
             method: "GET",
             view_tab: ViewTab::Headers,
+            focus: Focus::Method,
         }
     }
 
@@ -46,5 +56,34 @@ impl RequestBuilderState {
 
     pub fn view_tab(&mut self) -> &ViewTab {
         &self.view_tab
+    }
+
+    pub fn view_tab_index(&self) -> u8 {
+        match self.view_tab {
+            ViewTab::Headers => 0,
+            ViewTab::Body => 1,
+        }
+    }
+
+    pub fn focus(&self) -> &Focus {
+        &self.focus
+    }
+
+    pub fn next_focus(&mut self) {
+        self.focus = match self.focus {
+            Focus::Method => Focus::UrlInput,
+            Focus::UrlInput => Focus::Tabs,
+            Focus::Tabs => Focus::TabContent,
+            Focus::TabContent => Focus::Method,
+        };
+    }
+
+    pub fn prev_focus(&mut self) {
+        self.focus = match self.focus {
+            Focus::Method => Focus::TabContent,
+            Focus::UrlInput => Focus::Method,
+            Focus::Tabs => Focus::UrlInput,
+            Focus::TabContent => Focus::Tabs,
+        };
     }
 }

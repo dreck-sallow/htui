@@ -45,7 +45,23 @@ impl PaneState {
         self.element_focus = element_focus;
     }
 
+    pub fn next_focus_element(&mut self) {
+        self.element_focus = match self.element_focus {
+            ElementFocus::Collections => ElementFocus::ResponseViewer,
+            ElementFocus::RequestBuilder => ElementFocus::Collections,
+            ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
+        };
+    }
+
+    pub fn prev_focus_element(&mut self) {
+        self.element_focus = match self.element_focus {
+            ElementFocus::Collections => ElementFocus::ResponseViewer,
+            ElementFocus::RequestBuilder => ElementFocus::Collections,
+            ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
+        };
+    }
+
     pub fn is_element_focus(&self, _element_focus: ElementFocus) -> bool {
-        matches!(&self.element_focus, _element_focus)
+        self.element_focus == _element_focus
     }
 }

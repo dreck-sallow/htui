@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout},
-    style::Style,
+    style::{Style, Stylize},
     widgets::Block,
     Frame,
 };
@@ -47,8 +47,11 @@ impl UpsertItemView {
     }
 
     fn set_method(&mut self, method: UpsertMethod, text: &str) {
-        self.input
-            .set_block(Block::bordered().title(method_to_title(&method)));
+        self.input.set_block(
+            Block::bordered()
+                .title(method_to_title(&method))
+                .border_style(Style::default().blue()),
+        );
         self.state.set_method(method);
         self.input.insert_str(text);
     }

@@ -45,7 +45,7 @@ impl CollectionsView {
     //         .add_request(collection.id().to_string(), request.id().to_string());
     // }
 
-    pub fn render(&self, project: &ProjectModel, frame: &mut Frame, area: Rect) {
+    pub fn render(&self, project: &ProjectModel, frame: &mut Frame, area: Rect, is_focus: bool) {
         let items: Vec<Item<'_>> = project
             .collections()
             .iter()
@@ -62,7 +62,13 @@ impl CollectionsView {
 
         let collections = Collections::default()
             .set_items(items)
-            .set_block(Block::bordered().title(" Collections "))
+            .set_block(
+                Block::bordered().title(" Collections ").border_style(
+                    is_focus
+                        .then_some(Style::default().blue())
+                        .unwrap_or_default(),
+                ),
+            )
             .set_openeds(self.state.openeds())
             .set_idx(self.state.idx())
             .set_highlight_style(Style::default().green());
@@ -78,6 +84,12 @@ impl CollectionsView {
     ) {
         if key.kind == KeyEventKind::Press {
             match key.code {
+                KeyCode::Tab => {
+                    state.focus_element(super::focus::ElementFocus::RequestBuilder);
+                }
+                KeyCode::BackTab => {
+                    state.focus_element(super::focus::ElementFocus::ResponseViewer);
+                }
                 KeyCode::Left | KeyCode::Char('h') => self.state.close_collection(true),
                 KeyCode::Right | KeyCode::Char('l') => self.state.open_collection(true),
                 KeyCode::Down | KeyCode::Char('j') => self.state.next(),
