@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     text::Span,
-    widgets::{Block, Borders, Tabs},
+    widgets::{Block, Borders, Padding, Tabs},
     Frame,
 };
 use request_builder_state::{Focus, RequestBuilderState, ViewTab};
@@ -16,6 +16,8 @@ mod request_builder_state;
 pub struct RequestBuilderView {
     state: RequestBuilderState,
     url_input: TextArea<'static>,
+    header_editor: TextArea<'static>,
+    body_editor: TextArea<'static>,
 }
 
 impl RequestBuilderView {
@@ -26,18 +28,26 @@ impl RequestBuilderView {
         url_input.set_placeholder_text("Enter a url");
         url_input.insert_str("https://");
 
+        let mut editor = TextArea::default();
+        editor.set_cursor_line_style(Style::default());
+
         Self {
             state: RequestBuilderState::new(),
             url_input,
+            header_editor: editor.clone(),
+            body_editor: editor,
         }
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect, is_focus: bool) {
-        let block = Block::bordered().title(" Request builder ").border_style(
-            is_focus
-                .then_some(Style::default().blue())
-                .unwrap_or_default(),
-        );
+        let block = Block::bordered()
+            .title(" Request builder ")
+            .border_style(
+                is_focus
+                    .then_some(Style::default().blue())
+                    .unwrap_or_default(),
+            )
+            .padding(Padding::symmetric(1, 0));
 
         let [method_area, input_area, tabs_area, pane_area] = {
             let [header_area, content_area] =
@@ -77,8 +87,10 @@ impl RequestBuilderView {
         .block(Block::new().borders(Borders::BOTTOM));
 
         frame.render_widget(tabs, tabs_area);
-
-        frame.render_widget(Span::from("Pane content"), pane_area);
+        match self.state.view_tab() {
+            ViewTab::Headers => frame.render_widget(&self.header_editor, pane_area),
+            ViewTab::Body => frame.render_widget(&self.body_editor, pane_area),
+        }
     }
 
     fn handle_key_for_method(&mut self, key: KeyEvent, state: &mut PaneState) {
@@ -136,7 +148,18 @@ impl RequestBuilderView {
             KeyCode::BackTab => {
                 self.state.prev_focus();
             }
-            _ => {}
+            _ => {
+                let input = Input::from(key);
+
+                match self.state.view_tab() {
+                    ViewTab::Headers => {
+                        self.header_editor.input(input);
+                    }
+                    ViewTab::Body => {
+                        self.body_editor.input(input);
+                    }
+                }
+            }
         }
     }
 
