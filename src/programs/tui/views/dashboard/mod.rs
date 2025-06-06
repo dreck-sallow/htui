@@ -11,6 +11,7 @@ use crate::store::models::ProjectModel;
 
 mod action;
 mod collections;
+mod editor;
 mod focus;
 mod pane;
 mod pane_state;
