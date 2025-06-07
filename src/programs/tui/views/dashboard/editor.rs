@@ -141,7 +141,13 @@ impl Widget for &TextEditor {
 
         self.textarea.render(editor_area, buf);
 
-        let mode = Span::from(self.mode.as_str());
+        let mode_style = match self.mode {
+            EditMode::Visual => Style::default().on_yellow().black(),
+            EditMode::Select => Style::default().on_blue().black(),
+            EditMode::Insert => Style::default().on_green().black(),
+        };
+
+        let mode = Span::from(self.mode.as_str()).style(mode_style);
         area.y = editor_area.bottom();
         area.height = 1;
 
