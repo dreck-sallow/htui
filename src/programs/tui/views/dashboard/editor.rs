@@ -20,29 +20,19 @@ impl EditMode {
             EditMode::Insert => " Insert ",
         }
     }
+
+    pub fn is_visual_mode(&self) -> bool {
+        matches!(self, EditMode::Visual)
+    }
+
+    pub fn is_select_mode(&self) -> bool {
+        matches!(self, EditMode::Select)
+    }
+
+    pub fn is_insert_mode(&self) -> bool {
+        matches!(self, EditMode::Insert)
+    }
 }
-
-// impl Styled for EditMode {
-//     type Item = Span<'static>;
-
-//     fn style(&self) -> Style {
-//         match self {
-//             EditMode::Visual => Style::default().green(),
-//             EditMode::Select => Style::default().yellow(),
-//             EditMode::Insert => Style::default().magenta(),
-//         }
-//     }
-
-//     fn set_style<S: Into<Style>>(self, style: S) -> Self::Item {
-//         let txt = match self {
-//             EditMode::Visual => " Visual ",
-//             EditMode::Select => " Select ",
-//             EditMode::Insert => " Insert ",
-//         };
-
-//         Span::styled(txt, style)
-//     }
-// }
 
 pub struct TextEditor {
     textarea: TextArea<'static>,
@@ -62,6 +52,7 @@ impl TextEditor {
     }
 
     pub fn set_mode(&mut self, mode: EditMode) {
+        // TODO: Set the cursor style
         self.mode = mode;
     }
 
@@ -80,9 +71,6 @@ impl TextEditor {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
-        // let input = Input::from(key);
-        // self.textarea.input(input);
-
         if let KeyEventKind::Press = key.kind {
             let new_mode = match key.code {
                 KeyCode::Esc => Some(EditMode::Visual),
@@ -105,9 +93,12 @@ impl TextEditor {
 
             match new_mode {
                 Some(mode) => self.set_mode(mode),
-                None => match key.code {
-                    key_code => match self.mode {
-                        EditMode::Visual => match key_code {
+                None => {
+                    if self.mode.is_insert_mode() {
+                        let input = Input::from(key);
+                        self.textarea.input(input);
+                    } else {
+                        match key.code {
                             KeyCode::Char('j') | KeyCode::Down => {
                                 self.textarea.move_cursor(CursorMove::Down)
                             }
@@ -120,29 +111,21 @@ impl TextEditor {
                             KeyCode::Char('h') | KeyCode::Left => {
                                 self.textarea.move_cursor(CursorMove::Back)
                             }
-                            _ => {}
-                        },
-                        EditMode::Select => match key_code {
-                            KeyCode::Char('j') | KeyCode::Down => {
-                                self.textarea.move_cursor(CursorMove::Down)
+                            KeyCode::Char('e') => {
+                                self.textarea.move_cursor(CursorMove::WordForward)
                             }
-                            KeyCode::Char('k') | KeyCode::Up => {
-                                self.textarea.move_cursor(CursorMove::Up)
+                            KeyCode::Char('b') => self.textarea.move_cursor(CursorMove::WordBack),
+                            KeyCode::Char('d') => {
+                                self.textarea.delete_char();
                             }
-                            KeyCode::Char('l') | KeyCode::Right => {
-                                self.textarea.move_cursor(CursorMove::Forward)
-                            }
-                            KeyCode::Char('h') | KeyCode::Left => {
-                                self.textarea.move_cursor(CursorMove::Back)
+                            KeyCode::Char('x') => {
+                                self.textarea.delete_line_by_end();
+                                self.textarea.delete_line_by_head();
                             }
                             _ => {}
-                        },
-                        EditMode::Insert => {
-                            let input = Input::from(key);
-                            self.textarea.input(input);
                         }
-                    },
-                },
+                    }
+                }
             }
         }
     }
