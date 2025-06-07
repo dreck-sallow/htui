@@ -155,7 +155,7 @@ impl CollectionsView {
                         state::Idx::Parent(i) => i,
                         state::Idx::Child(i, _) => i,
                     };
-                    let request = RequestModel::new(name, "GET".into());
+                    let request = RequestModel::new(name);
                     self.state.add_request_on_current(request.id().to_string());
                     state.project_mut().add_request_by_i(i, request);
                 }

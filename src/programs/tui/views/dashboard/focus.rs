@@ -8,4 +8,5 @@ pub enum ElementFocus {
 #[derive(PartialEq, Eq)]
 pub enum OverlayFocus {
     UpsertItem,
+    MethodSelector,
 }

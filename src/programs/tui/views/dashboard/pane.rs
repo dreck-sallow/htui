@@ -9,8 +9,8 @@ use ratatui::{
 use crate::store::models::ProjectModel;
 
 use super::{
-    action::Action, collections::CollectionsView, pane_state::PaneState,
-    request_builder::RequestBuilderView, upsert_item::UpsertItemView,
+    action::Action, collections::CollectionsView, method_selector::MethodSelectorView,
+    pane_state::PaneState, request_builder::RequestBuilderView, upsert_item::UpsertItemView,
 };
 
 pub struct PaneView {
@@ -18,6 +18,7 @@ pub struct PaneView {
     collections_view: CollectionsView,
     request_builder_view: RequestBuilderView,
     upsert_item_view: UpsertItemView,
+    method_selector_view: MethodSelectorView,
 }
 
 impl PaneView {
@@ -33,6 +34,7 @@ impl PaneView {
             collections_view,
             upsert_item_view: UpsertItemView::new(),
             request_builder_view: RequestBuilderView::new(),
+            method_selector_view: MethodSelectorView::new(),
         }
     }
 
@@ -45,6 +47,8 @@ impl PaneView {
             self.collections_view
                 .handle_action(action.clone(), &mut self.state);
             self.upsert_item_view.handle_action(action.clone());
+            self.request_builder_view.handle_action(action.clone());
+            self.method_selector_view.handle_action(action.clone());
         }
     }
 
@@ -71,6 +75,7 @@ impl PaneView {
         if let Some(overlay_focus) = self.state.overlay_focus() {
             match overlay_focus {
                 super::focus::OverlayFocus::UpsertItem => self.upsert_item_view.draw(frame),
+                super::focus::OverlayFocus::MethodSelector => self.method_selector_view.draw(frame),
             }
         }
     }
@@ -84,6 +89,10 @@ impl PaneView {
                     self.upsert_item_view
                         .handle_key(key, &mut self.state, &mut acc_actions)
                 }
+                super::focus::OverlayFocus::MethodSelector => {
+                    self.method_selector_view
+                        .handle_key(key, &mut self.state, &mut acc_actions);
+                }
             }
         } else {
             match self.state.element_focus() {
@@ -92,7 +101,8 @@ impl PaneView {
                         .handle_key(key, &mut self.state, &mut acc_actions)
                 }
                 super::focus::ElementFocus::RequestBuilder => {
-                    self.request_builder_view.handle_key(key, &mut self.state)
+                    self.request_builder_view
+                        .handle_key(key, &mut self.state, &mut acc_actions)
                 }
                 super::focus::ElementFocus::ResponseViewer => todo!(),
             }

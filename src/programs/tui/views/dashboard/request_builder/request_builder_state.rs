@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::store::models::HttpMethod;
+
 pub const METHODS: [&'static str; 5] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
 
 /// SUGGEST: Add some other tabs?
@@ -26,7 +28,7 @@ impl Display for ViewTab {
 }
 
 pub struct RequestBuilderState {
-    pub method: &'static str,
+    pub method: HttpMethod,
     view_tab: ViewTab,
     focus: Focus,
 }
@@ -34,7 +36,7 @@ pub struct RequestBuilderState {
 impl RequestBuilderState {
     pub fn new() -> Self {
         Self {
-            method: "GET",
+            method: HttpMethod::Get,
             view_tab: ViewTab::Headers,
             focus: Focus::Method,
         }

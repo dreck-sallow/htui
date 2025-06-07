@@ -9,15 +9,18 @@ use ratatui::{
 use request_builder_state::{Focus, RequestBuilderState, ViewTab};
 use tui_textarea::{Input, TextArea};
 
-use super::pane_state::PaneState;
+use crate::store::models::HttpMethod;
+
+use super::{action::Action, editor::TextEditor, pane_state::PaneState};
 
 mod request_builder_state;
 
 pub struct RequestBuilderView {
     state: RequestBuilderState,
     url_input: TextArea<'static>,
-    header_editor: TextArea<'static>,
+    header_editor: TextEditor,
     body_editor: TextArea<'static>,
+    __method_area: Option<(u16, u16)>,
 }
 
 impl RequestBuilderView {
@@ -34,8 +37,9 @@ impl RequestBuilderView {
         Self {
             state: RequestBuilderState::new(),
             url_input,
-            header_editor: editor.clone(),
+            header_editor: TextEditor::new(),
             body_editor: editor,
+            __method_area: None,
         }
     }
 
@@ -65,12 +69,19 @@ impl RequestBuilderView {
 
         frame.render_widget(block, area);
 
-        frame.render_widget(Span::from(self.state.method), method_area);
+        frame.render_widget(
+            Span::from(Into::<&str>::into(&self.state.method)).style(Style::new().blue()),
+            method_area,
+        );
+
+        // TODO: handle better this way of store the areas!
+        self.__method_area = Some((method_area.left(), method_area.bottom()));
 
         self.url_input.set_style(
             (self.state.focus() == &Focus::UrlInput)
                 .then_some(Style::default().magenta())
-                .unwrap_or_default(),
+                .unwrap_or_default()
+                .on_dark_gray(),
         );
         frame.render_widget(&self.url_input, input_area);
 
@@ -93,10 +104,19 @@ impl RequestBuilderView {
         }
     }
 
-    fn handle_key_for_method(&mut self, key: KeyEvent, state: &mut PaneState) {
+    fn handle_key_for_method(
+        &mut self,
+        key: KeyEvent,
+        state: &mut PaneState,
+        register_actions: &mut Vec<Action>,
+    ) {
         match key.code {
             KeyCode::Enter => {
                 // Execute request
+                if let Some(coord) = self.__method_area {
+                    state.focus_overlay(super::focus::OverlayFocus::MethodSelector);
+                    register_actions.push(Action::SelectMethod(coord, HttpMethod::Head));
+                }
             }
             KeyCode::Tab => {
                 self.state.next_focus();
@@ -153,7 +173,7 @@ impl RequestBuilderView {
 
                 match self.state.view_tab() {
                     ViewTab::Headers => {
-                        self.header_editor.input(input);
+                        self.header_editor.handle_key(key);
                     }
                     ViewTab::Body => {
                         self.body_editor.input(input);
@@ -163,11 +183,16 @@ impl RequestBuilderView {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
+    pub fn handle_key(
+        &mut self,
+        key: KeyEvent,
+        state: &mut PaneState,
+        register_actions: &mut Vec<Action>,
+    ) {
         if key.kind == KeyEventKind::Press {
             match self.state.focus() {
                 request_builder_state::Focus::Method => {
-                    self.handle_key_for_method(key, state);
+                    self.handle_key_for_method(key, state, register_actions);
                 }
                 request_builder_state::Focus::UrlInput => {
                     self.handle_key_for_url_iput(key);
@@ -179,6 +204,15 @@ impl RequestBuilderView {
                     self.handle_key_for_content(key);
                 }
             }
+        }
+    }
+
+    pub fn handle_action(&mut self, action: Action) {
+        match action {
+            Action::SelectedMethod(http_method) => {
+                self.state.method = http_method;
+            }
+            _ => {}
         }
     }
 }

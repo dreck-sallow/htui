@@ -3,7 +3,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Serialize};
 
 pub fn time_as_id() -> String {
     SystemTime::now()
@@ -103,16 +103,16 @@ pub struct RequestModel {
     id: String,
     name: String,
     headers: HashMap<String, String>,
-    method: String, // TODO: define a http method as method model
+    method: HttpMethod, // TODO: define a http method as method model
 }
 
 impl RequestModel {
-    pub fn new(name: String, method: String) -> Self {
+    pub fn new(name: String) -> Self {
         Self {
             id: time_as_id(),
             name,
             headers: HashMap::default(),
-            method,
+            method: HttpMethod::Get,
         }
     }
 
@@ -122,5 +122,94 @@ impl RequestModel {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+}
+
+// Define the http model type
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum HttpMethod {
+    Options,
+    Get,
+    Post,
+    Put,
+    Delete,
+    Head,
+    Patch,
+}
+
+impl Serialize for HttpMethod {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let txt: &str = self.into();
+        serializer.serialize_str(txt)
+    }
+}
+
+struct HttpMethodVisitor;
+
+impl<'de> Visitor<'de> for HttpMethodVisitor {
+    type Value = HttpMethod;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "An valid defined Http Method ")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        match HttpMethod::try_from(v) {
+            Ok(method) => Ok(method),
+            Err(_) => Err(serde::de::Error::invalid_value(
+                serde::de::Unexpected::Str(v),
+                &self,
+            )),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for HttpMethod {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(HttpMethodVisitor)
+    }
+}
+
+impl Into<&str> for &HttpMethod {
+    fn into(self) -> &'static str {
+        match self {
+            HttpMethod::Options => "OPTIONS",
+            HttpMethod::Get => "GET",
+            HttpMethod::Post => "POST",
+            HttpMethod::Put => "PUT",
+            HttpMethod::Delete => "DELETE",
+            HttpMethod::Head => "HEAD",
+            HttpMethod::Patch => "PATCH",
+        }
+    }
+}
+
+/// Structure only used for parse a str to httpMethod;
+pub struct ParseErrorHttpMethod;
+
+impl TryFrom<&str> for HttpMethod {
+    type Error = ParseErrorHttpMethod;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "OPTIONS" => Ok(Self::Options),
+            "GET" => Ok(Self::Get),
+            "POST" => Ok(Self::Post),
+            "PUT" => Ok(Self::Put),
+            "DELETE" => Ok(Self::Delete),
+            "HEAD" => Ok(Self::Head),
+            "PATCH" => Ok(Self::Patch),
+            _ => Err(ParseErrorHttpMethod),
+        }
     }
 }

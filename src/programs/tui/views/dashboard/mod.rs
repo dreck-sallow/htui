@@ -13,6 +13,7 @@ mod action;
 mod collections;
 mod editor;
 mod focus;
+mod method_selector;
 mod pane;
 mod pane_state;
 mod request_builder;
