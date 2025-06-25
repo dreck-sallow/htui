@@ -6,6 +6,7 @@ use super::{
     collections::{CollectionsState, Idx},
     focus::{ElementFocus, OverlayFocus},
     request_builder::request_builder_state::RequestBuilderState,
+    response_viewer::response_viewer_state::ResponseViewerState,
     upsert_item::{upsert_item_state::UpsertItemState, UpsertMethod},
 };
 
@@ -60,6 +61,7 @@ pub struct GlobalPaneState {
     focus_state: FocusState,
     collections_state: CollectionsState<String>,
     request_builder_state: RequestBuilderState,
+    response_viewer_state: ResponseViewerState,
     upsert_item_state: UpsertItemState,
 }
 
@@ -83,6 +85,7 @@ impl GlobalPaneState {
             collections_state,
             request_builder_state: RequestBuilderState::new(),
             upsert_item_state: UpsertItemState::new(),
+            response_viewer_state: ResponseViewerState::new(),
         }
     }
 
@@ -200,5 +203,21 @@ impl GlobalPaneState {
 
     pub fn upsert_method(&self) -> UpsertMethod {
         self.upsert_item_state.method()
+    }
+
+    pub fn builder_state_ref(&self) -> &RequestBuilderState {
+        &self.request_builder_state
+    }
+
+    pub fn builder_state_mut(&mut self) -> &mut RequestBuilderState {
+        &mut self.request_builder_state
+    }
+
+    pub fn response_state_ref(&self) -> &ResponseViewerState {
+        &self.response_viewer_state
+    }
+
+    pub fn response_state_mut(&mut self) -> &mut ResponseViewerState {
+        &mut self.response_viewer_state
     }
 }

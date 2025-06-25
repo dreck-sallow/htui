@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout},
     style::{Style, Stylize},
-    widgets::Block,
+    widgets::{Block, Clear},
     Frame,
 };
 use tui_textarea::{CursorMove, Input, TextArea};
@@ -76,6 +76,7 @@ impl UpsertItemView {
             area
         };
 
+        frame.render_widget(Clear, area);
         frame.render_widget(&self.input, area);
     }
 

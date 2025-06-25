@@ -6,17 +6,15 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Tabs},
     Frame,
 };
-use request_builder_state::{Focus, RequestBuilderState, ViewTab};
+use request_builder_state::{Focus, ViewTab};
 use tui_textarea::{Input, TextArea};
 
-use crate::store::models::HttpMethod;
-
-use super::{action::Action, editor::TextEditor, pane_state::PaneState};
+use super::{action::Action, editor::TextEditor, global_pane_state::GlobalPaneState};
 
 pub mod request_builder_state;
 
 pub struct RequestBuilderView {
-    state: RequestBuilderState,
+    // state: RequestBuilderState,
     url_input: TextArea<'static>,
     header_editor: TextEditor,
     body_editor: TextArea<'static>,
@@ -35,15 +33,16 @@ impl RequestBuilderView {
         editor.set_cursor_line_style(Style::default());
 
         Self {
-            state: RequestBuilderState::new(),
+            // state: RequestBuilderState::new(),
             url_input,
-            header_editor: TextEditor::new(),
+            header_editor: TextEditor::new(true),
             body_editor: editor,
             __method_area: None,
         }
     }
 
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect, is_focus: bool) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, state: &GlobalPaneState) {
+        let is_focus = state.is_focus(super::focus::ElementFocus::RequestBuilder);
         let block = Block::bordered()
             .title(" Request builder ")
             .border_style(
@@ -69,8 +68,10 @@ impl RequestBuilderView {
 
         frame.render_widget(block, area);
 
+        let builder_state = state.builder_state_ref();
+
         frame.render_widget(
-            Span::from(Into::<&str>::into(&self.state.method)).style(Style::new().blue()),
+            Span::from(Into::<&str>::into(&builder_state.method)).style(Style::new().blue()),
             method_area,
         );
 
@@ -78,7 +79,7 @@ impl RequestBuilderView {
         self.__method_area = Some((method_area.left(), method_area.bottom()));
 
         self.url_input.set_style(
-            (self.state.focus() == &Focus::UrlInput)
+            (builder_state.focus() == &Focus::UrlInput)
                 .then_some(Style::default().magenta())
                 .unwrap_or_default()
                 .on_dark_gray(),
@@ -89,55 +90,50 @@ impl RequestBuilderView {
             format!(" {} ", ViewTab::Headers.to_string()),
             format!(" {} ", ViewTab::Body.to_string()),
         ])
-        .select(self.state.view_tab_index() as usize)
+        .select(builder_state.view_tab_index() as usize)
         .highlight_style(
-            (self.state.focus() == &Focus::Tabs)
+            (builder_state.focus() == &Focus::Tabs)
                 .then_some(Style::default().on_light_magenta().black())
                 .unwrap_or(Style::default().on_dark_gray()),
         )
         .block(Block::new().borders(Borders::BOTTOM));
 
         frame.render_widget(tabs, tabs_area);
-        match self.state.view_tab() {
+        match builder_state.view_tab() {
             ViewTab::Headers => frame.render_widget(&self.header_editor, pane_area),
             ViewTab::Body => frame.render_widget(&self.body_editor, pane_area),
         }
     }
 
-    fn handle_key_for_method(
-        &mut self,
-        key: KeyEvent,
-        state: &mut PaneState,
-        register_actions: &mut Vec<Action>,
-    ) {
+    fn handle_key_for_method(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Enter => {
                 // Execute request
-                if let Some(coord) = self.__method_area {
-                    state.focus_overlay(super::focus::OverlayFocus::MethodSelector);
-                    register_actions.push(Action::SelectMethod(coord, HttpMethod::Head));
+                if let Some(_coord) = self.__method_area {
+                    state.set_overlay(super::focus::OverlayFocus::MethodSelector);
+                    // register_actions.push(Action::SelectMethod(coord, HttpMethod::Head));
                 }
             }
             KeyCode::Tab => {
-                self.state.next_focus();
+                state.builder_state_mut().next_focus();
             }
             KeyCode::BackTab => {
-                state.prev_focus_element();
+                state.set_focus(super::focus::ElementFocus::Collections);
             }
             _ => {}
         }
     }
 
-    fn handle_key_for_url_iput(&mut self, key: KeyEvent) {
+    fn handle_key_for_url_iput(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Enter => {
                 // Execute request
             }
             KeyCode::Tab => {
-                self.state.next_focus();
+                state.builder_state_mut().next_focus();
             }
             KeyCode::BackTab => {
-                self.state.prev_focus();
+                state.builder_state_mut().prev_focus();
             }
             _ => {
                 let input = Input::from(key);
@@ -146,32 +142,32 @@ impl RequestBuilderView {
         }
     }
 
-    fn handle_key_for_tabs(&mut self, key: KeyEvent) {
+    fn handle_key_for_tabs(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Tab => {
-                self.state.next_focus();
+                state.builder_state_mut().next_focus();
             }
             KeyCode::BackTab => {
-                self.state.prev_focus();
+                state.builder_state_mut().prev_focus();
             }
-            KeyCode::Left | KeyCode::Char('h') => self.state.prev_tab(),
-            KeyCode::Right | KeyCode::Char('l') => self.state.next_tab(),
+            KeyCode::Left | KeyCode::Char('h') => state.builder_state_mut().prev_tab(),
+            KeyCode::Right | KeyCode::Char('l') => state.builder_state_mut().next_tab(),
             _ => {}
         }
     }
 
-    fn handle_key_for_content(&mut self, key: KeyEvent) {
+    fn handle_key_for_content(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Tab => {
-                self.state.next_focus();
+                state.builder_state_mut().next_focus();
             }
             KeyCode::BackTab => {
-                self.state.prev_focus();
+                state.builder_state_mut().prev_focus();
             }
             _ => {
                 let input = Input::from(key);
 
-                match self.state.view_tab() {
+                match state.builder_state_ref().view_tab() {
                     ViewTab::Headers => {
                         self.header_editor.handle_key(key);
                     }
@@ -183,25 +179,20 @@ impl RequestBuilderView {
         }
     }
 
-    pub fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        state: &mut PaneState,
-        register_actions: &mut Vec<Action>,
-    ) {
+    pub fn handle_key(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         if key.kind == KeyEventKind::Press {
-            match self.state.focus() {
+            match state.builder_state_ref().focus() {
                 request_builder_state::Focus::Method => {
-                    self.handle_key_for_method(key, state, register_actions);
+                    self.handle_key_for_method(key, state);
                 }
                 request_builder_state::Focus::UrlInput => {
-                    self.handle_key_for_url_iput(key);
+                    self.handle_key_for_url_iput(key, state);
                 }
                 request_builder_state::Focus::Tabs => {
-                    self.handle_key_for_tabs(key);
+                    self.handle_key_for_tabs(key, state);
                 }
                 request_builder_state::Focus::TabContent => {
-                    self.handle_key_for_content(key);
+                    self.handle_key_for_content(key, state);
                 }
             }
         }
@@ -209,8 +200,8 @@ impl RequestBuilderView {
 
     pub fn handle_action(&mut self, action: Action) {
         match action {
-            Action::SelectedMethod(http_method) => {
-                self.state.method = http_method;
+            Action::SelectedMethod(_http_method) => {
+                // self.state.method = http_method;
             }
             _ => {}
         }

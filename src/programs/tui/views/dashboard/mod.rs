@@ -18,6 +18,7 @@ mod method_selector;
 mod pane;
 mod pane_state;
 mod request_builder;
+mod response_viewer;
 mod upsert_item;
 
 pub struct DashboardState {

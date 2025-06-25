@@ -2,8 +2,6 @@ use std::fmt::Display;
 
 use crate::store::models::HttpMethod;
 
-pub const METHODS: [&'static str; 5] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"];
-
 /// SUGGEST: Add some other tabs?
 pub enum ViewTab {
     Headers,
@@ -56,7 +54,7 @@ impl RequestBuilderState {
         };
     }
 
-    pub fn view_tab(&mut self) -> &ViewTab {
+    pub fn view_tab(&self) -> &ViewTab {
         &self.view_tab
     }
 
