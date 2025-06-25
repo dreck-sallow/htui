@@ -13,7 +13,7 @@ use crate::store::models::HttpMethod;
 
 use super::{action::Action, editor::TextEditor, pane_state::PaneState};
 
-mod request_builder_state;
+pub mod request_builder_state;
 
 pub struct RequestBuilderView {
     state: RequestBuilderState,

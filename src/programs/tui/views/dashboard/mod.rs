@@ -13,6 +13,7 @@ mod action;
 mod collections;
 mod editor;
 mod focus;
+mod global_pane_state;
 mod method_selector;
 mod pane;
 mod pane_state;
@@ -61,7 +62,7 @@ impl DashboardView {
             Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(frame.area());
 
         // Draw the top header tabs
-        let titles = self.0.panes.iter().map(|pane| pane.project().name());
+        let titles = self.0.panes.iter().map(|pane| pane.project_name());
         let tabs = Tabs::new(titles)
             .select(self.0.selected)
             .highlight_style(Style::default().blue().underlined())

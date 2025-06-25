@@ -1,0 +1,191 @@
+use std::collections::HashSet;
+
+use crate::store::models::{CollectionsModel, ProjectModel, RequestModel};
+
+use super::{
+    collections::{CollectionsState, Idx},
+    focus::{ElementFocus, OverlayFocus},
+    request_builder::request_builder_state::RequestBuilderState,
+    upsert_item::{upsert_item_state::UpsertItemState, UpsertMethod},
+};
+
+#[derive(Clone, Copy)]
+pub enum CollectionChange {
+    CloseCollection,
+    OpenCollection,
+    NextItem,
+    PrevItem,
+}
+
+pub struct FocusState {
+    element_focus: ElementFocus,
+    overlay_focus: Option<OverlayFocus>,
+}
+
+impl FocusState {
+    pub fn new(element_focus: ElementFocus) -> Self {
+        Self {
+            element_focus,
+            overlay_focus: None,
+        }
+    }
+
+    pub fn element_focus(&self) -> &ElementFocus {
+        &self.element_focus
+    }
+
+    pub fn overlay_focus(&self) -> Option<&OverlayFocus> {
+        self.overlay_focus.as_ref()
+    }
+
+    pub fn focus_overlay(&mut self, overlay_focus: OverlayFocus) {
+        self.overlay_focus = Some(overlay_focus);
+    }
+
+    pub fn hidden_overlay(&mut self) {
+        self.overlay_focus = None;
+    }
+
+    pub fn focus_element(&mut self, element_focus: ElementFocus) {
+        self.element_focus = element_focus;
+    }
+
+    pub fn is_element_focus(&self, element_focus: ElementFocus) -> bool {
+        self.element_focus == element_focus
+    }
+}
+
+pub struct GlobalPaneState {
+    project: ProjectModel,
+    focus_state: FocusState,
+    collections_state: CollectionsState<String>,
+    request_builder_state: RequestBuilderState,
+    upsert_item_state: UpsertItemState,
+}
+
+impl GlobalPaneState {
+    pub fn new(project: ProjectModel) -> Self {
+        let mut collections_state = CollectionsState::new();
+
+        for collection in project.collections() {
+            let children = collection
+                .requests()
+                .iter()
+                .map(|req| req.id().to_string())
+                .collect();
+
+            collections_state.add_collection((collection.id().to_string(), children));
+        }
+
+        Self {
+            project: project,
+            focus_state: FocusState::new(ElementFocus::Collections),
+            collections_state,
+            request_builder_state: RequestBuilderState::new(),
+            upsert_item_state: UpsertItemState::new(),
+        }
+    }
+
+    pub fn project_ref(&self) -> &ProjectModel {
+        &self.project
+    }
+
+    pub fn project_collections(&self) -> &[CollectionsModel] {
+        self.project.collections()
+    }
+
+    pub fn project_name(&self) -> &str {
+        self.project.name()
+    }
+
+    pub fn is_focus(&self, element_focus: ElementFocus) -> bool {
+        self.focus_state.is_element_focus(element_focus)
+    }
+
+    pub fn overlay(&self) -> Option<&OverlayFocus> {
+        self.focus_state.overlay_focus()
+    }
+
+    pub fn element_focus(&self) -> &ElementFocus {
+        self.focus_state.element_focus()
+    }
+
+    pub fn set_focus(&mut self, element_focus: ElementFocus) {
+        self.focus_state.focus_element(element_focus);
+    }
+
+    pub fn set_overlay(&mut self, overlay: OverlayFocus) {
+        self.focus_state.focus_overlay(overlay);
+    }
+
+    pub fn hidden_overlay(&mut self) {
+        self.focus_state.hidden_overlay();
+    }
+
+    pub fn collections_raw_data(&self) -> (HashSet<usize>, Idx) {
+        (
+            self.collections_state.openeds(),
+            self.collections_state.idx(),
+        )
+    }
+
+    pub fn collection_change(&mut self, change: CollectionChange) {
+        match change {
+            CollectionChange::CloseCollection => self.collections_state.close_collection(true),
+            CollectionChange::OpenCollection => self.collections_state.open_collection(true),
+            CollectionChange::NextItem => self.collections_state.next(),
+            CollectionChange::PrevItem => self.collections_state.prev(),
+        }
+    }
+
+    pub fn add_collection(&mut self, collection: CollectionsModel) {
+        let children = collection
+            .requests()
+            .iter()
+            .map(|req| req.id().to_string())
+            .collect();
+
+        self.collections_state
+            .add_collection((collection.id().to_string(), children));
+        self.project.add_collection(collection);
+    }
+
+    pub fn edit_item_name(&mut self, name: String) {
+        match self.collections_state.idx() {
+            Idx::None => {}
+            Idx::Parent(i) => {
+                if let Some(coll) = self.project.collection_by_idx_mut(i) {
+                    coll.set_name(name);
+                };
+            }
+            Idx::Child(i, sub_i) => {
+                if let Some(req) = self
+                    .project
+                    .collection_by_idx_mut(i)
+                    .and_then(|coll| coll.get_request_mut(sub_i))
+                {
+                    req.set_name(name);
+                };
+            }
+        }
+    }
+
+    pub fn add_collection_request(&mut self, request: RequestModel) {
+        match self.collections_state.idx() {
+            Idx::None => {}
+            Idx::Parent(i) | Idx::Child(i, _) => {
+                self.collections_state
+                    .add_request_on_current(request.id().to_string());
+                self.project.add_request_by_i(i, request);
+            }
+        }
+    }
+
+    pub fn set_upsert_form(&mut self, method: UpsertMethod) {
+        self.upsert_item_state.set_method(method);
+    }
+
+    pub fn upsert_method(&self) -> UpsertMethod {
+        self.upsert_item_state.method()
+    }
+}

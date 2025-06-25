@@ -1,9 +1,20 @@
 #[derive(Clone)]
 pub enum UpsertMethod {
-    CreateRequest,
-    CreateCollection,
-    EditRequest,
-    EditCollection,
+    CreateRequest(String),
+    CreateCollection(String),
+    EditRequest(String),
+    EditCollection(String),
+}
+
+impl UpsertMethod {
+    pub fn text(&self) -> &str {
+        match self {
+            UpsertMethod::CreateRequest(t) => t,
+            UpsertMethod::CreateCollection(t) => t,
+            UpsertMethod::EditRequest(t) => t,
+            UpsertMethod::EditCollection(t) => t,
+        }
+    }
 }
 
 pub struct UpsertItemState {
@@ -13,7 +24,7 @@ pub struct UpsertItemState {
 impl UpsertItemState {
     pub fn new() -> Self {
         Self {
-            method: UpsertMethod::CreateRequest,
+            method: UpsertMethod::CreateRequest(String::new()),
         }
     }
 
@@ -26,6 +37,6 @@ impl UpsertItemState {
     }
 
     pub fn reset(&mut self) {
-        self.method = UpsertMethod::CreateRequest
+        self.method = UpsertMethod::CreateRequest(String::new())
     }
 }

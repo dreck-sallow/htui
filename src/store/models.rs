@@ -37,6 +37,10 @@ impl ProjectModel {
         &self.name
     }
 
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
+
     pub fn collections(&self) -> &[CollectionsModel] {
         &self.collections
     }
@@ -53,6 +57,10 @@ impl ProjectModel {
 
     pub fn collection_by_idx(&self, i: usize) -> Option<&CollectionsModel> {
         self.collections.get(i)
+    }
+
+    pub fn collection_by_idx_mut(&mut self, i: usize) -> Option<&mut CollectionsModel> {
+        self.collections.get_mut(i)
     }
 
     pub fn request_by_idx(&self, (i, sub_i): (usize, usize)) -> Option<&RequestModel> {
@@ -90,11 +98,21 @@ impl CollectionsModel {
     pub fn id(&self) -> &str {
         &self.id
     }
+
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
+
     pub fn requests(&self) -> &[RequestModel] {
         &self.requests
+    }
+
+    pub fn get_request_mut(&mut self, i: usize) -> Option<&mut RequestModel> {
+        self.requests.get_mut(i)
     }
 }
 
@@ -122,6 +140,10 @@ impl RequestModel {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
     }
 }
 
