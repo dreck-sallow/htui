@@ -95,6 +95,19 @@ impl CollectionsView {
                 KeyCode::Up | KeyCode::Char('k') => {
                     state.collection_change(CollectionChange::PrevItem)
                 }
+                KeyCode::Char('d') | KeyCode::Delete => {
+                    let (_, idx) = state.collections_raw_data();
+
+                    match idx {
+                        state::Idx::None => {}
+                        state::Idx::Parent(i) => {
+                            state.delete_collection_item((i, None));
+                        }
+                        state::Idx::Child(i, sub_i) => {
+                            state.delete_collection_item((i, Some(sub_i)));
+                        }
+                    }
+                }
                 KeyCode::Char('c') => {
                     state.set_upsert_form(UpsertMethod::CreateCollection("".into()));
                     state.set_overlay(super::focus::OverlayFocus::UpsertItem);

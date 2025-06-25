@@ -181,6 +181,19 @@ impl GlobalPaneState {
         }
     }
 
+    pub fn delete_collection_item(&mut self, (i, sub_i_opt): (usize, Option<usize>)) {
+        match sub_i_opt {
+            Some(sub_i) => {
+                self.project.remove_request((i, sub_i));
+                self.collections_state.delete();
+            }
+            None => {
+                self.project.remove_collection(i);
+                self.collections_state.delete();
+            }
+        }
+    }
+
     pub fn set_upsert_form(&mut self, method: UpsertMethod) {
         self.upsert_item_state.set_method(method);
     }

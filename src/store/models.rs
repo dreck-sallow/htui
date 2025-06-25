@@ -55,6 +55,16 @@ impl ProjectModel {
         }
     }
 
+    pub fn remove_collection(&mut self, i: usize) {
+        self.collections.remove(i);
+    }
+
+    pub fn remove_request(&mut self, (i, sub_i): (usize, usize)) {
+        if let Some(coll) = self.collections.get_mut(i) {
+            coll.requests.remove(sub_i);
+        }
+    }
+
     pub fn collection_by_idx(&self, i: usize) -> Option<&CollectionsModel> {
         self.collections.get(i)
     }
