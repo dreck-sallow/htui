@@ -7,30 +7,30 @@ use ratatui::{
 use tui_textarea::{CursorMove, Input, TextArea};
 
 pub enum EditMode {
-    Visual,
-    Select,
-    Insert,
+    Write,
+    Read,
+    ReadOnly,
 }
 
 impl EditMode {
     pub fn as_str(&self) -> &'static str {
         match self {
-            EditMode::Visual => " Visual ",
-            EditMode::Select => " Select ",
-            EditMode::Insert => " Insert ",
+            EditMode::Write => " Write ",
+            EditMode::Read => " Read ",
+            EditMode::ReadOnly => " Read-only ",
         }
     }
 
-    pub fn is_visual_mode(&self) -> bool {
-        matches!(self, EditMode::Visual)
+    pub fn is_read_mode(&self) -> bool {
+        matches!(self, EditMode::Read)
     }
 
-    pub fn is_select_mode(&self) -> bool {
-        matches!(self, EditMode::Select)
+    pub fn is_write_mode(&self) -> bool {
+        matches!(self, EditMode::Write)
     }
 
-    pub fn is_insert_mode(&self) -> bool {
-        matches!(self, EditMode::Insert)
+    pub fn is_read_only_mode(&self) -> bool {
+        matches!(self, EditMode::ReadOnly)
     }
 }
 
@@ -40,14 +40,18 @@ pub struct TextEditor {
 }
 
 impl TextEditor {
-    pub fn new() -> Self {
+    pub fn new(editable: bool) -> Self {
         let mut textarea = TextArea::default();
         textarea.set_line_number_style(Style::default().on_dark_gray());
-        textarea.set_cursor_line_style(Style::default().on_dark_gray());
+        textarea.set_cursor_line_style(Style::default());
 
         Self {
             textarea,
-            mode: EditMode::Visual,
+            mode: if editable {
+                EditMode::Read
+            } else {
+                EditMode::ReadOnly
+            },
         }
     }
 
@@ -73,19 +77,18 @@ impl TextEditor {
     pub fn handle_key(&mut self, key: KeyEvent) {
         if let KeyEventKind::Press = key.kind {
             let new_mode = match key.code {
-                KeyCode::Esc => Some(EditMode::Visual),
-                KeyCode::Char('v') => {
-                    if let EditMode::Visual = self.mode {
-                        Some(EditMode::Select)
-                    } else {
+                KeyCode::Esc => {
+                    if self.mode.is_read_only_mode() {
                         None
+                    } else {
+                        Some(EditMode::Read)
                     }
                 }
                 KeyCode::Char('i') => {
-                    if let EditMode::Insert = self.mode {
+                    if self.mode.is_read_only_mode() {
                         None
                     } else {
-                        Some(EditMode::Insert)
+                        Some(EditMode::Write)
                     }
                 }
                 _ => None,
@@ -94,7 +97,7 @@ impl TextEditor {
             match new_mode {
                 Some(mode) => self.set_mode(mode),
                 None => {
-                    if self.mode.is_insert_mode() {
+                    if self.mode.is_write_mode() {
                         let input = Input::from(key);
                         self.textarea.input(input);
                     } else {
@@ -142,9 +145,9 @@ impl Widget for &TextEditor {
         self.textarea.render(editor_area, buf);
 
         let mode_style = match self.mode {
-            EditMode::Visual => Style::default().on_yellow().black(),
-            EditMode::Select => Style::default().on_blue().black(),
-            EditMode::Insert => Style::default().on_green().black(),
+            EditMode::Read => Style::default().on_yellow().black(),
+            EditMode::ReadOnly => Style::default().on_red().black(),
+            EditMode::Write => Style::default().on_blue().black(),
         };
 
         let mode = Span::from(self.mode.as_str()).style(mode_style);
