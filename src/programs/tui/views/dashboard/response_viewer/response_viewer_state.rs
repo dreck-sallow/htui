@@ -15,12 +15,14 @@ impl Into<&str> for ViewerTabs {
 
 pub struct ResponseViewerState {
     pub tab: ViewerTabs,
+    pub is_tab_focus: bool,
 }
 
 impl ResponseViewerState {
     pub fn new() -> Self {
         Self {
             tab: ViewerTabs::Headers,
+            is_tab_focus: true,
         }
     }
 

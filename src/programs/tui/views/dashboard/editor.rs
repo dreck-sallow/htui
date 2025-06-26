@@ -85,10 +85,10 @@ impl TextEditor {
                     }
                 }
                 KeyCode::Char('i') => {
-                    if self.mode.is_read_only_mode() {
-                        None
-                    } else {
+                    if self.mode.is_read_mode() {
                         Some(EditMode::Write)
+                    } else {
+                        None
                     }
                 }
                 _ => None,

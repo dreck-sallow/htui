@@ -87,7 +87,9 @@ impl PaneView {
                 super::focus::ElementFocus::RequestBuilder => self
                     .request_builder_view
                     .handle_key(key, &mut self.global_pane_state),
-                super::focus::ElementFocus::ResponseViewer => todo!(),
+                super::focus::ElementFocus::ResponseViewer => self
+                    .response_viewer_view
+                    .handle_key(key, &mut self.global_pane_state),
             }
 
             // TODO: when open a overlay, react to the previous changes

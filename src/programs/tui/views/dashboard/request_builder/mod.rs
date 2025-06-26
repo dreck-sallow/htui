@@ -9,12 +9,11 @@ use ratatui::{
 use request_builder_state::{Focus, ViewTab};
 use tui_textarea::{Input, TextArea};
 
-use super::{action::Action, editor::TextEditor, global_pane_state::GlobalPaneState};
+use super::{editor::TextEditor, global_pane_state::GlobalPaneState};
 
 pub mod request_builder_state;
 
 pub struct RequestBuilderView {
-    // state: RequestBuilderState,
     url_input: TextArea<'static>,
     header_editor: TextEditor,
     body_editor: TextArea<'static>,
@@ -33,7 +32,6 @@ impl RequestBuilderView {
         editor.set_cursor_line_style(Style::default());
 
         Self {
-            // state: RequestBuilderState::new(),
             url_input,
             header_editor: TextEditor::new(true),
             body_editor: editor,
@@ -145,7 +143,7 @@ impl RequestBuilderView {
     fn handle_key_for_tabs(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Tab => {
-                state.builder_state_mut().next_focus();
+                state.set_focus(super::focus::ElementFocus::ResponseViewer);
             }
             KeyCode::BackTab => {
                 state.builder_state_mut().prev_focus();
@@ -198,12 +196,12 @@ impl RequestBuilderView {
         }
     }
 
-    pub fn handle_action(&mut self, action: Action) {
-        match action {
-            Action::SelectedMethod(_http_method) => {
-                // self.state.method = http_method;
-            }
-            _ => {}
-        }
-    }
+    // pub fn handle_action(&mut self, action: Action) {
+    //     match action {
+    //         Action::SelectedMethod(_http_method) => {
+    //             // self.state.method = http_method;
+    //         }
+    //         _ => {}
+    //     }
+    // }
 }
