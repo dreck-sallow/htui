@@ -1,17 +1,19 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     widgets::{Block, Clear},
     Frame,
 };
 use tui_textarea::{CursorMove, Input, TextArea};
-use upsert_item_state::UpsertItemState;
 pub use upsert_item_state::UpsertMethod;
 
-use crate::store::models::{CollectionsModel, RequestModel};
+use crate::{
+    programs::tui::element_view::ElementView,
+    store::models::{CollectionsModel, RequestModel},
+};
 
-use super::{action::Action, global_pane_state::GlobalPaneState, pane_state::PaneState};
+use super::global_pane_state::GlobalPaneState;
 
 pub mod upsert_item_state;
 
@@ -25,7 +27,7 @@ fn method_to_title(method: &UpsertMethod) -> &'static str {
 }
 
 pub struct UpsertItemView {
-    // state: UpsertItemState,
+    render_area: Rect,
     input: TextArea<'static>,
 }
 
@@ -37,7 +39,7 @@ impl UpsertItemView {
         input.set_cursor_line_style(Style::default());
 
         Self {
-            // state: UpsertItemState::new(),
+            render_area: Rect::default(),
             input,
         }
     }
@@ -62,12 +64,21 @@ impl UpsertItemView {
         let method = state.upsert_method();
         self.set_method(method);
     }
+}
 
-    pub fn draw(&self, frame: &mut Frame) {
-        let area = {
+impl ElementView for UpsertItemView {
+    type State = GlobalPaneState;
+
+    fn draw(&self, frame: &mut Frame, _state: &Self::State) {
+        frame.render_widget(Clear, self.render_area);
+        frame.render_widget(&self.input, self.render_area);
+    }
+
+    fn set_area(&mut self, area: ratatui::prelude::Rect) {
+        let _area = {
             let [area] = Layout::vertical([Constraint::Length(3)])
                 .flex(ratatui::layout::Flex::Center)
-                .areas(frame.area());
+                .areas(area);
 
             let [area] = Layout::horizontal([Constraint::Percentage(40)])
                 .flex(ratatui::layout::Flex::Center)
@@ -75,12 +86,10 @@ impl UpsertItemView {
 
             area
         };
-
-        frame.render_widget(Clear, area);
-        frame.render_widget(&self.input, area);
+        self.render_area = _area;
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
+    fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Enter => {
@@ -113,12 +122,5 @@ impl UpsertItemView {
         }
     }
 
-    pub fn handle_action(&mut self, action: Action) {
-        // match action {
-        //     Action::UpsertItem(upsert_method, title) => {
-        //         self.set_method(upsert_method, &title);
-        //     }
-        //     _ => {}
-        // }
-    }
+    fn on_change_state(&mut self, _state: &Self::State) {}
 }

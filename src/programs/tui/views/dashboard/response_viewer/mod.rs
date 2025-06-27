@@ -6,24 +6,31 @@ use ratatui::{
     Frame,
 };
 use response_viewer_state::ViewerTabs;
-use tui_textarea::Input;
+
+use crate::programs::tui::element_view::ElementView;
 
 use super::{editor::TextEditor, global_pane_state::GlobalPaneState};
 
 pub mod response_viewer_state;
 
 pub struct ResponseViewerView {
+    render_area: Rect,
     headers_editor: TextEditor,
 }
 
 impl ResponseViewerView {
     pub fn new() -> Self {
         Self {
+            render_area: Rect::default(),
             headers_editor: TextEditor::new(false),
         }
     }
+}
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, state: &GlobalPaneState) {
+impl ElementView for ResponseViewerView {
+    type State = GlobalPaneState;
+
+    fn draw(&self, frame: &mut Frame, state: &Self::State) {
         let response_state = state.response_state_ref();
         let is_focus = state.is_focus(super::focus::ElementFocus::ResponseViewer);
 
@@ -37,9 +44,10 @@ impl ResponseViewerView {
             .padding(Padding::symmetric(1, 0));
 
         let [tabs_area, content_area] =
-            Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(block.inner(area));
+            Layout::vertical([Constraint::Length(2), Constraint::Fill(1)])
+                .areas(block.inner(self.render_area));
 
-        frame.render_widget(block, area);
+        frame.render_widget(block, self.render_area);
 
         let tabs = Tabs::new([
             format!(" {} ", Into::<&str>::into(ViewerTabs::Headers)),
@@ -63,7 +71,11 @@ impl ResponseViewerView {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
+    fn set_area(&mut self, area: Rect) {
+        self.render_area = area;
+    }
+
+    fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
         if key.kind == KeyEventKind::Press {
             let is_tab_focus = state.response_state_ref().is_tab_focus;
 
@@ -112,4 +124,6 @@ impl ResponseViewerView {
             }
         }
     }
+
+    fn on_change_state(&mut self, _state: &Self::State) {}
 }

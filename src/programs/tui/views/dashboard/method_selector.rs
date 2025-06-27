@@ -78,7 +78,7 @@ impl MethodSelectorView {
         self.state.select(method);
     }
 
-    pub fn draw(&mut self, frame: &mut Frame) {
+    pub fn draw(&self, frame: &mut Frame) {
         if let Some((x, y)) = self.coord {
             let area = Rect {
                 x: x,
@@ -92,7 +92,7 @@ impl MethodSelectorView {
 
             frame.render_widget(Clear, area);
 
-            frame.render_stateful_widget(list, area, self.state.mut_state());
+            // frame.render_stateful_widget(list, area, self.state.mut_state());
         }
     }
 

@@ -148,9 +148,5 @@ impl ElementView for CollectionsView {
         }
     }
 
-    fn on_resize(&mut self, area: Rect, _state: &mut Self::State) {
-        self.set_area(area);
-    }
-
     fn on_change_state(&mut self, _state: &Self::State) {}
 }

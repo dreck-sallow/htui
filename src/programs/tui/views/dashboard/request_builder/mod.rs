@@ -173,7 +173,7 @@ impl RequestBuilderView {
     fn handle_key_for_tabs(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Tab => {
-                state.set_focus(super::focus::ElementFocus::ResponseViewer);
+                state.builder_state_mut().next_focus();
             }
             KeyCode::BackTab => {
                 state.builder_state_mut().prev_focus();
@@ -187,7 +187,7 @@ impl RequestBuilderView {
     fn handle_key_for_content(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Tab => {
-                state.builder_state_mut().next_focus();
+                state.set_focus(super::focus::ElementFocus::ResponseViewer);
             }
             KeyCode::BackTab => {
                 state.builder_state_mut().prev_focus();
@@ -206,34 +206,6 @@ impl RequestBuilderView {
             }
         }
     }
-
-    // pub fn handle_key(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
-    //     if key.kind == KeyEventKind::Press {
-    //         match state.builder_state_ref().focus() {
-    //             request_builder_state::Focus::Method => {
-    //                 self.handle_key_for_method(key, state);
-    //             }
-    //             request_builder_state::Focus::UrlInput => {
-    //                 self.handle_key_for_url_iput(key, state);
-    //             }
-    //             request_builder_state::Focus::Tabs => {
-    //                 self.handle_key_for_tabs(key, state);
-    //             }
-    //             request_builder_state::Focus::TabContent => {
-    //                 self.handle_key_for_content(key, state);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // pub fn handle_action(&mut self, action: Action) {
-    //     match action {
-    //         Action::SelectedMethod(_http_method) => {
-    //             // self.state.method = http_method;
-    //         }
-    //         _ => {}
-    //     }
-    // }
 }
 
 impl ElementView for RequestBuilderView {
@@ -259,15 +231,6 @@ impl ElementView for RequestBuilderView {
             self.children_areas.method_area,
         );
 
-        // TODO: handle better this way of store the areas!
-        // self.__method_area = Some((method_area.left(), method_area.bottom()));
-
-        // self.url_input.set_style(
-        //     (builder_state.focus() == &Focus::UrlInput)
-        //         .then_some(Style::default().magenta())
-        //         .unwrap_or_default()
-        //         .on_dark_gray(),
-        // );
         frame.render_widget(&self.url_input, self.children_areas.input_area);
 
         let tabs = Tabs::new([
@@ -291,7 +254,10 @@ impl ElementView for RequestBuilderView {
         }
     }
 
-    fn set_area(&mut self, _area: Rect) {}
+    fn set_area(&mut self, area: Rect) {
+        self.children_areas.calculate(area.inner(Margin::new(1, 1)));
+        self.render_area = area;
+    }
 
     fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
         if key.kind == KeyEventKind::Press {
@@ -310,11 +276,6 @@ impl ElementView for RequestBuilderView {
                 }
             }
         }
-    }
-
-    fn on_resize(&mut self, area: Rect, _state: &mut Self::State) {
-        self.children_areas.calculate(area.inner(Margin::new(1, 1)));
-        self.render_area = area;
     }
 
     fn on_change_state(&mut self, _state: &Self::State) {}

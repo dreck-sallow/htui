@@ -67,7 +67,7 @@ impl DashboardView {
 
         // for pane in self.t
         for pane in &mut self.state.panes {
-            pane.on_resize(pane_area, &mut ()); // QUEST: call om_resize?
+            pane.set_area(pane_area);
         }
     }
 
@@ -76,9 +76,6 @@ impl DashboardView {
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
-        // let areas =
-        //     Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(frame.area());
-
         // Draw the top header tabs
         let titles = self.state.panes.iter().map(|pane| pane.project_name());
         let tabs = Tabs::new(titles)

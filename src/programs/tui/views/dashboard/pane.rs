@@ -118,25 +118,45 @@ impl ElementView for PaneView {
         self.request_builder_view
             .draw(frame, &self.global_pane_state);
 
-        // self.response_viewer_view
-        //     .draw(frame, response_area, &self.global_pane_state);
+        self.response_viewer_view
+            .draw(frame, &self.global_pane_state);
 
-        // if let Some(overlay_focus) = self.global_pane_state.overlay() {
-        //     match overlay_focus {
-        //         super::focus::OverlayFocus::UpsertItem => self.upsert_item_view.draw(frame),
-        //         super::focus::OverlayFocus::MethodSelector => self.method_selector_view.draw(frame),
-        //     }
-        // }
+        if let Some(overlay_focus) = self.global_pane_state.overlay() {
+            match overlay_focus {
+                super::focus::OverlayFocus::UpsertItem => {
+                    self.upsert_item_view.draw(frame, &self.global_pane_state)
+                }
+                super::focus::OverlayFocus::MethodSelector => self.method_selector_view.draw(frame),
+            }
+        }
     }
 
-    fn set_area(&mut self, _area: Rect) {}
+    fn set_area(&mut self, area: Rect) {
+        let [collections_area, request_area, response_area] = {
+            let [collections_area, content_area] =
+                Layout::horizontal([Constraint::Percentage(25), Constraint::Fill(1)])
+                    .spacing(1)
+                    .areas(area);
+
+            let [request_area, response_area] =
+                Layout::vertical([Constraint::Percentage(55), Constraint::Percentage(45)])
+                    .areas(content_area);
+
+            [collections_area, request_area, response_area]
+        };
+        self.collections_view.set_area(collections_area);
+        self.request_builder_view.set_area(request_area);
+        self.response_viewer_view.set_area(response_area);
+        self.upsert_item_view.set_area(area);
+        self.render_area = area;
+    }
 
     fn on_key(&mut self, key: KeyEvent, _state: &mut Self::State) {
         if let Some(overlay_focus) = self.global_pane_state.overlay() {
             match overlay_focus {
                 super::focus::OverlayFocus::UpsertItem => self
                     .upsert_item_view
-                    .handle_key(key, &mut self.global_pane_state),
+                    .on_key(key, &mut self.global_pane_state),
                 super::focus::OverlayFocus::MethodSelector => {
                     // self.method_selector_view
                     //     .handle_key(key, &mut self.state, &mut acc_actions);
@@ -152,7 +172,7 @@ impl ElementView for PaneView {
                     .on_key(key, &mut self.global_pane_state),
                 super::focus::ElementFocus::ResponseViewer => self
                     .response_viewer_view
-                    .handle_key(key, &mut self.global_pane_state),
+                    .on_key(key, &mut self.global_pane_state),
             }
 
             // TODO: when open a overlay, react to the previous changes
@@ -167,25 +187,6 @@ impl ElementView for PaneView {
                 }
             }
         }
-    }
-
-    fn on_resize(&mut self, area: Rect, _state: &mut Self::State) {
-        let [collections_area, request_area, response_area] = {
-            let [collections_area, content_area] =
-                Layout::horizontal([Constraint::Percentage(25), Constraint::Fill(1)])
-                    .spacing(1)
-                    .areas(area);
-
-            let [request_area, response_area] =
-                Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .areas(content_area);
-
-            [collections_area, request_area, response_area]
-        };
-        self.collections_view.set_area(collections_area);
-        self.request_builder_view
-            .on_resize(request_area, &mut self.global_pane_state);
-        self.render_area = area;
     }
 
     fn on_change_state(&mut self, _state: &Self::State) {}
