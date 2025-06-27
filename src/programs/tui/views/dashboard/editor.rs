@@ -6,6 +6,7 @@ use ratatui::{
 };
 use tui_textarea::{CursorMove, Input, TextArea};
 
+#[derive(Clone, Copy)]
 pub enum EditMode {
     Write,
     Read,
@@ -53,6 +54,10 @@ impl TextEditor {
                 EditMode::ReadOnly
             },
         }
+    }
+
+    pub fn mode(&self) -> EditMode {
+        self.mode
     }
 
     pub fn set_mode(&mut self, mode: EditMode) {

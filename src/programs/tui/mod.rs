@@ -1,6 +1,7 @@
 use std::io;
 
 use events::Events;
+use ratatui::layout::Rect;
 use sources::TerminalSource;
 use views::dashboard::DashboardView;
 
@@ -9,6 +10,7 @@ use crate::{
     store::{models::ProjectModel, LocalStore, Store, StoreError, StoreResult},
 };
 
+mod element_view;
 mod events;
 mod sources;
 mod views;
@@ -26,6 +28,13 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
 
     let mut dashboard_view = DashboardView::new();
     dashboard_view.add_pane_from_project(project);
+
+    dashboard_view.calculate_areas(Rect {
+        x: 0,
+        y: 0,
+        width: terminal.size().unwrap().width,
+        height: terminal.size().unwrap().height,
+    });
 
     terminal.draw(|frame| {
         dashboard_view.draw(frame);

@@ -1,13 +1,13 @@
 use crossterm::event::KeyEvent;
 use pane::PaneView;
 use ratatui::{
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     widgets::{Block, Borders, Tabs},
     Frame,
 };
 
-use crate::store::models::ProjectModel;
+use crate::{programs::tui::element_view::ElementView, store::models::ProjectModel};
 
 mod action;
 mod collections;
@@ -47,39 +47,56 @@ impl DashboardState {
     }
 }
 
-pub struct DashboardView(DashboardState);
+pub struct DashboardView {
+    state: DashboardState,
+    tabs_area: Rect,
+}
 
 impl DashboardView {
     pub fn new() -> Self {
-        Self(DashboardState::new())
+        Self {
+            state: DashboardState::new(),
+            tabs_area: Rect::default(),
+        }
+    }
+
+    pub fn calculate_areas(&mut self, area: Rect) {
+        let [tabs_area, pane_area] =
+            Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(area);
+        self.tabs_area = tabs_area;
+
+        // for pane in self.t
+        for pane in &mut self.state.panes {
+            pane.on_resize(pane_area, &mut ()); // QUEST: call om_resize?
+        }
     }
 
     pub fn add_pane_from_project(&mut self, project: ProjectModel) {
-        self.0.add_pane(PaneView::new(project));
+        self.state.add_pane(PaneView::new(project));
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
-        let areas =
-            Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(frame.area());
+        // let areas =
+        //     Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).split(frame.area());
 
         // Draw the top header tabs
-        let titles = self.0.panes.iter().map(|pane| pane.project_name());
+        let titles = self.state.panes.iter().map(|pane| pane.project_name());
         let tabs = Tabs::new(titles)
-            .select(self.0.selected)
+            .select(self.state.selected)
             .highlight_style(Style::default().blue().underlined())
             .block(Block::new().borders(Borders::BOTTOM))
             .divider(" - ");
-        frame.render_widget(tabs, areas[0]);
+        frame.render_widget(tabs, self.tabs_area);
 
         // Draw the current selected pane
-        if let Some(pane) = self.0.current_pane_mut() {
-            pane.draw(frame, areas[1]);
+        if let Some(pane) = self.state.current_pane_mut() {
+            pane.draw(frame, &mut ());
         }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
-        if let Some(pane) = self.0.current_pane_mut() {
-            pane.handle_key_event(key);
+        if let Some(pane) = self.state.current_pane_mut() {
+            pane.on_key(key, &mut ());
         }
     }
 }

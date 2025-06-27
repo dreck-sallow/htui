@@ -1,5 +1,7 @@
 use std::{
     collections::HashMap,
+    path::PathBuf,
+    str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -131,7 +133,8 @@ pub struct RequestModel {
     id: String,
     name: String,
     headers: HashMap<String, String>,
-    method: HttpMethod, // TODO: define a http method as method model
+    method: HttpMethod,
+    // body: BodyContent,
 }
 
 impl RequestModel {
@@ -245,3 +248,48 @@ impl TryFrom<&str> for HttpMethod {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum BodyContent {
+    Empty,
+    File(PathBuf),
+    Form(HashMap<String, String>), // FIXME: use another value for the hashmap
+    Text(String),                  // FIXME: support json as separate, and yaml, etc
+}
+
+// impl Serialize for BodyContent {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         // let txt: &str = self.into();
+//         // serializer.serialize_str(txt)
+//     }
+// }
+
+// pub struct BodyVisitor;
+
+// impl<'de> Visitor<'de> for BodyVisitor {
+//     type Value = BodyContent;
+
+//     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         write!(formatter, "An valid defined body content ")
+//     }
+
+//     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+//     where
+//         E: serde::de::Error,
+//     {
+//         match PathBuf::try_from(v) {
+//             Ok(p) => todo!(),
+//             Err(e) => todo!(),
+//         }
+//         // match HttpMethod::try_from(v) {
+//         //     Ok(method) => Ok(method),
+//         //     Err(_) => Err(serde::de::Error::invalid_value(
+//         //         serde::de::Unexpected::Str(v),
+//         //         &self,
+//         //     )),
+//         // }
+//     }
+// }

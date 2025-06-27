@@ -7,6 +7,8 @@ use ratatui::{
     Frame,
 };
 
+use crate::programs::tui::element_view::ElementView;
+
 use super::{
     global_pane_state::{CollectionChange, GlobalPaneState},
     upsert_item::UpsertMethod,
@@ -17,30 +19,22 @@ mod state;
 
 pub use state::{CollectionsState, Idx};
 
-pub struct CollectionsView;
+pub struct CollectionsView {
+    render_area: Rect,
+}
 
 impl CollectionsView {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            render_area: Rect::default(),
+        }
     }
+}
 
-    // pub fn insert_collection(&mut self, collection: &CollectionsModel) {
-    //     let children = collection
-    //         .requests()
-    //         .iter()
-    //         .map(|req| req.id().to_string())
-    //         .collect();
+impl ElementView for CollectionsView {
+    type State = GlobalPaneState;
 
-    //     self.state
-    //         .add_collection((collection.id().to_string(), children));
-    // }
-
-    // pub fn insert_request(&mut self, collection: &CollectionsModel, request: &RequestModel) {
-    //     self.state
-    //         .add_request(collection.id().to_string(), request.id().to_string());
-    // }
-
-    pub fn render(&self, frame: &mut Frame, area: Rect, state: &GlobalPaneState) {
+    fn draw(&self, frame: &mut Frame, state: &Self::State) {
         let items: Vec<Item<'_>> = state
             .project_collections()
             .iter()
@@ -71,10 +65,14 @@ impl CollectionsView {
             .set_idx(idx)
             .set_highlight_style(Style::default().green());
 
-        frame.render_widget(collections, area);
+        frame.render_widget(collections, self.render_area);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
+    fn set_area(&mut self, area: Rect) {
+        self.render_area = area;
+    }
+
+    fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Tab => {
@@ -150,30 +148,9 @@ impl CollectionsView {
         }
     }
 
-    // pub fn handle_action(&mut self, action: Action, state: &mut PaneState) {
-    //     match action {
-    //         Action::SaveUpsertItem(upsert_method, name) => match upsert_method {
-    //             UpsertMethod::CreateRequest => {
-    //                 let i = match self.state.idx() {
-    //                     state::Idx::None => {
-    //                         unreachable!()
-    //                     }
-    //                     state::Idx::Parent(i) => i,
-    //                     state::Idx::Child(i, _) => i,
-    //                 };
-    //                 let request = RequestModel::new(name);
-    //                 self.state.add_request_on_current(request.id().to_string());
-    //                 state.project_mut().add_request_by_i(i, request);
-    //             }
-    //             UpsertMethod::CreateCollection => {
-    //                 let collection = CollectionsModel::new(name);
-    //                 self.state
-    //                     .add_collection((collection.id().to_string(), Vec::new()));
-    //                 state.project_mut().add_collection(collection);
-    //             }
-    //             _ => {}
-    //         },
-    //         _ => {}
-    //     }
-    // }
+    fn on_resize(&mut self, area: Rect, _state: &mut Self::State) {
+        self.set_area(area);
+    }
+
+    fn on_change_state(&mut self, _state: &Self::State) {}
 }
