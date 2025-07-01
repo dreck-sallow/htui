@@ -1,11 +1,14 @@
 use std::{
     collections::HashMap,
     path::PathBuf,
-    str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{
+    de::{self, Visitor},
+    ser::SerializeMap,
+    Deserialize, Serialize,
+};
 
 pub fn time_as_id() -> String {
     SystemTime::now()
@@ -134,7 +137,7 @@ pub struct RequestModel {
     name: String,
     headers: HashMap<String, String>,
     method: HttpMethod,
-    // body: BodyContent,
+    body: BodyContent,
 }
 
 impl RequestModel {
@@ -144,6 +147,7 @@ impl RequestModel {
             name,
             headers: HashMap::default(),
             method: HttpMethod::Get,
+            body: BodyContent::Empty,
         }
     }
 
@@ -254,42 +258,74 @@ pub enum BodyContent {
     Empty,
     File(PathBuf),
     Form(HashMap<String, String>), // FIXME: use another value for the hashmap
-    Text(String),                  // FIXME: support json as separate, and yaml, etc
+    Text(String),
 }
 
-// impl Serialize for BodyContent {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         // let txt: &str = self.into();
-//         // serializer.serialize_str(txt)
-//     }
-// }
+impl Serialize for BodyContent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(1))?;
 
-// pub struct BodyVisitor;
+        match self {
+            BodyContent::Empty => map.serialize_entry("empty", &())?,
+            BodyContent::Text(str) => map.serialize_entry("text", str)?,
+            BodyContent::File(path_buf) => {
+                map.serialize_entry("file", path_buf.as_os_str().to_str().unwrap())?
+            }
+            BodyContent::Form(form) => map.serialize_entry("form", form)?,
+        }
 
-// impl<'de> Visitor<'de> for BodyVisitor {
-//     type Value = BodyContent;
+        map.end()
+    }
+}
 
-//     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         write!(formatter, "An valid defined body content ")
-//     }
+pub struct BodyVisitor;
 
-//     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-//     where
-//         E: serde::de::Error,
-//     {
-//         match PathBuf::try_from(v) {
-//             Ok(p) => todo!(),
-//             Err(e) => todo!(),
-//         }
-//         // match HttpMethod::try_from(v) {
-//         //     Ok(method) => Ok(method),
-//         //     Err(_) => Err(serde::de::Error::invalid_value(
-//         //         serde::de::Unexpected::Str(v),
-//         //         &self,
-//         //     )),
-//         // }
-//     }
-// }
+impl<'de> Visitor<'de> for BodyVisitor {
+    type Value = BodyContent;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "An valid defined body content ")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let Some((key, val)) = map.next_entry::<String, serde_json::Value>()? else {
+            return Ok(BodyContent::Empty);
+        };
+
+        match key.as_str() {
+            "text" => {
+                let text = serde_json::from_value::<String>(val).map_err(de::Error::custom)?;
+                Ok(BodyContent::Text(text))
+            }
+            "file" => {
+                let file_path = serde_json::from_value::<String>(val).map_err(de::Error::custom)?;
+                Ok(BodyContent::File(PathBuf::from(file_path)))
+            }
+            "form" => {
+                let form = serde_json::from_value::<HashMap<String, String>>(val)
+                    .map_err(de::Error::custom)?;
+                Ok(BodyContent::Form(form))
+            }
+            "empty" => return Ok(BodyContent::Empty),
+            other => Err(de::Error::unknown_field(
+                other,
+                &["text", "file", "form", "empty"],
+            )),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for BodyContent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(BodyVisitor)
+    }
+}
