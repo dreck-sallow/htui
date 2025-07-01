@@ -16,6 +16,7 @@ pub enum CollectionChange {
     OpenCollection,
     NextItem,
     PrevItem,
+    Select,
 }
 
 pub struct FocusState {
@@ -58,6 +59,7 @@ impl FocusState {
 
 pub struct GlobalPaneState {
     project: ProjectModel,
+    pub current_request_idx: Option<(usize, usize)>,
     focus_state: FocusState,
     collections_state: CollectionsState<String>,
     request_builder_state: RequestBuilderState,
@@ -79,8 +81,14 @@ impl GlobalPaneState {
             collections_state.add_collection((collection.id().to_string(), children));
         }
 
+        let current_request_idx = match collections_state.idx() {
+            Idx::Child(i, sub_i) => Some((i, sub_i)),
+            _ => None,
+        };
+
         Self {
             project: project,
+            current_request_idx,
             focus_state: FocusState::new(ElementFocus::Collections),
             collections_state,
             request_builder_state: RequestBuilderState::new(),
@@ -138,6 +146,13 @@ impl GlobalPaneState {
             CollectionChange::OpenCollection => self.collections_state.open_collection(true),
             CollectionChange::NextItem => self.collections_state.next(),
             CollectionChange::PrevItem => self.collections_state.prev(),
+            CollectionChange::Select => {
+                // FIXME: add to other mutate indices
+                self.current_request_idx = match self.collections_state.idx() {
+                    Idx::Child(i, sub_i) => Some((i, sub_i)),
+                    _ => None,
+                };
+            }
         }
     }
 

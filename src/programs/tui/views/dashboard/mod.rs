@@ -17,6 +17,7 @@ mod global_pane_state;
 mod method_selector;
 mod pane;
 mod pane_state;
+mod placeholder;
 mod request_builder;
 mod response_viewer;
 mod upsert_item;

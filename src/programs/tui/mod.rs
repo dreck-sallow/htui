@@ -17,7 +17,6 @@ mod views;
 
 pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     let project = load_project(project_name).await.unwrap();
-    // println!("project: {:?}", project);
 
     let mut terminal = ratatui::init();
 

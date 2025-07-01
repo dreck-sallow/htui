@@ -78,6 +78,9 @@ impl ElementView for CollectionsView {
                 KeyCode::Tab => {
                     state.set_focus(super::focus::ElementFocus::RequestBuilder);
                 }
+                KeyCode::Enter => {
+                    state.collection_change(CollectionChange::Select);
+                }
                 KeyCode::BackTab => {
                     state.set_focus(super::focus::ElementFocus::ResponseViewer);
                 }
