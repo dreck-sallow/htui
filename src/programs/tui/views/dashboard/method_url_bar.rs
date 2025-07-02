@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
@@ -15,6 +15,7 @@ pub struct MethodUrlBarView {
     render_area: Rect,
     url_input: TextArea<'static>,
     is_sending: bool,
+    request_idx: (usize, usize),
 }
 
 impl MethodUrlBarView {
@@ -29,7 +30,13 @@ impl MethodUrlBarView {
             render_area: Rect::default(),
             url_input,
             is_sending: false,
+            request_idx: (0, 0),
         }
+    }
+
+    fn clean_url(&mut self) {
+        self.url_input.move_cursor(tui_textarea::CursorMove::End);
+        self.url_input.delete_line_by_head();
     }
 }
 
@@ -37,6 +44,7 @@ impl ElementView for MethodUrlBarView {
     type State = GlobalPaneState;
 
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
+        let request = state.current_request().unwrap();
         let is_focus = state.is_focus(super::focus::ElementFocus::MethodUrlBar);
 
         let border_style = is_focus
@@ -68,7 +76,7 @@ impl ElementView for MethodUrlBarView {
         );
 
         frame.render_widget(
-            Span::from(" GET      ")
+            Span::from(Into::<&str>::into(&request.method()))
                 .style(Style::new().on_light_red())
                 .black(),
             method_area,
@@ -91,12 +99,35 @@ impl ElementView for MethodUrlBarView {
         self.render_area = area;
     }
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, _state: &mut Self::State) {
+    fn on_key(&mut self, key: crossterm::event::KeyEvent, state: &mut Self::State) {
         if key.kind == KeyEventKind::Press {
             match key.code {
+                KeyCode::Tab => {
+                    state.set_focus(super::focus::ElementFocus::RequestBuilder);
+                    let url = self.url_input.lines()[0].clone();
+                    state.change_url_from_state(url);
+                }
+                KeyCode::BackTab => {
+                    state.set_focus(super::focus::ElementFocus::Collections);
+                    let url = self.url_input.lines()[0].clone();
+                    state.change_url_from_state(url);
+                }
                 KeyCode::Enter => {
                     // Change to pending
-                    self.is_sending = !self.is_sending;
+                    if key.modifiers == KeyModifiers::ALT {
+                        // Open the method picker
+                        state.set_overlay(super::focus::OverlayFocus::MethodSelector);
+                        let method = state.current_request().unwrap().method();
+                        state.method_selector_state_mut().set_state((
+                            method,
+                            (
+                                self.render_area.left(),
+                                self.render_area.bottom().saturating_sub(1),
+                            ),
+                        ));
+                    } else {
+                        self.is_sending = !self.is_sending;
+                    }
                 }
 
                 _ => {
@@ -105,5 +136,19 @@ impl ElementView for MethodUrlBarView {
                 }
             }
         }
+    }
+
+    fn on_change_state(&mut self, state: &Self::State) {
+        match state.current_request_idx {
+            Some(idx) => {
+                if self.request_idx != idx {
+                    let new_url = state.current_request().unwrap().url();
+                    self.clean_url();
+                    self.url_input.insert_str(new_url);
+                    self.request_idx = idx;
+                }
+            }
+            None => {}
+        };
     }
 }

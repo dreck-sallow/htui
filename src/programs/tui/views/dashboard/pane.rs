@@ -16,8 +16,6 @@ pub struct PaneView {
     render_area: Rect,
     global_pane_state: GlobalPaneState,
     collections_view: CollectionsView,
-    // request_builder_view: RequestBuilderView,
-    // response_viewer_view: ResponseViewerView,
     method_url_bar_view: MethodUrlBarView,
     response_viewer_editor: HttpPayloadEditorView,
     upsert_item_view: UpsertItemView,
@@ -32,7 +30,6 @@ impl PaneView {
             global_pane_state: GlobalPaneState::new(project),
             collections_view: CollectionsView::new(),
             upsert_item_view: UpsertItemView::new(),
-            // request_builder_view: RequestBuilderView::new(),
             method_url_bar_view: MethodUrlBarView::new(),
             response_viewer_editor: HttpPayloadEditorView::new(false, " Response viewer "),
             method_selector_view: MethodSelectorView::new(),
@@ -66,7 +63,9 @@ impl ElementView for PaneView {
                 super::focus::OverlayFocus::UpsertItem => {
                     self.upsert_item_view.draw(frame, &self.global_pane_state)
                 }
-                super::focus::OverlayFocus::MethodSelector => self.method_selector_view.draw(frame),
+                super::focus::OverlayFocus::MethodSelector => self
+                    .method_selector_view
+                    .draw(frame, &self.global_pane_state),
             }
         }
     }
@@ -102,8 +101,8 @@ impl ElementView for PaneView {
                     .upsert_item_view
                     .on_key(key, &mut self.global_pane_state),
                 super::focus::OverlayFocus::MethodSelector => {
-                    // self.method_selector_view
-                    //     .handle_key(key, &mut self.state, &mut acc_actions);
+                    self.method_selector_view
+                        .on_key(key, &mut self.global_pane_state);
                 }
             }
         } else {
@@ -135,6 +134,10 @@ impl ElementView for PaneView {
                     }
                 }
             }
+
+            // FIXME: call on_change_state only when the global_pane_state was changed
+            self.method_url_bar_view
+                .on_change_state(&self.global_pane_state);
         }
     }
 

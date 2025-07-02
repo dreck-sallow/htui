@@ -81,6 +81,12 @@ impl ProjectModel {
     pub fn request_by_idx(&self, (i, sub_i): (usize, usize)) -> Option<&RequestModel> {
         self.collections.get(i).and_then(|c| c.requests.get(sub_i))
     }
+
+    pub fn request_mut_by_idx(&mut self, (i, sub_i): (usize, usize)) -> Option<&mut RequestModel> {
+        self.collections
+            .get_mut(i)
+            .and_then(|c| c.requests.get_mut(sub_i))
+    }
 }
 
 impl Default for ProjectModel {
@@ -165,12 +171,20 @@ impl RequestModel {
         &self.url
     }
 
+    pub fn set_url(&mut self, url: String) {
+        self.url = url;
+    }
+
     pub fn body(&self) -> &BodyContent {
         &self.body
     }
 
     pub fn method(&self) -> HttpMethod {
         self.method
+    }
+
+    pub fn set_method(&mut self, method: HttpMethod) {
+        self.method = method;
     }
 
     pub fn set_name(&mut self, name: String) {

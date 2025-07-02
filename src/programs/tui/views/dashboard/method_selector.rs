@@ -2,13 +2,14 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     layout::Rect,
     style::{Style, Stylize},
-    widgets::{Block, Clear, List, ListState},
+    text::Span,
+    widgets::{Block, Borders, Clear},
     Frame,
 };
 
-use crate::store::models::HttpMethod;
+use crate::{programs::tui::element_view::ElementView, store::models::HttpMethod};
 
-use super::{action::Action, pane_state::PaneState};
+use super::global_pane_state::GlobalPaneState;
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,
@@ -20,109 +21,130 @@ const METHODS: [HttpMethod; 7] = [
     HttpMethod::Options,
 ];
 
-struct MethodSelectorState {
-    // method: HttpMethod,
-    list_state: ListState,
+fn current_method_idx(current: HttpMethod) -> usize {
+    METHODS
+        .iter()
+        .enumerate()
+        .find(|(_i, method)| **method == current)
+        .unwrap()
+        .0
+}
+
+fn next_method(current_idx: usize) -> usize {
+    if current_idx >= METHODS.len() - 1 {
+        current_idx
+    } else {
+        current_idx + 1
+    }
+}
+
+fn prev_method(current_idx: usize) -> usize {
+    if current_idx == 0 {
+        current_idx
+    } else {
+        current_idx - 1
+    }
+}
+
+pub struct MethodSelectorState {
+    method: HttpMethod,
+    area: Rect,
 }
 
 impl MethodSelectorState {
     pub fn new() -> Self {
         Self {
-            // method: HttpMethod::Get,
-            list_state: ListState::default(),
+            method: HttpMethod::Get,
+            area: Rect::default(),
         }
     }
 
-    pub fn select(&mut self, method: HttpMethod) {
-        let idx = METHODS
-            .iter()
-            .enumerate()
-            .find(|(_, m)| **m == method)
-            .map(|(i, _)| i)
-            .unwrap();
-        // self.method = method;
-        self.list_state.select(Some(idx));
+    pub fn inner(&self) -> HttpMethod {
+        self.method
     }
 
-    pub fn mut_state(&mut self) -> &mut ListState {
-        &mut self.list_state
-    }
-
-    pub fn idx(&mut self) -> Option<usize> {
-        self.list_state.selected()
-    }
-
-    pub fn next_method(&mut self) {
-        self.list_state.select_next();
-    }
-
-    pub fn prev_method(&mut self) {
-        self.list_state.select_previous();
+    pub fn set_state(&mut self, (method, area): (HttpMethod, (u16, u16))) {
+        self.method = method;
+        self.area = Rect {
+            x: area.0,
+            y: area.1,
+            width: (Into::<&str>::into(&HttpMethod::Options).len() + 4) as u16,
+            height: METHODS.len() as u16 + 2u16,
+        };
     }
 }
 
 pub struct MethodSelectorView {
-    state: MethodSelectorState,
-    coord: Option<(u16, u16)>,
+    // selected_idx: Option<usize>,
 }
 
 impl MethodSelectorView {
     pub fn new() -> Self {
-        Self {
-            state: MethodSelectorState::new(),
-            coord: None,
-        }
+        Self {}
     }
+}
 
-    pub fn select_method(&mut self, method: HttpMethod) {
-        self.state.select(method);
-    }
+impl ElementView for MethodSelectorView {
+    type State = GlobalPaneState;
 
-    pub fn draw(&self, frame: &mut Frame) {
-        if let Some((x, y)) = self.coord {
-            let area = Rect {
-                x: x,
-                y: y,
-                width: 8 + 2,
-                height: METHODS.len() as u16 + 2,
+    fn draw(&self, frame: &mut Frame, state: &Self::State) {
+        let inner_state = state.method_selector_state_ref();
+        let current_idx = current_method_idx(inner_state.method);
+
+        frame.render_widget(Clear, inner_state.area);
+
+        let block = Block::bordered()
+            // .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+            .border_style(Style::default().blue());
+        let area = block.inner(inner_state.area);
+
+        frame.render_widget(block, inner_state.area);
+
+        for (i, method) in METHODS.iter().enumerate() {
+            let style = if current_idx == i {
+                Style::default().on_blue()
+            } else {
+                Style::default()
             };
-            let list = List::new(METHODS.map(|m| Into::<&str>::into(&m)))
-                .block(Block::bordered().border_style(Style::default().blue()))
-                .highlight_style(Style::default().blue());
 
-            frame.render_widget(Clear, area);
+            let line_area = Rect {
+                x: area.left(),
+                y: (area.top() + (1u16 * i as u16)),
+                width: area.width,
+                height: 1,
+            };
 
-            // frame.render_stateful_widget(list, area, self.state.mut_state());
+            frame.render_widget(
+                Span::from(Into::<&str>::into(method)).style(style),
+                line_area,
+            );
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState, actions: &mut Vec<Action>) {
+    fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
+        let inner = state.method_selector_state_mut();
+
         if let KeyEventKind::Press = key.kind {
             match key.code {
-                KeyCode::Char('j') | KeyCode::Down => self.state.next_method(),
-                KeyCode::Char('k') | KeyCode::Up => self.state.prev_method(),
+                KeyCode::Char('j') | KeyCode::Down => {
+                    let idx = next_method(current_method_idx(inner.method));
+                    inner.method = METHODS[idx];
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    let idx = prev_method(current_method_idx(inner.method));
+                    inner.method = METHODS[idx];
+                }
                 KeyCode::Enter => {
                     // TODO: go back to method selector
                     // state.focus_element(super::focus::ElementFocus::RequestBuilder);
                     state.hidden_overlay();
-                    let method = METHODS[self.state.idx().unwrap()];
-                    actions.push(Action::SelectedMethod(method));
+                    state.change_method_from_state();
                 }
                 KeyCode::Esc => {
                     state.hidden_overlay();
                 }
                 _ => {}
             }
-        }
-    }
-
-    pub fn handle_action(&mut self, action: Action) {
-        match action {
-            Action::SelectMethod(coord, http_method) => {
-                self.coord = Some(coord);
-                self.state.select(http_method);
-            }
-            _ => {}
         }
     }
 }

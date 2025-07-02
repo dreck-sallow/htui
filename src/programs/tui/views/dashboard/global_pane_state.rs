@@ -5,6 +5,7 @@ use crate::store::models::{CollectionsModel, ProjectModel, RequestModel};
 use super::{
     collections::{CollectionsState, Idx},
     focus::{ElementFocus, OverlayFocus},
+    method_selector::MethodSelectorState,
     request_builder::request_builder_state::RequestBuilderState,
     response_viewer::response_viewer_state::ResponseViewerState,
     upsert_item::{upsert_item_state::UpsertItemState, UpsertMethod},
@@ -65,6 +66,7 @@ pub struct GlobalPaneState {
     request_builder_state: RequestBuilderState,
     response_viewer_state: ResponseViewerState,
     upsert_item_state: UpsertItemState,
+    method_selector_state: MethodSelectorState,
 }
 
 impl GlobalPaneState {
@@ -94,6 +96,7 @@ impl GlobalPaneState {
             request_builder_state: RequestBuilderState::new(),
             upsert_item_state: UpsertItemState::new(),
             response_viewer_state: ResponseViewerState::new(),
+            method_selector_state: MethodSelectorState::new(),
         }
     }
 
@@ -217,6 +220,22 @@ impl GlobalPaneState {
         }
     }
 
+    pub fn change_method_from_state(&mut self) {
+        if let Some(idx) = self.current_request_idx {
+            if let Some(req) = self.project.request_mut_by_idx(idx) {
+                req.set_method(self.method_selector_state.inner());
+            }
+        }
+    }
+
+    pub fn change_url_from_state(&mut self, url: String) {
+        if let Some(idx) = self.current_request_idx {
+            if let Some(req) = self.project.request_mut_by_idx(idx) {
+                req.set_url(url);
+            }
+        }
+    }
+
     pub fn set_upsert_form(&mut self, method: UpsertMethod) {
         self.upsert_item_state.set_method(method);
     }
@@ -239,5 +258,13 @@ impl GlobalPaneState {
 
     pub fn response_state_mut(&mut self) -> &mut ResponseViewerState {
         &mut self.response_viewer_state
+    }
+
+    pub fn method_selector_state_ref(&self) -> &MethodSelectorState {
+        &self.method_selector_state
+    }
+
+    pub fn method_selector_state_mut(&mut self) -> &mut MethodSelectorState {
+        &mut self.method_selector_state
     }
 }
