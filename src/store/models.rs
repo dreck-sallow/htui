@@ -135,6 +135,7 @@ impl CollectionsModel {
 pub struct RequestModel {
     id: String,
     name: String,
+    url: String,
     headers: HashMap<String, String>,
     method: HttpMethod,
     body: BodyContent,
@@ -145,6 +146,7 @@ impl RequestModel {
         Self {
             id: time_as_id(),
             name,
+            url: String::from("https://"),
             headers: HashMap::default(),
             method: HttpMethod::Get,
             body: BodyContent::Empty,
@@ -157,6 +159,18 @@ impl RequestModel {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn body(&self) -> &BodyContent {
+        &self.body
+    }
+
+    pub fn method(&self) -> HttpMethod {
+        self.method
     }
 
     pub fn set_name(&mut self, name: String) {
@@ -259,6 +273,17 @@ pub enum BodyContent {
     File(PathBuf),
     Form(HashMap<String, String>), // FIXME: use another value for the hashmap
     Text(String),
+}
+
+impl BodyContent {
+    pub fn as_tag(&self) -> &str {
+        match self {
+            BodyContent::Empty => "Empty",
+            BodyContent::File(_) => "File",
+            BodyContent::Form(_) => "Form",
+            BodyContent::Text(_) => "Text",
+        }
+    }
 }
 
 impl Serialize for BodyContent {
