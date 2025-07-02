@@ -11,6 +11,7 @@ use crate::{
 };
 
 mod element_view;
+mod elements;
 mod events;
 mod sources;
 mod views;

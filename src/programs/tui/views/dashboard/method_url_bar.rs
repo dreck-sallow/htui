@@ -7,7 +7,7 @@ use ratatui::{
 };
 use tui_textarea::{Input, TextArea};
 
-use crate::programs::tui::element_view::ElementView;
+use crate::programs::tui::{element_view::ElementView, elements::Separator};
 
 use super::global_pane_state::GlobalPaneState;
 
@@ -39,21 +39,33 @@ impl ElementView for MethodUrlBarView {
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
         let is_focus = state.is_focus(super::focus::ElementFocus::MethodUrlBar);
 
-        let line_block = Block::bordered().border_style(
-            is_focus
-                .then_some(Style::default().blue())
-                .unwrap_or_default(),
-        );
+        let border_style = is_focus
+            .then_some(Style::default().blue())
+            .unwrap_or_default();
+
+        let line_block = Block::bordered().border_style(border_style);
 
         let area = line_block.inner(self.render_area);
         frame.render_widget(line_block, self.render_area);
 
-        let [method_area, url_area, indicator_area] = Layout::horizontal([
-            Constraint::Length(12),
-            Constraint::Min(10),
-            Constraint::Length(10),
-        ])
-        .areas(area);
+        let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
+            Layout::horizontal([
+                Constraint::Length(11),
+                Constraint::Length(1),
+                Constraint::Min(10),
+                Constraint::Length(1),
+                Constraint::Length(10),
+            ])
+            .areas(area);
+
+        frame.render_widget(
+            Separator::default().style(border_style),
+            left_separator_area,
+        );
+        frame.render_widget(
+            Separator::default().style(border_style),
+            right_reparator_area,
+        );
 
         frame.render_widget(
             Span::from(" GET      ")
