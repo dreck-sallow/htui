@@ -7,7 +7,10 @@ use ratatui::{
 };
 use tui_textarea::{Input, TextArea};
 
-use crate::programs::tui::{element_view::ElementView, elements::Separator};
+use crate::programs::tui::{
+    element_view::ElementView,
+    elements::{utils::expand, Separator},
+};
 
 use super::global_pane_state::GlobalPaneState;
 
@@ -76,7 +79,7 @@ impl ElementView for MethodUrlBarView {
         );
 
         frame.render_widget(
-            Span::from(Into::<&str>::into(&request.method()))
+            Span::from(expand(Into::<&str>::into(&request.method()), " ", 10))
                 .style(Style::new().on_light_red())
                 .black(),
             method_area,
@@ -84,13 +87,9 @@ impl ElementView for MethodUrlBarView {
 
         frame.render_widget(&self.url_input, url_area);
         frame.render_widget(
-            Span::from(if self.is_sending {
-                "    ---   "
-            } else {
-                "   Send   "
-            })
-            .on_light_green()
-            .black(),
+            Span::from(expand(if self.is_sending { "--" } else { "Send" }, " ", 10))
+                .on_light_green()
+                .black(),
             indicator_area,
         );
     }

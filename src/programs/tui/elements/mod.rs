@@ -1,5 +1,19 @@
 use ratatui::{style::Style, symbols, widgets::Widget};
 
+pub mod utils {
+    pub fn expand(txt: &str, fill: &str, width: usize) -> String {
+        let missing_len = width - txt.len();
+
+        let left_half = missing_len / 2;
+        let right_half = (missing_len) - left_half;
+
+        let left = &fill.repeat(left_half);
+        let right = &fill.repeat(right_half);
+
+        format!("{left}{txt}{right}")
+    }
+}
+
 pub struct Separator {
     symbol: &'static str,
     style: Style, // SUGGEST: use only fg & bg?
