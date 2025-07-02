@@ -76,7 +76,7 @@ impl ElementView for CollectionsView {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Tab => {
-                    state.set_focus(super::focus::ElementFocus::RequestBuilder);
+                    state.set_focus(super::focus::ElementFocus::MethodUrlBar);
                 }
                 KeyCode::Enter => {
                     state.collection_change(CollectionChange::Select);

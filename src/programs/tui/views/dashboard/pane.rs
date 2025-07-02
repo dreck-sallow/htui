@@ -8,17 +8,18 @@ use crate::{programs::tui::element_view::ElementView, store::models::ProjectMode
 
 use super::{
     collections::CollectionsView, global_pane_state::GlobalPaneState,
-    method_selector::MethodSelectorView, placeholder::PlaceholderView,
-    request_builder::RequestBuilderView, response_viewer::ResponseViewerView,
-    upsert_item::UpsertItemView,
+    http_payload_editor::HttpPayloadEditorView, method_selector::MethodSelectorView,
+    method_url_bar::MethodUrlBarView, placeholder::PlaceholderView, upsert_item::UpsertItemView,
 };
 
 pub struct PaneView {
     render_area: Rect,
     global_pane_state: GlobalPaneState,
     collections_view: CollectionsView,
-    request_builder_view: RequestBuilderView,
-    response_viewer_view: ResponseViewerView,
+    // request_builder_view: RequestBuilderView,
+    // response_viewer_view: ResponseViewerView,
+    method_url_bar_view: MethodUrlBarView,
+    response_viewer_editor: HttpPayloadEditorView,
     upsert_item_view: UpsertItemView,
     method_selector_view: MethodSelectorView,
     placeholder_view: PlaceholderView,
@@ -31,8 +32,9 @@ impl PaneView {
             global_pane_state: GlobalPaneState::new(project),
             collections_view: CollectionsView::new(),
             upsert_item_view: UpsertItemView::new(),
-            request_builder_view: RequestBuilderView::new(),
-            response_viewer_view: ResponseViewerView::new(),
+            // request_builder_view: RequestBuilderView::new(),
+            method_url_bar_view: MethodUrlBarView::new(),
+            response_viewer_editor: HttpPayloadEditorView::new(false, " Response viewer "),
             method_selector_view: MethodSelectorView::new(),
             placeholder_view: PlaceholderView::new(),
         }
@@ -50,10 +52,10 @@ impl ElementView for PaneView {
         self.collections_view.draw(frame, &self.global_pane_state);
 
         if self.global_pane_state.current_request_idx.is_some() {
-            self.request_builder_view
+            self.method_url_bar_view
                 .draw(frame, &self.global_pane_state);
 
-            self.response_viewer_view
+            self.response_viewer_editor
                 .draw(frame, &self.global_pane_state);
         } else {
             self.placeholder_view.draw(frame, &self.global_pane_state);
@@ -70,21 +72,24 @@ impl ElementView for PaneView {
     }
 
     fn set_area(&mut self, area: Rect) {
-        let [collections_area, request_area, response_area, placeholder_area] = {
+        let (collections_area, placeholder_area, content_areas) = {
             let [collections_area, content_area] =
                 Layout::horizontal([Constraint::Percentage(25), Constraint::Fill(1)])
                     .spacing(1)
                     .areas(area);
 
-            let [request_area, response_area] =
-                Layout::vertical([Constraint::Percentage(55), Constraint::Percentage(45)])
-                    .areas(content_area);
+            let right_areas = Layout::vertical([
+                Constraint::Length(3),
+                Constraint::Fill(1),
+                Constraint::Fill(1),
+            ])
+            .split(content_area);
 
-            [collections_area, request_area, response_area, content_area]
+            (collections_area, content_area, right_areas)
         };
         self.collections_view.set_area(collections_area);
-        self.request_builder_view.set_area(request_area);
-        self.response_viewer_view.set_area(response_area);
+        self.method_url_bar_view.set_area(content_areas[0]);
+        self.response_viewer_editor.set_area(content_areas[2]);
         self.placeholder_view.set_area(placeholder_area);
         self.upsert_item_view.set_area(area);
         self.render_area = area;
@@ -106,11 +111,16 @@ impl ElementView for PaneView {
                 super::focus::ElementFocus::Collections => self
                     .collections_view
                     .on_key(key, &mut self.global_pane_state),
-                super::focus::ElementFocus::RequestBuilder => self
-                    .request_builder_view
+                super::focus::ElementFocus::MethodUrlBar => self
+                    .method_url_bar_view
                     .on_key(key, &mut self.global_pane_state),
+                super::focus::ElementFocus::RequestBuilder => {
+                    // self
+                    //                     .request_builder_view
+                    //                     .on_key(key, &mut self.global_pane_state)
+                }
                 super::focus::ElementFocus::ResponseViewer => self
-                    .response_viewer_view
+                    .response_viewer_editor
                     .on_key(key, &mut self.global_pane_state),
             }
 

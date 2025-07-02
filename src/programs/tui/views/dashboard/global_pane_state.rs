@@ -133,6 +133,11 @@ impl GlobalPaneState {
         self.focus_state.hidden_overlay();
     }
 
+    pub fn current_request(&self) -> Option<&RequestModel> {
+        self.current_request_idx
+            .and_then(|i| self.project.request_by_idx(i))
+    }
+
     pub fn collections_raw_data(&self) -> (HashSet<usize>, Idx) {
         (
             self.collections_state.openeds(),

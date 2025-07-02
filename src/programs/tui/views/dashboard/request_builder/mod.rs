@@ -69,70 +69,6 @@ impl RequestBuilderView {
         }
     }
 
-    // pub fn draw(&mut self, frame: &mut Frame, area: Rect, state: &GlobalPaneState) {
-    //     let is_focus = state.is_focus(super::focus::ElementFocus::RequestBuilder);
-    //     let block = Block::bordered()
-    //         .title(" Request builder ")
-    //         .border_style(
-    //             is_focus
-    //                 .then_some(Style::default().blue())
-    //                 .unwrap_or_default(),
-    //         )
-    //         .padding(Padding::symmetric(1, 0));
-
-    //     let [method_area, input_area, tabs_area, pane_area] = {
-    //         let [header_area, content_area] =
-    //             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
-    //                 .areas(block.inner(area));
-
-    //         let [method_area, input_area] =
-    //             Layout::horizontal([Constraint::Length(6), Constraint::Fill(1)]).areas(header_area);
-
-    //         let [tabs_area, pane_area] =
-    //             Layout::vertical([Constraint::Length(2), Constraint::Fill(1)]).areas(content_area);
-
-    //         [method_area, input_area, tabs_area, pane_area]
-    //     };
-
-    //     frame.render_widget(block, area);
-
-    //     let builder_state = state.builder_state_ref();
-
-    //     frame.render_widget(
-    //         Span::from(Into::<&str>::into(&builder_state.method)).style(Style::new().blue()),
-    //         method_area,
-    //     );
-
-    //     // TODO: handle better this way of store the areas!
-    //     self.__method_area = Some((method_area.left(), method_area.bottom()));
-
-    //     self.url_input.set_style(
-    //         (builder_state.focus() == &Focus::UrlInput)
-    //             .then_some(Style::default().magenta())
-    //             .unwrap_or_default()
-    //             .on_dark_gray(),
-    //     );
-    //     frame.render_widget(&self.url_input, input_area);
-
-    //     let tabs = Tabs::new([
-    //         format!(" {} ", ViewTab::Headers.to_string()),
-    //         format!(" {} ", ViewTab::Body.to_string()),
-    //     ])
-    //     .select(builder_state.view_tab_index() as usize)
-    //     .highlight_style(
-    //         (builder_state.focus() == &Focus::Tabs)
-    //             .then_some(Style::default().on_light_magenta().black())
-    //             .unwrap_or(Style::default().on_dark_gray()),
-    //     )
-    //     .block(Block::new().borders(Borders::BOTTOM));
-
-    //     frame.render_widget(tabs, tabs_area);
-    //     match builder_state.view_tab() {
-    //         ViewTab::Headers => frame.render_widget(&self.header_editor, pane_area),
-    //         ViewTab::Body => frame.render_widget(&self.body_editor, pane_area),
-    //     }
-    // }
-
     fn handle_key_for_method(&mut self, key: KeyEvent, state: &mut GlobalPaneState) {
         match key.code {
             KeyCode::Enter => {
@@ -212,6 +148,9 @@ impl ElementView for RequestBuilderView {
     type State = GlobalPaneState;
 
     fn draw(&self, frame: &mut Frame, state: &Self::State) {
+        // SAFETY: check on the parent for render this section
+
+        let request = state.current_request().unwrap();
         let is_focus = state.is_focus(super::focus::ElementFocus::RequestBuilder);
         let block = Block::bordered()
             .title(" Request builder ")
@@ -227,7 +166,7 @@ impl ElementView for RequestBuilderView {
         let builder_state = state.builder_state_ref();
 
         frame.render_widget(
-            Span::from(Into::<&str>::into(&builder_state.method)).style(Style::new().blue()),
+            Span::from(Into::<&str>::into(&request.method())).style(Style::new().blue()),
             self.children_areas.method_area,
         );
 

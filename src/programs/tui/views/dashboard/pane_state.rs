@@ -48,6 +48,7 @@ impl PaneState {
     pub fn next_focus_element(&mut self) {
         self.element_focus = match self.element_focus {
             ElementFocus::Collections => ElementFocus::ResponseViewer,
+            ElementFocus::MethodUrlBar => ElementFocus::RequestBuilder,
             ElementFocus::RequestBuilder => ElementFocus::Collections,
             ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
         };
@@ -56,6 +57,7 @@ impl PaneState {
     pub fn prev_focus_element(&mut self) {
         self.element_focus = match self.element_focus {
             ElementFocus::Collections => ElementFocus::ResponseViewer,
+            ElementFocus::MethodUrlBar => ElementFocus::Collections,
             ElementFocus::RequestBuilder => ElementFocus::Collections,
             ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
         };
