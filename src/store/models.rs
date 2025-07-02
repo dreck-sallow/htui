@@ -175,6 +175,16 @@ impl RequestModel {
         self.url = url;
     }
 
+    pub fn headers(&self) -> Vec<(&str, &str)> {
+        let mut list = Vec::new();
+
+        for (k, v) in &self.headers {
+            list.push((k.as_str(), v.as_str()));
+        }
+
+        list
+    }
+
     pub fn body(&self) -> &BodyContent {
         &self.body
     }

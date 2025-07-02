@@ -21,6 +21,7 @@ mod pane;
 mod pane_state;
 mod placeholder;
 mod request_builder;
+mod request_editor;
 mod response_viewer;
 mod upsert_item;
 

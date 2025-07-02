@@ -7,7 +7,6 @@ use super::{
     focus::{ElementFocus, OverlayFocus},
     method_selector::MethodSelectorState,
     request_builder::request_builder_state::RequestBuilderState,
-    response_viewer::response_viewer_state::ResponseViewerState,
     upsert_item::{upsert_item_state::UpsertItemState, UpsertMethod},
 };
 
@@ -64,7 +63,7 @@ pub struct GlobalPaneState {
     focus_state: FocusState,
     collections_state: CollectionsState<String>,
     request_builder_state: RequestBuilderState,
-    response_viewer_state: ResponseViewerState,
+    // response_viewer_state: ResponseViewerState,
     upsert_item_state: UpsertItemState,
     method_selector_state: MethodSelectorState,
 }
@@ -95,7 +94,7 @@ impl GlobalPaneState {
             collections_state,
             request_builder_state: RequestBuilderState::new(),
             upsert_item_state: UpsertItemState::new(),
-            response_viewer_state: ResponseViewerState::new(),
+            // response_viewer_state: ResponseViewerState::new(),
             method_selector_state: MethodSelectorState::new(),
         }
     }
@@ -252,13 +251,13 @@ impl GlobalPaneState {
         &mut self.request_builder_state
     }
 
-    pub fn response_state_ref(&self) -> &ResponseViewerState {
-        &self.response_viewer_state
-    }
+    // pub fn response_state_ref(&self) -> &ResponseViewerState {
+    //     &self.response_viewer_state
+    // }
 
-    pub fn response_state_mut(&mut self) -> &mut ResponseViewerState {
-        &mut self.response_viewer_state
-    }
+    // pub fn response_state_mut(&mut self) -> &mut ResponseViewerState {
+    //     &mut self.response_viewer_state
+    // }
 
     pub fn method_selector_state_ref(&self) -> &MethodSelectorState {
         &self.method_selector_state

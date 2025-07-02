@@ -1,7 +1,6 @@
 use body_editor::BodyEditor;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
-    prelude::BlockExt,
     text::Span,
     widgets::{Block, Borders},
 };
@@ -10,7 +9,7 @@ use crate::programs::tui::element_view::ElementView;
 
 use super::{editor::TextEditor, global_pane_state::GlobalPaneState};
 
-mod body_editor;
+pub mod body_editor;
 
 pub struct HttpPayloadEditorView {
     render_area: Rect,
