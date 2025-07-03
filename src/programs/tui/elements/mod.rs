@@ -1,5 +1,7 @@
 use ratatui::{style::Style, symbols, widgets::Widget};
 
+pub mod dropdown;
+
 pub mod utils {
     pub fn expand(txt: &str, fill: &str, width: usize) -> String {
         let missing_len = width - txt.len();
