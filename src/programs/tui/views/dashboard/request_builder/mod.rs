@@ -166,7 +166,7 @@ impl ElementView for RequestBuilderView {
         let builder_state = state.builder_state_ref();
 
         frame.render_widget(
-            Span::from(Into::<&str>::into(&request.method())).style(Style::new().blue()),
+            Span::from(request.method().as_ref()).style(Style::new().blue()),
             self.children_areas.method_area,
         );
 

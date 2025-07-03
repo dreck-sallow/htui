@@ -29,16 +29,18 @@ pub struct PaneView {
 
 impl PaneView {
     pub fn new(project: ProjectModel) -> Self {
+        let (method_url_bar_view, method_selector_view) = MethodUrlBarView::new_with_dropdown();
+
         Self {
             render_area: Rect::default(),
             global_pane_state: GlobalPaneState::new(project),
             collections_view: CollectionsView::new(),
             upsert_item_view: UpsertItemView::new(),
-            method_url_bar_view: MethodUrlBarView::new(),
+            method_url_bar_view,
             request_editor_view: RequestEditorView::new(),
             response_viewer_view: ResponseViewerView::new(),
             // response_viewer_editor: HttpPayloadEditorView::new(false, " Response viewer "),
-            method_selector_view: MethodSelectorView::new(),
+            method_selector_view,
             placeholder_view: PlaceholderView::new(),
         }
     }
@@ -146,6 +148,9 @@ impl ElementView for PaneView {
 
             // FIXME: call on_change_state only when the global_pane_state was changed
             self.method_url_bar_view
+                .on_change_state(&self.global_pane_state);
+
+            self.request_editor_view
                 .on_change_state(&self.global_pane_state);
         }
     }

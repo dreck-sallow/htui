@@ -1,6 +1,7 @@
+use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::Stylize,
+    style::{Style, Stylize},
     text::Span,
 };
 
@@ -29,8 +30,8 @@ impl BodyEditor {
         frame: &mut ratatui::Frame,
         body_content: &BodyContent,
     ) {
-        let title = Span::from("Body");
-        let body_type = Span::from(body_content.as_tag());
+        let title = Span::from(format!(" Type: {} ", body_content.as_tag())).italic();
+        let body_type = Span::from("\u{25bc} ");
 
         let [title_area, body_type_area] = Layout::horizontal([
             Constraint::Length(title.width() as u16),
@@ -41,6 +42,9 @@ impl BodyEditor {
 
         frame.render_widget(title, title_area);
         frame.render_widget(body_type, body_type_area);
+        frame
+            .buffer_mut()
+            .set_style(line_area, Style::default().on_dark_gray());
     }
 }
 
@@ -48,10 +52,18 @@ impl ElementView for BodyEditor {
     type State = BodyContent;
 
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
-        let [header_area, content_area] =
-            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(self.render_area);
+        let content_area = {
+            if self.editable {
+                let [header_area, content_area] =
+                    Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
+                        .areas(self.render_area);
 
-        Self::draw_header_line(header_area, frame, state);
+                Self::draw_header_line(header_area, frame, state);
+                content_area
+            } else {
+                self.render_area
+            }
+        };
 
         match state {
             BodyContent::Empty => {
@@ -81,6 +93,19 @@ impl ElementView for BodyEditor {
             }
             BodyContent::Text(_) => {
                 frame.render_widget(&self.text_editor, content_area);
+            }
+        }
+    }
+
+    fn on_key(&mut self, key: crossterm::event::KeyEvent, _state: &mut Self::State) {
+        if key.kind == KeyEventKind::Press {
+            match key.code {
+                KeyCode::Enter => {
+                    if key.modifiers == KeyModifiers::ALT {
+                        // open menu
+                    }
+                }
+                _ => {}
             }
         }
     }

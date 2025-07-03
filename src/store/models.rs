@@ -215,12 +215,26 @@ pub enum HttpMethod {
     Patch,
 }
 
+impl AsRef<str> for HttpMethod {
+    fn as_ref(&self) -> &'static str {
+        match self {
+            HttpMethod::Options => "OPTIONS",
+            HttpMethod::Get => "GET",
+            HttpMethod::Post => "POST",
+            HttpMethod::Put => "PUT",
+            HttpMethod::Delete => "DELETE",
+            HttpMethod::Head => "HEAD",
+            HttpMethod::Patch => "PATCH",
+        }
+    }
+}
+
 impl Serialize for HttpMethod {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let txt: &str = self.into();
+        let txt: &str = self.as_ref();
         serializer.serialize_str(txt)
     }
 }
@@ -257,19 +271,19 @@ impl<'de> Deserialize<'de> for HttpMethod {
     }
 }
 
-impl Into<&str> for &HttpMethod {
-    fn into(self) -> &'static str {
-        match self {
-            HttpMethod::Options => "OPTIONS",
-            HttpMethod::Get => "GET",
-            HttpMethod::Post => "POST",
-            HttpMethod::Put => "PUT",
-            HttpMethod::Delete => "DELETE",
-            HttpMethod::Head => "HEAD",
-            HttpMethod::Patch => "PATCH",
-        }
-    }
-}
+// impl Into<&str> for &HttpMethod {
+//     fn into(self) -> &'static str {
+//         match self {
+//             HttpMethod::Options => "OPTIONS",
+//             HttpMethod::Get => "GET",
+//             HttpMethod::Post => "POST",
+//             HttpMethod::Put => "PUT",
+//             HttpMethod::Delete => "DELETE",
+//             HttpMethod::Head => "HEAD",
+//             HttpMethod::Patch => "PATCH",
+//         }
+//     }
+// }
 
 /// Structure only used for parse a str to httpMethod;
 pub struct ParseErrorHttpMethod;

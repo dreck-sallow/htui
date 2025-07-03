@@ -1,11 +1,10 @@
 use std::collections::HashSet;
 
-use crate::store::models::{CollectionsModel, ProjectModel, RequestModel};
+use crate::store::models::{CollectionsModel, HttpMethod, ProjectModel, RequestModel};
 
 use super::{
     collections::{CollectionsState, Idx},
     focus::{ElementFocus, OverlayFocus},
-    method_selector::MethodSelectorState,
     request_builder::request_builder_state::RequestBuilderState,
     upsert_item::{upsert_item_state::UpsertItemState, UpsertMethod},
 };
@@ -63,9 +62,7 @@ pub struct GlobalPaneState {
     focus_state: FocusState,
     collections_state: CollectionsState<String>,
     request_builder_state: RequestBuilderState,
-    // response_viewer_state: ResponseViewerState,
     upsert_item_state: UpsertItemState,
-    method_selector_state: MethodSelectorState,
 }
 
 impl GlobalPaneState {
@@ -94,8 +91,6 @@ impl GlobalPaneState {
             collections_state,
             request_builder_state: RequestBuilderState::new(),
             upsert_item_state: UpsertItemState::new(),
-            // response_viewer_state: ResponseViewerState::new(),
-            method_selector_state: MethodSelectorState::new(),
         }
     }
 
@@ -219,10 +214,10 @@ impl GlobalPaneState {
         }
     }
 
-    pub fn change_method_from_state(&mut self) {
+    pub fn set_current_request_method(&mut self, method: HttpMethod) {
         if let Some(idx) = self.current_request_idx {
             if let Some(req) = self.project.request_mut_by_idx(idx) {
-                req.set_method(self.method_selector_state.inner());
+                req.set_method(method);
             }
         }
     }
@@ -249,21 +244,5 @@ impl GlobalPaneState {
 
     pub fn builder_state_mut(&mut self) -> &mut RequestBuilderState {
         &mut self.request_builder_state
-    }
-
-    // pub fn response_state_ref(&self) -> &ResponseViewerState {
-    //     &self.response_viewer_state
-    // }
-
-    // pub fn response_state_mut(&mut self) -> &mut ResponseViewerState {
-    //     &mut self.response_viewer_state
-    // }
-
-    pub fn method_selector_state_ref(&self) -> &MethodSelectorState {
-        &self.method_selector_state
-    }
-
-    pub fn method_selector_state_mut(&mut self) -> &mut MethodSelectorState {
-        &mut self.method_selector_state
     }
 }
