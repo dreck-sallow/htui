@@ -159,6 +159,7 @@ impl ElementView for RequestEditorView {
             Some(idx) => {
                 if self.request_idx != idx {
                     // Save the request data into "Request"
+                    self.headers_editor.clean_lines();
 
                     // Start from zero
                     {

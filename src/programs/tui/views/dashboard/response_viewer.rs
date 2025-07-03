@@ -161,6 +161,7 @@ impl ElementView for ResponseViewerView {
                     // Save the request data into "Request"
 
                     // Start from zero
+                    self.headers_editor.clean_lines();
                     {
                         let mut headers_text = String::new();
                         for (k, v) in state.current_request().unwrap().headers() {
