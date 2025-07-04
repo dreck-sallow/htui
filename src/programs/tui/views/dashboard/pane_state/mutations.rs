@@ -1,6 +1,10 @@
-use crate::store::models::{CollectionsModel, RequestModel};
+use std::collections::HashMap;
+
+use crate::store::models::{CollectionsModel, HttpMethod, RequestModel};
 
 use super::PaneState;
+
+// TODO:  For previous values, I should use Cow
 
 pub trait PaneStateMutation {
     fn apply(&mut self, state: &mut PaneState);
@@ -35,6 +39,12 @@ impl PaneStateMutation for SetRquestIdx {
 pub struct RemoveCollection {
     idx: usize,
     removed: Option<CollectionsModel>,
+}
+
+impl RemoveCollection {
+    pub fn new(idx: usize) -> Self {
+        Self { idx, removed: None }
+    }
 }
 
 impl PaneStateMutation for RemoveCollection {
@@ -136,6 +146,121 @@ impl PaneStateMutation for AddRequest {
 
         if let Some(idx) = idx_op {
             self.request = state.delete_request((self.collection_idx, idx));
+        }
+    }
+}
+
+pub struct EditCollectionName {
+    collection_idx: usize,
+    name: String,
+    previous_name: String,
+}
+
+impl EditCollectionName {
+    pub fn new(name: String, idx: usize) -> Self {
+        Self {
+            collection_idx: idx,
+            name,
+            previous_name: String::new(),
+        }
+    }
+}
+
+impl PaneStateMutation for EditCollectionName {
+    fn apply(&mut self, state: &mut PaneState) {
+        self.previous_name = state.project.collections()[self.collection_idx]
+            .name()
+            .to_string();
+        state.edit_collection_name(self.collection_idx, self.name.clone());
+    }
+
+    fn undo(&mut self, state: &mut PaneState) {
+        state.edit_collection_name(self.collection_idx, self.previous_name.clone());
+    }
+}
+
+#[derive(Clone)]
+pub enum RequestEditType {
+    Name(String),
+    Url(String),
+    Method(HttpMethod),
+    Headers(HashMap<String, String>),
+}
+
+pub struct EditRequest {
+    idx: (usize, usize),
+    action: RequestEditType,
+    previous_action: RequestEditType,
+}
+
+impl EditRequest {
+    pub fn new(idx: (usize, usize), action: RequestEditType) -> Self {
+        Self {
+            idx,
+            previous_action: action.clone(),
+            action,
+        }
+    }
+}
+
+impl PaneStateMutation for EditRequest {
+    fn apply(&mut self, state: &mut PaneState) {
+        let req = &state.project.collections()[self.idx.0].requests()[self.idx.1];
+
+        match &self.action {
+            RequestEditType::Name(name) => {
+                self.previous_action = RequestEditType::Name(req.name().to_string());
+
+                state.edit_request(self.idx, |req| {
+                    req.set_name(name.clone());
+                });
+            }
+            RequestEditType::Url(url) => {
+                self.previous_action = RequestEditType::Url(req.url().to_string());
+
+                state.edit_request(self.idx, |req| {
+                    req.set_url(url.clone());
+                });
+            }
+            RequestEditType::Method(http_method) => {
+                self.previous_action = RequestEditType::Method(req.method());
+
+                state.edit_request(self.idx, |req| {
+                    req.set_method(*http_method);
+                });
+            }
+            RequestEditType::Headers(hash_map) => {
+                self.previous_action = RequestEditType::Headers(req.headers_map().clone());
+
+                state.edit_request(self.idx, |req| {
+                    req.set_headers(hash_map.clone());
+                });
+            }
+        }
+    }
+
+    fn undo(&mut self, state: &mut PaneState) {
+        match &self.previous_action {
+            RequestEditType::Name(name) => {
+                state.edit_request(self.idx, |req| {
+                    req.set_name(name.clone());
+                });
+            }
+            RequestEditType::Url(url) => {
+                state.edit_request(self.idx, |req| {
+                    req.set_url(url.clone());
+                });
+            }
+            RequestEditType::Method(http_method) => {
+                state.edit_request(self.idx, |req| {
+                    req.set_method(*http_method);
+                });
+            }
+            RequestEditType::Headers(hash_map) => {
+                state.edit_request(self.idx, |req| {
+                    req.set_headers(hash_map.clone());
+                });
+            }
         }
     }
 }

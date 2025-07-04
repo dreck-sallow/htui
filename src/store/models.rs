@@ -177,6 +177,10 @@ impl RequestModel {
         self.url = url;
     }
 
+    pub fn headers_map(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
     pub fn headers(&self) -> Vec<(&str, &str)> {
         let mut list = Vec::new();
 
@@ -185,6 +189,10 @@ impl RequestModel {
         }
 
         list
+    }
+
+    pub fn set_headers(&mut self, headers: HashMap<String, String>) {
+        self.headers = headers;
     }
 
     pub fn body(&self) -> &BodyContent {
