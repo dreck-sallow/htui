@@ -10,4 +10,5 @@ pub enum ElementFocus {
 pub enum OverlayFocus {
     UpsertItem,
     MethodSelector,
+    BodySelector,
 }

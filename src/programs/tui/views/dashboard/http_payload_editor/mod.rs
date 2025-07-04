@@ -20,15 +20,15 @@ pub struct HttpPayloadEditorView {
 }
 
 impl HttpPayloadEditorView {
-    pub fn new(editable: bool, title: &'static str) -> Self {
-        Self {
-            render_area: Rect::default(),
-            headers_area: Rect::default(),
-            headers_editor: TextEditor::new(editable),
-            body_editor: BodyEditor::new(editable),
-            title,
-        }
-    }
+    // pub fn new(editable: bool, title: &'static str) -> Self {
+    //     Self {
+    //         render_area: Rect::default(),
+    //         headers_area: Rect::default(),
+    //         headers_editor: TextEditor::new(editable),
+    //         body_editor: BodyEditor::new(editable),
+    //         title,
+    //     }
+    // }
 }
 
 impl ElementView for HttpPayloadEditorView {

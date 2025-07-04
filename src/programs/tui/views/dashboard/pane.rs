@@ -7,10 +7,11 @@ use ratatui::{
 use crate::{programs::tui::element_view::ElementView, store::models::ProjectModel};
 
 use super::{
-    collections::CollectionsView, global_pane_state::GlobalPaneState,
-    method_selector::MethodSelectorView, method_url_bar::MethodUrlBarView,
-    placeholder::PlaceholderView, request_editor::RequestEditorView,
-    response_viewer::ResponseViewerView, upsert_item::UpsertItemView,
+    body_type_selector::BodyTypeSelectorView, collections::CollectionsView,
+    global_pane_state::GlobalPaneState, method_selector::MethodSelectorView,
+    method_url_bar::MethodUrlBarView, placeholder::PlaceholderView,
+    request_editor::RequestEditorView, response_viewer::ResponseViewerView,
+    upsert_item::UpsertItemView,
 };
 
 pub struct PaneView {
@@ -24,12 +25,14 @@ pub struct PaneView {
     // response_viewer_editor: HttpPayloadEditorView,
     upsert_item_view: UpsertItemView,
     method_selector_view: MethodSelectorView,
+    body_selector_view: BodyTypeSelectorView,
     placeholder_view: PlaceholderView,
 }
 
 impl PaneView {
     pub fn new(project: ProjectModel) -> Self {
         let (method_url_bar_view, method_selector_view) = MethodUrlBarView::new_with_dropdown();
+        let (request_editor_view, body_selector_view) = RequestEditorView::new_with_dropdown();
 
         Self {
             render_area: Rect::default(),
@@ -37,10 +40,10 @@ impl PaneView {
             collections_view: CollectionsView::new(),
             upsert_item_view: UpsertItemView::new(),
             method_url_bar_view,
-            request_editor_view: RequestEditorView::new(),
+            request_editor_view,
             response_viewer_view: ResponseViewerView::new(),
-            // response_viewer_editor: HttpPayloadEditorView::new(false, " Response viewer "),
             method_selector_view,
+            body_selector_view,
             placeholder_view: PlaceholderView::new(),
         }
     }
@@ -77,6 +80,9 @@ impl ElementView for PaneView {
                 super::focus::OverlayFocus::MethodSelector => self
                     .method_selector_view
                     .draw(frame, &self.global_pane_state),
+                super::focus::OverlayFocus::BodySelector => {
+                    self.body_selector_view.draw(frame, &self.global_pane_state)
+                }
             }
         }
     }
@@ -116,6 +122,9 @@ impl ElementView for PaneView {
                     self.method_selector_view
                         .on_key(key, &mut self.global_pane_state);
                 }
+                super::focus::OverlayFocus::BodySelector => self
+                    .body_selector_view
+                    .on_key(key, &mut self.global_pane_state),
             }
         } else {
             match self.global_pane_state.element_focus() {
@@ -143,6 +152,7 @@ impl ElementView for PaneView {
                     super::focus::OverlayFocus::MethodSelector => {
                         // self.method_selector_view.draw(frame)
                     }
+                    super::focus::OverlayFocus::BodySelector => {}
                 }
             }
 

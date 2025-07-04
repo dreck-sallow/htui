@@ -45,7 +45,7 @@ impl ResponseViewerView {
             content_area: Rect::default(),
             tab: ResponseTab::Response,
             headers_editor: TextEditor::new(false),
-            body_editor: BodyEditor::new(false),
+            body_editor: BodyEditor::new_readable(),
             request_idx: (0, 0),
         }
     }

@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
@@ -5,10 +7,15 @@ use ratatui::{
     widgets::{Block, Borders, Tabs},
 };
 
-use crate::{programs::tui::element_view::ElementView, store::models::BodyContent};
+use crate::{
+    programs::tui::{element_view::ElementView, elements::dropdown::OverlayDropdownData},
+    store::models::BodyContent,
+};
 
 use super::{
-    editor::TextEditor, global_pane_state::GlobalPaneState,
+    body_type_selector::{BodyType, BodyTypeSelectorView},
+    editor::TextEditor,
+    global_pane_state::GlobalPaneState,
     http_payload_editor::body_editor::BodyEditor,
 };
 
@@ -38,16 +45,22 @@ pub struct RequestEditorView {
 }
 
 impl RequestEditorView {
-    pub fn new() -> Self {
-        Self {
+    pub fn new_with_dropdown() -> (Self, BodyTypeSelectorView) {
+        let dropdown_data = Rc::new(RefCell::new(OverlayDropdownData::new(BodyType::Empty)));
+
+        let this = Self {
             render_area: Rect::default(),
             header_area: Rect::default(),
             content_area: Rect::default(),
             tab: RequestTab::Headers,
             headers_editor: TextEditor::new(true),
-            body_editor: BodyEditor::new(true),
+            body_editor: BodyEditor::new_editable(Rc::clone(&dropdown_data)),
             request_idx: (0, 0),
-        }
+        };
+
+        let body_type_selector = BodyTypeSelectorView::new(dropdown_data);
+
+        (this, body_type_selector)
     }
 
     pub fn tab_idx(&self) -> usize {
@@ -133,12 +146,15 @@ impl ElementView for RequestEditorView {
                 },
                 _ => match self.tab {
                     RequestTab::Headers => self.headers_editor.handle_key(key),
-                    RequestTab::Body => self.body_editor.on_key(
-                        key,
-                        &mut BodyContent::Text(String::from(
-                            "{'name': 'dikson Aranda'\n, 'age': 'other name'}",
-                        )),
-                    ),
+                    RequestTab::Body => {
+                        state.set_overlay(super::focus::OverlayFocus::BodySelector);
+                        self.body_editor.on_key(
+                            key,
+                            &mut BodyContent::Text(String::from(
+                                "{'name': 'dikson Aranda'\n, 'age': 'other name'}",
+                            )),
+                        );
+                    }
                 },
             }
         }

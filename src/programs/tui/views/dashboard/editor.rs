@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     style::{Style, Stylize},
     text::Span,
@@ -118,6 +118,14 @@ impl TextEditor {
                             }
                             KeyCode::Char('h') | KeyCode::Left => {
                                 self.textarea.move_cursor(CursorMove::Back)
+                            }
+
+                            KeyCode::Char('u') => {
+                                if key.modifiers == KeyModifiers::SHIFT {
+                                    self.textarea.redo();
+                                } else {
+                                    self.textarea.undo();
+                                }
                             }
                             KeyCode::Char('e') => {
                                 self.textarea.move_cursor(CursorMove::WordForward)

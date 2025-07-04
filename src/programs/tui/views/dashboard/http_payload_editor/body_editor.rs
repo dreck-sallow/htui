@@ -6,22 +6,47 @@ use ratatui::{
 };
 
 use crate::{
-    programs::tui::{element_view::ElementView, views::dashboard::editor::TextEditor},
+    programs::tui::{
+        element_view::ElementView,
+        elements::dropdown::SharedDropdown,
+        views::dashboard::{body_type_selector::BodyType, editor::TextEditor},
+    },
     store::models::BodyContent,
 };
 
+pub enum BodyEditorContent {
+    Mutable(SharedDropdown<BodyType>),
+    Static(BodyContent),
+}
+
 pub struct BodyEditor {
+    state_content: BodyEditorContent,
     render_area: Rect,
     text_editor: TextEditor,
-    pub editable: bool,
+    // pub editable: bool,
 }
 
 impl BodyEditor {
-    pub fn new(editable: bool) -> Self {
+    pub fn new_editable(shared: SharedDropdown<BodyType>) -> Self {
         Self {
+            state_content: BodyEditorContent::Mutable(shared),
             render_area: Rect::default(),
-            text_editor: TextEditor::new(editable),
-            editable,
+            text_editor: TextEditor::new(true),
+        }
+    }
+
+    pub fn new_readable() -> Self {
+        Self {
+            state_content: BodyEditorContent::Static(BodyContent::Empty),
+            render_area: Rect::default(),
+            text_editor: TextEditor::new(true),
+        }
+    }
+
+    pub fn is_editable(&self) -> bool {
+        match self.state_content {
+            BodyEditorContent::Mutable(_) => true,
+            BodyEditorContent::Static(_) => false,
         }
     }
 
@@ -53,7 +78,7 @@ impl ElementView for BodyEditor {
 
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
         let content_area = {
-            if self.editable {
+            if self.is_editable() {
                 let [header_area, content_area] =
                     Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
                         .areas(self.render_area);
@@ -98,15 +123,21 @@ impl ElementView for BodyEditor {
     }
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent, _state: &mut Self::State) {
-        if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Enter => {
-                    if key.modifiers == KeyModifiers::ALT {
-                        // open menu
+        match key.code {
+            KeyCode::Enter => {
+                if key.modifiers == KeyModifiers::ALT {
+                    if let BodyEditorContent::Mutable(dropdown_data) = &mut self.state_content {
+                        dropdown_data.borrow_mut().select(BodyType::from(_state));
+                        dropdown_data.borrow_mut().set_area(Rect {
+                            x: self.render_area.left(),
+                            y: self.render_area.top() + 1,
+                            width: self.render_area.width,
+                            height: 4,
+                        });
                     }
                 }
-                _ => {}
             }
+            _ => {}
         }
     }
 
