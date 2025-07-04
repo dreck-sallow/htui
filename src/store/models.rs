@@ -60,13 +60,15 @@ impl ProjectModel {
         }
     }
 
-    pub fn remove_collection(&mut self, i: usize) {
-        self.collections.remove(i);
+    pub fn remove_collection(&mut self, i: usize) -> CollectionsModel {
+        self.collections.remove(i)
     }
 
-    pub fn remove_request(&mut self, (i, sub_i): (usize, usize)) {
+    pub fn remove_request(&mut self, (i, sub_i): (usize, usize)) -> Option<RequestModel> {
         if let Some(coll) = self.collections.get_mut(i) {
-            coll.requests.remove(sub_i);
+            Some(coll.requests.remove(sub_i))
+        } else {
+            None
         }
     }
 
