@@ -21,7 +21,14 @@ use crate::{
     store::models::HttpMethod,
 };
 
-use super::{global_pane_state::GlobalPaneState, method_selector::MethodSelectorView};
+use super::{
+    global_pane_state::GlobalPaneState,
+    method_selector::MethodSelectorView,
+    pane_state::{
+        history::MutationCollector,
+        mutations::{FocusNavigation, SetFocus},
+    },
+};
 
 pub struct MethodUrlBarView {
     render_area: Rect,
@@ -57,8 +64,9 @@ impl MethodUrlBarView {
     }
 }
 
-impl ElementView for MethodUrlBarView {
+impl<'a> ElementView<'a> for MethodUrlBarView {
     type State = GlobalPaneState;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
         let request = state.current_request().unwrap();
@@ -112,25 +120,27 @@ impl ElementView for MethodUrlBarView {
         self.render_area = area;
     }
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, state: &mut Self::State) {
+    fn on_key(&mut self, key: crossterm::event::KeyEvent, collector: &mut Self::Collector) {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Tab => {
-                    state.set_focus(super::focus::ElementFocus::RequestBuilder);
-                    let url = self.url_input.lines()[0].clone();
-                    state.change_url_from_state(url);
+                    collector.add(SetFocus::new(FocusNavigation::Next));
+                    // state.set_focus(super::focus::ElementFocus::RequestBuilder);
+                    // let url = self.url_input.lines()[0].clone();
+                    // state.change_url_from_state(url);
                 }
                 KeyCode::BackTab => {
-                    state.set_focus(super::focus::ElementFocus::Collections);
-                    let url = self.url_input.lines()[0].clone();
-                    state.change_url_from_state(url);
+                    collector.add(SetFocus::new(FocusNavigation::Prev));
+                    // state.set_focus(super::focus::ElementFocus::Collections);
+                    // let url = self.url_input.lines()[0].clone();
+                    // state.change_url_from_state(url);
                 }
                 KeyCode::Enter => {
                     // Change to pending
                     if key.modifiers == KeyModifiers::ALT {
                         // Open the method picker
-                        state.set_overlay(super::focus::OverlayFocus::MethodSelector);
-                        let method = state.current_request().unwrap().method();
+                        // state.set_overlay(super::focus::OverlayFocus::MethodSelector);
+                        // let method = state.current_request().unwrap().method();
 
                         let mut dropdown_mut = self.dropdown_data_ref.borrow_mut();
 
@@ -140,7 +150,7 @@ impl ElementView for MethodUrlBarView {
                             width: 11, // length of the largest httpMethod
                             height: 8, // options + 1 (border)
                         });
-                        dropdown_mut.select(method);
+                        // dropdown_mut.select(method);
                     } else {
                         self.is_sending = !self.is_sending;
                     }

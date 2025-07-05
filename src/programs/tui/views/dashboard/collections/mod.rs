@@ -1,21 +1,34 @@
 use collections::{Collections, Item};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
-    widgets::Block,
+    widgets::{Block, Clear},
     Frame,
 };
+use tui_textarea::Input;
+use upsert_item_menu::{UpsertItemMenu, UpsertMethod};
 
-use crate::programs::tui::element_view::ElementView;
+use crate::{
+    programs::tui::element_view::{Drawable, ElementView, Interactive, Painter},
+    store::models::{CollectionsModel, ProjectModel, RequestModel},
+};
 
 use super::{
-    global_pane_state::{CollectionChange, GlobalPaneState},
-    upsert_item::UpsertMethod,
+    global_pane_state::GlobalPaneState,
+    pane_state::{
+        history::MutationCollector,
+        mutations::{
+            AddCollection, AddRequest, EditCollectionName, EditRequest, FocusNavigation,
+            RemoveCollection, RemoveRequest, RequestEditType, SetFocus, SetRquestIdx,
+        },
+        PaneState,
+    },
 };
 
 mod collections;
 mod state;
+mod upsert_item_menu;
 
 pub use state::{CollectionsState, Idx};
 
@@ -31,8 +44,9 @@ impl CollectionsView {
     }
 }
 
-impl ElementView for CollectionsView {
+impl<'a> ElementView<'a> for CollectionsView {
     type State = GlobalPaneState;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut Frame, state: &Self::State) {
         let items: Vec<Item<'_>> = state
@@ -72,84 +86,305 @@ impl ElementView for CollectionsView {
         self.render_area = area;
     }
 
-    fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
+    fn on_key(&mut self, key: KeyEvent, collector: &mut Self::Collector) {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Tab => {
-                    state.set_focus(super::focus::ElementFocus::MethodUrlBar);
+                    collector.add(SetFocus::new(FocusNavigation::Next));
                 }
                 KeyCode::Enter => {
-                    state.collection_change(CollectionChange::Select);
+                    collector.add(SetRquestIdx::new(Some((0, 0))));
                 }
                 KeyCode::BackTab => {
-                    state.set_focus(super::focus::ElementFocus::ResponseViewer);
+                    collector.add(SetFocus::new(FocusNavigation::Prev));
                 }
                 KeyCode::Left | KeyCode::Char('h') => {
-                    state.collection_change(CollectionChange::CloseCollection)
+                    // state.collection_change(CollectionChange::CloseCollection)
                 }
                 KeyCode::Right | KeyCode::Char('l') => {
-                    state.collection_change(CollectionChange::OpenCollection)
+                    // state.collection_change(CollectionChange::OpenCollection)
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    state.collection_change(CollectionChange::NextItem)
+                    // state.collection_change(CollectionChange::NextItem)
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
-                    state.collection_change(CollectionChange::PrevItem)
+                    // state.collection_change(CollectionChange::PrevItem)
                 }
                 KeyCode::Char('d') | KeyCode::Delete => {
-                    let (_, idx) = state.collections_raw_data();
+                    // let (_, idx) = state.collections_raw_data();
 
-                    match idx {
-                        state::Idx::None => {}
-                        state::Idx::Parent(i) => {
-                            state.delete_collection_item((i, None));
-                        }
-                        state::Idx::Child(i, sub_i) => {
-                            state.delete_collection_item((i, Some(sub_i)));
-                        }
-                    }
+                    // match idx {
+                    //     state::Idx::None => {}
+                    //     state::Idx::Parent(i) => {
+                    //         state.delete_collection_item((i, None));
+                    //     }
+                    //     state::Idx::Child(i, sub_i) => {
+                    //         state.delete_collection_item((i, Some(sub_i)));
+                    //     }
+                    // }
                 }
                 KeyCode::Char('c') => {
-                    state.set_upsert_form(UpsertMethod::CreateCollection("".into()));
-                    state.set_overlay(super::focus::OverlayFocus::UpsertItem);
+                    // state.set_upsert_form(UpsertMethod::CreateCollection("".into()));
+                    // state.set_overlay(super::focus::OverlayFocus::UpsertItem);
                 }
                 KeyCode::Char('r') => {
-                    let (_, idx) = state.collections_raw_data();
-                    if !idx.is_none() {
-                        state.set_upsert_form(UpsertMethod::CreateRequest("".into()));
-                        state.set_overlay(super::focus::OverlayFocus::UpsertItem);
-                    }
+                    // let (_, idx) = state.collections_raw_data();
+                    // if !idx.is_none() {
+                    //     state.set_upsert_form(UpsertMethod::CreateRequest("".into()));
+                    //     state.set_overlay(super::focus::OverlayFocus::UpsertItem);
+                    // }
                 }
                 KeyCode::Char('e') => {
-                    let (_, idx) = state.collections_raw_data();
-                    match idx {
-                        state::Idx::None => {}
-                        state::Idx::Parent(i) => {
-                            let name = state
-                                .project_ref()
-                                .collection_by_idx(i)
-                                .unwrap()
-                                .name()
-                                .to_string();
-                            state.set_upsert_form(UpsertMethod::EditCollection(name));
-                            state.set_overlay(super::focus::OverlayFocus::UpsertItem);
-                        }
-                        state::Idx::Child(i, sub_i) => {
-                            let name = state
-                                .project_ref()
-                                .request_by_idx((i, sub_i))
-                                .unwrap()
-                                .name()
-                                .to_string();
-                            state.set_upsert_form(UpsertMethod::EditRequest(name));
-                            state.set_overlay(super::focus::OverlayFocus::UpsertItem);
-                        }
-                    }
+                    // let (_, idx) = state.collections_raw_data();
+                    // match idx {
+                    //     state::Idx::None => {}
+                    //     state::Idx::Parent(i) => {
+                    //         let name = state
+                    //             .project_ref()
+                    //             .collection_by_idx(i)
+                    //             .unwrap()
+                    //             .name()
+                    //             .to_string();
+                    //         state.set_upsert_form(UpsertMethod::EditCollection(name));
+                    //         state.set_overlay(super::focus::OverlayFocus::UpsertItem);
+                    //     }
+                    //     state::Idx::Child(i, sub_i) => {
+                    //         let name = state
+                    //             .project_ref()
+                    //             .request_by_idx((i, sub_i))
+                    //             .unwrap()
+                    //             .name()
+                    //             .to_string();
+                    //         state.set_upsert_form(UpsertMethod::EditRequest(name));
+                    //         state.set_overlay(super::focus::OverlayFocus::UpsertItem);
+                    //     }
+                    // }
                 }
                 _ => {}
             }
         }
     }
 
-    fn on_change_state(&mut self, _state: &Self::State) {}
+    // fn on_change_state(&mut self, _state: &Self::State) {}
+}
+
+pub struct CollectionsComponent {
+    render_area: Rect,
+    state: CollectionsState<String>,
+    menu: UpsertItemMenu,
+    show_popup: bool,
+}
+
+impl CollectionsComponent {
+    pub fn new(project: &ProjectModel) -> Self {
+        let mut collections_state = CollectionsState::new();
+
+        for collection in project.collections() {
+            let children = collection
+                .requests()
+                .iter()
+                .map(|req| req.id().to_string())
+                .collect();
+
+            collections_state.add_collection((collection.id().to_string(), children));
+        }
+
+        Self {
+            render_area: Rect::default(),
+            state: collections_state,
+            menu: UpsertItemMenu::new(),
+            show_popup: false,
+        }
+    }
+}
+
+impl<'a: 'painter_fn, 'painter_fn> Drawable<'a, 'painter_fn> for CollectionsComponent {
+    type State = PaneState;
+
+    fn draw(&'a self, painter: &mut Painter<'painter_fn>, state: &'a Self::State) {
+        painter.render(move |frame| {
+            let reader = state.reader();
+            let is_focus = state.is_focused(super::focus::ElementFocus::Collections);
+            let items: Vec<Item<'_>> = reader
+                .collections()
+                .iter()
+                .map(|coll| {
+                    let mut itm = Item::new(coll.name());
+
+                    for req in coll.requests() {
+                        itm.add_child(Item::new(req.name()));
+                    }
+
+                    itm
+                })
+                .collect();
+
+            let collections = Collections::default()
+                .set_items(items)
+                .set_block(
+                    Block::bordered().title(" Collections ").border_style(
+                        is_focus
+                            .then_some(Style::default().blue())
+                            .unwrap_or_default(),
+                    ),
+                )
+                .set_openeds(self.state.openeds())
+                .set_idx(self.state.idx())
+                .set_highlight_style(Style::default().green());
+
+            frame.render_widget(collections, self.render_area);
+        });
+
+        if self.show_popup {
+            painter.render_last(|frame| {
+                let area = {
+                    let [area] = Layout::vertical([Constraint::Length(3)])
+                        .flex(ratatui::layout::Flex::Center)
+                        .areas(frame.area());
+
+                    let [area] = Layout::horizontal([Constraint::Percentage(40)])
+                        .flex(ratatui::layout::Flex::Center)
+                        .areas(area);
+
+                    area
+                };
+
+                frame.render_widget(Clear, area);
+                self.menu.draw(frame, area);
+            });
+        }
+    }
+
+    fn set_render_area(&mut self, _area: Rect) {
+        self.render_area = _area;
+    }
+}
+
+impl<'a: 'painter_fn, 'painter_fn> Interactive<'a, 'painter_fn> for CollectionsComponent {
+    type Mutator = MutationCollector<'a>;
+
+    fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, state: &Self::State) {
+        if key.kind == KeyEventKind::Press {
+            if self.show_popup {
+                match key.code {
+                    KeyCode::Enter => {
+                        let idx = self.state.idx();
+                        let text = self.menu.text();
+
+                        match self.menu.method_type() {
+                            UpsertMethod::CreateRequest => {
+                                mutator.add(AddRequest::new(
+                                    idx.parent_idx(),
+                                    RequestModel::new(text),
+                                ));
+                            }
+                            UpsertMethod::CreateCollection => {
+                                mutator.add(AddCollection::new(CollectionsModel::new(text)));
+                            }
+                            UpsertMethod::EditRequest => {
+                                mutator.add(EditRequest::new(
+                                    idx.child_idx(),
+                                    RequestEditType::Name(text),
+                                ));
+                            }
+                            UpsertMethod::EditCollection => {
+                                mutator.add(EditCollectionName::new(text, idx.parent_idx()));
+                            }
+                        }
+
+                        self.show_popup = false;
+                    }
+                    KeyCode::Esc => {
+                        self.show_popup = false;
+                    }
+                    _ => {
+                        self.menu.handle_input(Input::from(key));
+                    }
+                }
+            } else {
+                match key.code {
+                    KeyCode::Tab => {
+                        mutator.add(SetFocus::new(FocusNavigation::Next));
+                    }
+                    KeyCode::Enter => match self.state.idx() {
+                        Idx::Child(i, sub_i) => mutator.add(SetRquestIdx::new(Some((i, sub_i)))),
+                        _ => {}
+                    },
+                    KeyCode::BackTab => {
+                        mutator.add(SetFocus::new(FocusNavigation::Prev));
+                    }
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        self.state.close_collection(true);
+                    }
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        self.state.open_collection(true);
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.state.next();
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.state.prev();
+                    }
+                    KeyCode::Char('d') | KeyCode::Delete => {
+                        match self.state.idx() {
+                            state::Idx::None => {}
+                            state::Idx::Parent(i) => {
+                                // SUGGEST: not delete, or react on on_change_state
+                                self.state.delete_collection();
+                                mutator.add(RemoveCollection::new(i));
+                            }
+                            state::Idx::Child(i, sub_i) => {
+                                // SUGGEST: not delete, or react on on_change_state
+                                self.state.delete_request();
+                                mutator.add(RemoveRequest::new((i, sub_i)));
+                            }
+                        }
+                    }
+                    KeyCode::Char('c') => {
+                        self.show_popup = true;
+                        self.menu.set_state(UpsertMethod::CreateCollection, "");
+                    }
+                    KeyCode::Char('r') => {
+                        self.show_popup = true;
+                        if !self.state.idx().is_none() {
+                            self.menu.set_state(UpsertMethod::CreateRequest, "");
+                        }
+                    }
+                    KeyCode::Char('e') => {
+                        let reader = state.reader();
+
+                        match self.state.idx() {
+                            state::Idx::None => {}
+                            state::Idx::Parent(i) => {
+                                let name = reader.collections()[i].name();
+                                self.menu.set_state(UpsertMethod::EditCollection, name);
+                                self.show_popup = true;
+                            }
+                            state::Idx::Child(i, sub_i) => {
+                                let name = reader.collections()[i].requests()[sub_i].name();
+                                self.menu.set_state(UpsertMethod::EditRequest, name);
+                                self.show_popup = true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn on_change_state(&mut self, state: &Self::State) {
+        let reader = state.reader();
+
+        for collection in reader.collections() {
+            let children = collection
+                .requests()
+                .iter()
+                .map(|req| req.id().to_string())
+                .collect();
+
+            self.state
+                .add_collection((collection.id().to_string(), children));
+        }
+    }
 }

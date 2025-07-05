@@ -17,6 +17,7 @@ use super::{
     editor::TextEditor,
     global_pane_state::GlobalPaneState,
     http_payload_editor::body_editor::BodyEditor,
+    pane_state::{history::MutationCollector, mutations::SetFocus},
 };
 
 #[derive(Clone, Copy)]
@@ -71,8 +72,9 @@ impl RequestEditorView {
     }
 }
 
-impl ElementView for RequestEditorView {
+impl<'a> ElementView<'a> for RequestEditorView {
     type State = GlobalPaneState;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
         let style = if state.is_focus(super::focus::ElementFocus::RequestBuilder) {
@@ -103,7 +105,7 @@ impl ElementView for RequestEditorView {
         }
     }
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, state: &mut Self::State) {
+    fn on_key(&mut self, key: crossterm::event::KeyEvent, collector: &mut Self::Collector) {
         if key.kind == KeyEventKind::Press {
             let is_editing = match self.tab {
                 RequestTab::Headers => self.headers_editor.mode().is_write_mode(),
@@ -121,9 +123,9 @@ impl ElementView for RequestEditorView {
                     }
                     RequestTab::Body => {
                         if is_editing {
-                            self.body_editor.on_key(key, &mut BodyContent::Empty);
+                            // self.body_editor.on_key(key, &mut BodyContent::Empty);
                         } else {
-                            state.set_focus(super::focus::ElementFocus::ResponseViewer);
+                            collector.add(SetFocus::for_next());
                         }
                     }
                 },
@@ -133,12 +135,13 @@ impl ElementView for RequestEditorView {
                         if is_editing {
                             self.headers_editor.handle_key(key);
                         } else {
-                            state.set_focus(super::focus::ElementFocus::MethodUrlBar);
+                            collector.add(SetFocus::for_previous());
+                            // state.set_focus(super::focus::ElementFocus::MethodUrlBar);
                         }
                     }
                     RequestTab::Body => {
                         if is_editing {
-                            self.body_editor.on_key(key, &mut BodyContent::Empty);
+                            // self.body_editor.on_key(key, &mut BodyContent::Empty);
                         } else {
                             self.tab = RequestTab::Headers;
                         }
@@ -147,13 +150,13 @@ impl ElementView for RequestEditorView {
                 _ => match self.tab {
                     RequestTab::Headers => self.headers_editor.handle_key(key),
                     RequestTab::Body => {
-                        state.set_overlay(super::focus::OverlayFocus::BodySelector);
-                        self.body_editor.on_key(
-                            key,
-                            &mut BodyContent::Text(String::from(
-                                "{'name': 'dikson Aranda'\n, 'age': 'other name'}",
-                            )),
-                        );
+                        // state.set_overlay(super::focus::OverlayFocus::BodySelector);
+                        // self.body_editor.on_key(
+                        //     key,
+                        //     &mut BodyContent::Text(String::from(
+                        //         "{'name': 'dikson Aranda'\n, 'age': 'other name'}",
+                        //     )),
+                        // );
                     }
                 },
             }

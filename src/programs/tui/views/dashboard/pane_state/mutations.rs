@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::store::models::{CollectionsModel, HttpMethod, RequestModel};
+use crate::{
+    programs::tui::views::dashboard::focus::ElementFocus,
+    store::models::{CollectionsModel, HttpMethod, RequestModel},
+};
 
 use super::PaneState;
 
@@ -33,6 +36,63 @@ impl PaneStateMutation for SetRquestIdx {
 
     fn undo(&mut self, state: &mut PaneState) {
         state.set_request_idx(self.previous_idx);
+    }
+}
+
+pub enum FocusNavigation {
+    Next,
+    Prev,
+}
+
+pub struct SetFocus {
+    navigation: FocusNavigation,
+}
+
+impl SetFocus {
+    pub fn new(navigation: FocusNavigation) -> Self {
+        Self { navigation }
+    }
+
+    pub fn for_next() -> Self {
+        Self::new(FocusNavigation::Next)
+    }
+
+    pub fn for_previous() -> Self {
+        Self::new(FocusNavigation::Prev)
+    }
+
+    fn next_focus(focus: &ElementFocus) -> ElementFocus {
+        match focus {
+            ElementFocus::Collections => ElementFocus::MethodUrlBar,
+            ElementFocus::MethodUrlBar => ElementFocus::RequestBuilder,
+            ElementFocus::RequestBuilder => ElementFocus::ResponseViewer,
+            ElementFocus::ResponseViewer => ElementFocus::Collections,
+        }
+    }
+
+    fn prev_focus(focus: &ElementFocus) -> ElementFocus {
+        match focus {
+            ElementFocus::Collections => ElementFocus::ResponseViewer,
+            ElementFocus::MethodUrlBar => ElementFocus::Collections,
+            ElementFocus::RequestBuilder => ElementFocus::MethodUrlBar,
+            ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
+        }
+    }
+}
+
+impl PaneStateMutation for SetFocus {
+    fn apply(&mut self, state: &mut PaneState) {
+        match self.navigation {
+            FocusNavigation::Next => state.focus_element(Self::next_focus(&state.element_focus)),
+            FocusNavigation::Prev => state.focus_element(Self::prev_focus(&state.element_focus)),
+        }
+    }
+
+    fn undo(&mut self, state: &mut PaneState) {
+        match self.navigation {
+            FocusNavigation::Next => state.focus_element(Self::prev_focus(&state.element_focus)),
+            FocusNavigation::Prev => state.focus_element(Self::next_focus(&state.element_focus)),
+        }
     }
 }
 
@@ -98,6 +158,12 @@ impl PaneStateMutation for AddCollection {
 pub struct RemoveRequest {
     idx: (usize, usize),
     removed: Option<RequestModel>,
+}
+
+impl RemoveRequest {
+    pub fn new(idx: (usize, usize)) -> Self {
+        Self { idx, removed: None }
+    }
 }
 
 impl PaneStateMutation for RemoveRequest {

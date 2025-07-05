@@ -13,7 +13,7 @@ use crate::{
     store::models::{CollectionsModel, RequestModel},
 };
 
-use super::global_pane_state::GlobalPaneState;
+use super::{global_pane_state::GlobalPaneState, pane_state::history::MutationCollector};
 
 pub mod upsert_item_state;
 
@@ -66,8 +66,9 @@ impl UpsertItemView {
     }
 }
 
-impl ElementView for UpsertItemView {
+impl<'a> ElementView<'a> for UpsertItemView {
     type State = GlobalPaneState;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut Frame, _state: &Self::State) {
         frame.render_widget(Clear, self.render_area);
@@ -89,30 +90,30 @@ impl ElementView for UpsertItemView {
         self.render_area = _area;
     }
 
-    fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
+    fn on_key(&mut self, key: KeyEvent, collecor: &mut Self::Collector) {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Enter => {
                     let name = self.input.lines()[0].clone();
-                    match state.upsert_method() {
-                        UpsertMethod::CreateRequest(_) => {
-                            state.add_collection_request(RequestModel::new(name));
-                        }
-                        UpsertMethod::CreateCollection(_) => {
-                            state.add_collection(CollectionsModel::new(name));
-                        }
-                        UpsertMethod::EditRequest(_) | UpsertMethod::EditCollection(_) => {
-                            state.edit_item_name(name);
-                        }
-                    }
+                    // match collecor.upsert_method() {
+                    //     UpsertMethod::CreateRequest(_) => {
+                    //         collecor.add_collection_request(RequestModel::new(name));
+                    //     }
+                    //     UpsertMethod::CreateCollection(_) => {
+                    //         collecor.add_collection(CollectionsModel::new(name));
+                    //     }
+                    //     UpsertMethod::EditRequest(_) | UpsertMethod::EditCollection(_) => {
+                    //         collecor.edit_item_name(name);
+                    //     }
+                    // }
 
                     self.reset();
-                    state.hidden_overlay();
-                    state.set_focus(super::focus::ElementFocus::Collections);
+                    // collecor.hidden_overlay();
+                    // collecor.set_focus(super::focus::ElementFocus::Collections);
                 }
                 KeyCode::Esc => {
                     self.reset();
-                    state.hidden_overlay();
+                    // collecor.hidden_overlay();
                 }
                 _ => {
                     let input = Input::from(key);

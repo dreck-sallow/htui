@@ -2,6 +2,7 @@ use crate::store::models::{CollectionsModel, ProjectModel, RequestModel};
 
 use super::focus::{ElementFocus, OverlayFocus};
 
+pub mod history;
 pub mod mutations;
 
 pub struct PaneState {
@@ -11,7 +12,7 @@ pub struct PaneState {
     current_request_idx: Option<(usize, usize)>,
 }
 
-impl PaneState {
+impl<'a> PaneState {
     pub fn new(project: ProjectModel) -> Self {
         let request_idx =
             if project.collections().is_empty() || project.collections()[0].requests().is_empty() {
@@ -28,7 +29,15 @@ impl PaneState {
         }
     }
 
-    pub fn set_request_idx(&mut self, idx_opt: Option<(usize, usize)>) {
+    pub fn reader(&self) -> PaneStateReader<'_> {
+        PaneStateReader::new(&self)
+    }
+
+    pub fn project_name(&self) -> &str {
+        self.project.name()
+    }
+
+    fn set_request_idx(&mut self, idx_opt: Option<(usize, usize)>) {
         match idx_opt {
             Some((idx, sub_idx)) => {
                 let exist_request = self
@@ -80,24 +89,6 @@ impl PaneState {
         }
     }
 
-    // pub fn next_focus(&mut self) {
-    //     self.element_focus = match self.element_focus {
-    //         ElementFocus::Collections => ElementFocus::MethodUrlBar,
-    //         ElementFocus::MethodUrlBar => ElementFocus::RequestBuilder,
-    //         ElementFocus::RequestBuilder => ElementFocus::ResponseViewer,
-    //         ElementFocus::ResponseViewer => ElementFocus::Collections,
-    //     };
-    // }
-
-    // pub fn prev_focus(&mut self) {
-    //     self.element_focus = match self.element_focus {
-    //         ElementFocus::Collections => ElementFocus::ResponseViewer,
-    //         ElementFocus::MethodUrlBar => ElementFocus::Collections,
-    //         ElementFocus::RequestBuilder => ElementFocus::MethodUrlBar,
-    //         ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
-    //     };
-    // }
-
     pub fn focus_element(&mut self, element_focus: ElementFocus) {
         self.element_focus = element_focus;
     }
@@ -112,5 +103,34 @@ impl PaneState {
 
     pub fn is_focused(&self, element_focus: ElementFocus) -> bool {
         self.element_focus == element_focus
+    }
+}
+
+pub struct PaneStateReader<'a> {
+    state: &'a PaneState,
+}
+
+impl<'a> PaneStateReader<'a> {
+    fn new(state: &'a PaneState) -> Self {
+        Self { state }
+    }
+
+    pub fn project_name(&self) -> &str {
+        self.state.project.name()
+    }
+
+    pub fn current_request_idx(&self) -> Option<(usize, usize)> {
+        self.state.current_request_idx
+    }
+
+    pub fn current_request(&self) -> Option<&RequestModel> {
+        match self.state.current_request_idx {
+            Some(idx) => self.state.project.request_by_idx(idx),
+            None => None,
+        }
+    }
+
+    pub fn collections(&self) -> &[CollectionsModel] {
+        self.state.project.collections()
     }
 }

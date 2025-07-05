@@ -9,7 +9,10 @@ use crate::{
     programs::tui::{
         element_view::ElementView,
         elements::dropdown::SharedDropdown,
-        views::dashboard::{body_type_selector::BodyType, editor::TextEditor},
+        views::dashboard::{
+            body_type_selector::BodyType, editor::TextEditor,
+            pane_state::history::MutationCollector,
+        },
     },
     store::models::BodyContent,
 };
@@ -73,8 +76,9 @@ impl BodyEditor {
     }
 }
 
-impl ElementView for BodyEditor {
+impl<'a> ElementView<'a> for BodyEditor {
     type State = BodyContent;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
         let content_area = {
@@ -122,18 +126,18 @@ impl ElementView for BodyEditor {
         }
     }
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, _state: &mut Self::State) {
+    fn on_key(&mut self, key: crossterm::event::KeyEvent, _state: &mut Self::Collector) {
         match key.code {
             KeyCode::Enter => {
                 if key.modifiers == KeyModifiers::ALT {
                     if let BodyEditorContent::Mutable(dropdown_data) = &mut self.state_content {
-                        dropdown_data.borrow_mut().select(BodyType::from(_state));
-                        dropdown_data.borrow_mut().set_area(Rect {
-                            x: self.render_area.left(),
-                            y: self.render_area.top() + 1,
-                            width: self.render_area.width,
-                            height: 4,
-                        });
+                        // dropdown_data.borrow_mut().select(BodyType::from(_state));
+                        // dropdown_data.borrow_mut().set_area(Rect {
+                        //     x: self.render_area.left(),
+                        //     y: self.render_area.top() + 1,
+                        //     width: self.render_area.width,
+                        //     height: 4,
+                        // });
                     }
                 }
             }

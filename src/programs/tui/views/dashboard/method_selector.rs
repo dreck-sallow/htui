@@ -14,7 +14,7 @@ use crate::{
     store::models::HttpMethod,
 };
 
-use super::global_pane_state::GlobalPaneState;
+use super::{global_pane_state::GlobalPaneState, pane_state::history::MutationCollector};
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,
@@ -39,14 +39,15 @@ impl MethodSelectorView {
     }
 }
 
-impl ElementView for MethodSelectorView {
+impl<'a> ElementView<'a> for MethodSelectorView {
     type State = GlobalPaneState;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut Frame, _state: &Self::State) {
         self.inner.draw(frame);
     }
 
-    fn on_key(&mut self, key: KeyEvent, state: &mut Self::State) {
+    fn on_key(&mut self, key: KeyEvent, state: &mut Self::Collector) {
         if let KeyEventKind::Press = key.kind {
             match key.code {
                 KeyCode::Char('j') | KeyCode::Down => {
@@ -56,11 +57,11 @@ impl ElementView for MethodSelectorView {
                     self.inner.prev();
                 }
                 KeyCode::Enter => {
-                    state.hidden_overlay();
-                    state.set_current_request_method(self.inner.selected());
+                    // state.hidden_overlay();
+                    // state.set_current_request_method(self.inner.selected());
                 }
                 KeyCode::Esc => {
-                    state.hidden_overlay();
+                    // state.hidden_overlay();
                 }
                 _ => {}
             }

@@ -8,8 +8,10 @@ use ratatui::{
 use crate::{programs::tui::element_view::ElementView, store::models::BodyContent};
 
 use super::{
-    editor::TextEditor, global_pane_state::GlobalPaneState,
+    editor::TextEditor,
+    global_pane_state::GlobalPaneState,
     http_payload_editor::body_editor::BodyEditor,
+    pane_state::{history::MutationCollector, mutations::SetFocus},
 };
 
 #[derive(Clone, Copy)]
@@ -58,8 +60,9 @@ impl ResponseViewerView {
     }
 }
 
-impl ElementView for ResponseViewerView {
+impl<'a> ElementView<'a> for ResponseViewerView {
     type State = GlobalPaneState;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
         let style = if state.is_focus(super::focus::ElementFocus::ResponseViewer) {
@@ -90,7 +93,7 @@ impl ElementView for ResponseViewerView {
         }
     }
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, state: &mut Self::State) {
+    fn on_key(&mut self, key: crossterm::event::KeyEvent, collector: &mut Self::Collector) {
         if key.kind == KeyEventKind::Press {
             let is_editing = match self.tab {
                 ResponseTab::Headers => self.headers_editor.mode().is_write_mode(),
@@ -103,12 +106,12 @@ impl ElementView for ResponseViewerView {
                         if is_editing {
                             self.headers_editor.handle_key(key)
                         } else {
-                            state.set_focus(super::focus::ElementFocus::Collections);
+                            collector.add(SetFocus::for_next());
                         }
                     }
                     ResponseTab::Response => {
                         if is_editing {
-                            self.body_editor.on_key(key, &mut BodyContent::Empty);
+                            // self.body_editor.on_key(key, &mut BodyContent::Empty);
                         } else {
                             self.tab = ResponseTab::Headers;
                         }
@@ -125,20 +128,22 @@ impl ElementView for ResponseViewerView {
                     }
                     ResponseTab::Response => {
                         if is_editing {
-                            self.body_editor.on_key(key, &mut BodyContent::Empty);
+                            // self.body_editor.on_key(key, &mut BodyContent::Empty);
                         } else {
-                            state.set_focus(super::focus::ElementFocus::RequestBuilder);
+                            collector.add(SetFocus::for_previous());
                         }
                     }
                 },
                 _ => match self.tab {
                     ResponseTab::Headers => self.headers_editor.handle_key(key),
-                    ResponseTab::Response => self.body_editor.on_key(
-                        key,
-                        &mut BodyContent::Text(String::from(
-                            "{'name': 'dikson Aranda'\n, 'age': 'other name'}",
-                        )),
-                    ),
+                    ResponseTab::Response => {
+                        // self.body_editor.on_key(
+                        //                         key,
+                        //                         &mut BodyContent::Text(String::from(
+                        //                             "{'name': 'dikson Aranda'\n, 'age': 'other name'}",
+                        //                         )),
+                        //                     )
+                    }
                 },
             }
         }

@@ -25,43 +25,31 @@ mod request_editor;
 mod response_viewer;
 mod upsert_item;
 
-pub struct DashboardState {
-    panes: Vec<PaneView>,
+pub struct DashboardView<'a> {
+    panes: Vec<PaneView<'a>>,
     selected: Option<usize>,
+    tabs_area: Rect,
 }
 
-impl DashboardState {
+impl<'a> DashboardView<'a> {
     pub fn new() -> Self {
         Self {
             panes: Vec::new(),
             selected: None,
+            tabs_area: Rect::default(),
         }
     }
 
-    pub fn add_pane(&mut self, pane: PaneView) {
+    pub fn add_pane(&mut self, pane: PaneView<'a>) {
         self.panes.push(pane);
         self.selected = self.selected.is_none().then_some(0);
     }
 
-    fn current_pane_mut(&mut self) -> Option<&mut PaneView> {
+    fn current_pane_mut(&mut self) -> Option<&mut PaneView<'a>> {
         if let Some(i) = self.selected {
             return self.panes.get_mut(i);
         }
         None
-    }
-}
-
-pub struct DashboardView {
-    state: DashboardState,
-    tabs_area: Rect,
-}
-
-impl DashboardView {
-    pub fn new() -> Self {
-        Self {
-            state: DashboardState::new(),
-            tabs_area: Rect::default(),
-        }
     }
 
     pub fn calculate_areas(&mut self, area: Rect) {
@@ -70,33 +58,33 @@ impl DashboardView {
         self.tabs_area = tabs_area;
 
         // for pane in self.t
-        for pane in &mut self.state.panes {
+        for pane in &mut self.panes {
             pane.set_area(pane_area);
         }
     }
 
     pub fn add_pane_from_project(&mut self, project: ProjectModel) {
-        self.state.add_pane(PaneView::new(project));
+        self.add_pane(PaneView::new(project));
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
         // Draw the top header tabs
-        let titles = self.state.panes.iter().map(|pane| pane.project_name());
+        let titles = self.panes.iter().map(|pane| pane.project_name());
         let tabs = Tabs::new(titles)
-            .select(self.state.selected)
+            .select(self.selected)
             .highlight_style(Style::default().blue().underlined())
             .block(Block::new().borders(Borders::BOTTOM))
             .divider(" - ");
         frame.render_widget(tabs, self.tabs_area);
 
         // Draw the current selected pane
-        if let Some(pane) = self.state.current_pane_mut() {
+        if let Some(pane) = self.current_pane_mut() {
             pane.draw(frame, &mut ());
         }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
-        if let Some(pane) = self.state.current_pane_mut() {
+        if let Some(pane) = self.current_pane_mut() {
             pane.on_key(key, &mut ());
         }
     }

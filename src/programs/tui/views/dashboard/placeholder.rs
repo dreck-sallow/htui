@@ -19,8 +19,9 @@ impl PlaceholderView {
     }
 }
 
-impl ElementView for PlaceholderView {
+impl ElementView<'_> for PlaceholderView {
     type State = GlobalPaneState;
+    type Collector = ();
 
     fn draw(&self, frame: &mut ratatui::Frame, _state: &Self::State) {
         let [x_area] = Layout::horizontal([Constraint::Percentage(40)])

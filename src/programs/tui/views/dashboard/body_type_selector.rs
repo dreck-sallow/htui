@@ -10,7 +10,7 @@ use crate::{
     store::models::BodyContent,
 };
 
-use super::global_pane_state::GlobalPaneState;
+use super::{global_pane_state::GlobalPaneState, pane_state::history::MutationCollector};
 
 /// Body content type
 /// mirror from `BodyContent`
@@ -86,14 +86,15 @@ impl BodyTypeSelectorView {
     }
 }
 
-impl ElementView for BodyTypeSelectorView {
+impl<'a> ElementView<'a> for BodyTypeSelectorView {
     type State = GlobalPaneState;
+    type Collector = MutationCollector<'a>;
 
     fn draw(&self, frame: &mut ratatui::Frame, _state: &Self::State) {
         self.inner.draw(frame);
     }
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, state: &mut Self::State) {
+    fn on_key(&mut self, key: crossterm::event::KeyEvent, _collector: &mut Self::Collector) {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Char('j') | KeyCode::Down => {
@@ -103,11 +104,11 @@ impl ElementView for BodyTypeSelectorView {
                     self.inner.prev();
                 }
                 KeyCode::Enter => {
-                    state.hidden_overlay();
+                    // state.hidden_overlay();
                     // state.set_current_request_method(self.inner.selected());
                 }
                 KeyCode::Esc => {
-                    state.hidden_overlay();
+                    // state.hidden_overlay();
                 }
                 _ => {}
             }

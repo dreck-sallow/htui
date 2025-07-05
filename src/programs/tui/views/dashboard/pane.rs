@@ -4,39 +4,50 @@ use ratatui::{
     Frame,
 };
 
-use crate::{programs::tui::element_view::ElementView, store::models::ProjectModel};
+use crate::{
+    programs::tui::element_view::{Drawable, ElementView, Interactive, Painter},
+    store::models::ProjectModel,
+};
 
 use super::{
-    body_type_selector::BodyTypeSelectorView, collections::CollectionsView,
-    global_pane_state::GlobalPaneState, method_selector::MethodSelectorView,
-    method_url_bar::MethodUrlBarView, placeholder::PlaceholderView,
-    request_editor::RequestEditorView, response_viewer::ResponseViewerView,
+    body_type_selector::BodyTypeSelectorView,
+    collections::{CollectionsComponent, CollectionsView},
+    method_selector::MethodSelectorView,
+    method_url_bar::MethodUrlBarView,
+    pane_state::{history::MutationsHistory, PaneState},
+    placeholder::PlaceholderView,
+    request_editor::RequestEditorView,
+    response_viewer::ResponseViewerView,
     upsert_item::UpsertItemView,
 };
 
-pub struct PaneView {
+pub struct PaneView<'a> {
     render_area: Rect,
-    global_pane_state: GlobalPaneState,
-
+    pane_state: PaneState,
+    mutations_history: MutationsHistory<'a>,
     collections_view: CollectionsView,
     method_url_bar_view: MethodUrlBarView,
     request_editor_view: RequestEditorView,
     response_viewer_view: ResponseViewerView,
-    // response_viewer_editor: HttpPayloadEditorView,
     upsert_item_view: UpsertItemView,
     method_selector_view: MethodSelectorView,
     body_selector_view: BodyTypeSelectorView,
     placeholder_view: PlaceholderView,
+
+    __collections_component: CollectionsComponent,
 }
 
-impl PaneView {
+impl PaneView<'_> {
     pub fn new(project: ProjectModel) -> Self {
         let (method_url_bar_view, method_selector_view) = MethodUrlBarView::new_with_dropdown();
         let (request_editor_view, body_selector_view) = RequestEditorView::new_with_dropdown();
 
         Self {
             render_area: Rect::default(),
-            global_pane_state: GlobalPaneState::new(project),
+            __collections_component: CollectionsComponent::new(&project),
+            pane_state: PaneState::new(project),
+            mutations_history: MutationsHistory::new(),
+            // global_pane_state: GlobalPaneState::new(project),
             collections_view: CollectionsView::new(),
             upsert_item_view: UpsertItemView::new(),
             method_url_bar_view,
@@ -49,42 +60,47 @@ impl PaneView {
     }
 
     pub fn project_name(&self) -> &str {
-        self.global_pane_state.project_name()
+        self.pane_state.project_name()
     }
 }
 
-impl ElementView for PaneView {
+impl<'a> ElementView<'a> for PaneView<'_> {
     type State = ();
+    type Collector = ();
 
     fn draw(&self, frame: &mut Frame, _state: &Self::State) {
-        self.collections_view.draw(frame, &self.global_pane_state);
+        let mut painter = Painter::new();
+        self.__collections_component
+            .draw(&mut painter, &self.pane_state);
 
-        if self.global_pane_state.current_request_idx.is_some() {
-            self.method_url_bar_view
-                .draw(frame, &self.global_pane_state);
+        painter.draw(frame);
 
-            self.request_editor_view
-                .draw(frame, &self.global_pane_state);
+        // let state_reader = self.pane_state.reader();
+        // self.collections_view.draw(frame, &state_reader);
 
-            self.response_viewer_view
-                .draw(frame, &self.global_pane_state);
-        } else {
-            self.placeholder_view.draw(frame, &self.global_pane_state);
-        }
+        // if state_reader.current_request_idx().is_some() {
+        //     self.method_url_bar_view.draw(frame, &state_reader);
 
-        if let Some(overlay_focus) = self.global_pane_state.overlay() {
-            match overlay_focus {
-                super::focus::OverlayFocus::UpsertItem => {
-                    self.upsert_item_view.draw(frame, &self.global_pane_state)
-                }
-                super::focus::OverlayFocus::MethodSelector => self
-                    .method_selector_view
-                    .draw(frame, &self.global_pane_state),
-                super::focus::OverlayFocus::BodySelector => {
-                    self.body_selector_view.draw(frame, &self.global_pane_state)
-                }
-            }
-        }
+        //     self.request_editor_view.draw(frame, &state_reader);
+
+        //     self.response_viewer_view.draw(frame, &state_reader);
+        // } else {
+        //     self.placeholder_view.draw(frame, &state_reader);
+        // }
+
+        // if let Some(overlay_focus) = self.global_pane_state.overlay() {
+        //     match overlay_focus {
+        //         super::focus::OverlayFocus::UpsertItem => {
+        //             self.upsert_item_view.draw(frame, &self.global_pane_state)
+        //         }
+        //         super::focus::OverlayFocus::MethodSelector => self
+        //             .method_selector_view
+        //             .draw(frame, &self.global_pane_state),
+        //         super::focus::OverlayFocus::BodySelector => {
+        //             self.body_selector_view.draw(frame, &self.global_pane_state)
+        //         }
+        //     }
+        // }
     }
 
     fn set_area(&mut self, area: Rect) {
@@ -103,6 +119,8 @@ impl ElementView for PaneView {
 
             (collections_area, content_area, right_areas)
         };
+        self.__collections_component
+            .set_render_area(collections_area);
         self.collections_view.set_area(collections_area);
         self.method_url_bar_view.set_area(content_areas[0]);
         self.request_editor_view.set_area(content_areas[1]);
@@ -113,56 +131,67 @@ impl ElementView for PaneView {
     }
 
     fn on_key(&mut self, key: KeyEvent, _state: &mut Self::State) {
-        if let Some(overlay_focus) = self.global_pane_state.overlay() {
-            match overlay_focus {
-                super::focus::OverlayFocus::UpsertItem => self
-                    .upsert_item_view
-                    .on_key(key, &mut self.global_pane_state),
-                super::focus::OverlayFocus::MethodSelector => {
-                    self.method_selector_view
-                        .on_key(key, &mut self.global_pane_state);
-                }
-                super::focus::OverlayFocus::BodySelector => self
-                    .body_selector_view
-                    .on_key(key, &mut self.global_pane_state),
-            }
-        } else {
-            match self.global_pane_state.element_focus() {
-                super::focus::ElementFocus::Collections => self
-                    .collections_view
-                    .on_key(key, &mut self.global_pane_state),
-                super::focus::ElementFocus::MethodUrlBar => self
-                    .method_url_bar_view
-                    .on_key(key, &mut self.global_pane_state),
-                super::focus::ElementFocus::RequestBuilder => {
-                    self.request_editor_view
-                        .on_key(key, &mut self.global_pane_state);
-                }
-                super::focus::ElementFocus::ResponseViewer => self
-                    .response_viewer_view
-                    .on_key(key, &mut self.global_pane_state),
-            }
+        let mut mutations_collector = self.mutations_history.collector();
 
-            // TODO: when open a overlay, react to the previous changes
-            if let Some(overlay_focus) = self.global_pane_state.overlay() {
-                match overlay_focus {
-                    super::focus::OverlayFocus::UpsertItem => {
-                        self.upsert_item_view.set_inner(&self.global_pane_state)
-                    }
-                    super::focus::OverlayFocus::MethodSelector => {
-                        // self.method_selector_view.draw(frame)
-                    }
-                    super::focus::OverlayFocus::BodySelector => {}
-                }
-            }
+        self.__collections_component
+            .on_key(key, &mut mutations_collector, &self.pane_state);
 
-            // FIXME: call on_change_state only when the global_pane_state was changed
-            self.method_url_bar_view
-                .on_change_state(&self.global_pane_state);
+        if mutations_collector.has_content() {
+            self.mutations_history
+                .apply_from_collector(mutations_collector, &mut self.pane_state);
 
-            self.request_editor_view
-                .on_change_state(&self.global_pane_state);
+            self.__collections_component
+                .on_change_state(&self.pane_state);
         }
+
+        // if let Some(overlay_focus) = self.global_pane_state.overlay() {
+        //     match overlay_focus {
+        //         super::focus::OverlayFocus::UpsertItem => self
+        //             .upsert_item_view
+        //             .on_key(key, &mut self.global_pane_state),
+        //         super::focus::OverlayFocus::MethodSelector => {
+        //             self.method_selector_view
+        //                 .on_key(key, &mut self.global_pane_state);
+        //         }
+        //         super::focus::OverlayFocus::BodySelector => self
+        //             .body_selector_view
+        //             .on_key(key, &mut self.global_pane_state),
+        //     }
+        // } else {
+        //     match self.global_pane_state.element_focus() {
+        //         super::focus::ElementFocus::Collections => self
+        //             .collections_view
+        //             .on_key(key, &mut self.global_pane_state),
+        //         super::focus::ElementFocus::MethodUrlBar => self
+        //             .method_url_bar_view
+        //             .on_key(key, &mut self.global_pane_state),
+        //         super::focus::ElementFocus::RequestBuilder => {
+        //             self.request_editor_view
+        //                 .on_key(key, &mut self.global_pane_state);
+        //         }
+        //         super::focus::ElementFocus::ResponseViewer => self
+        //             .response_viewer_view
+        //             .on_key(key, &mut self.global_pane_state),
+        //     }
+
+        //     // TODO: when open a overlay, react to the previous changes
+        //     // if let Some(overlay_focus) = self.global_pane_state.overlay() {
+        //     //     match overlay_focus {
+        //     //         super::focus::OverlayFocus::UpsertItem => {
+        //     //             self.upsert_item_view.set_inner(&self.global_pane_state)
+        //     //         }
+        //     //         super::focus::OverlayFocus::MethodSelector => {
+        //     //             // self.method_selector_view.draw(frame)
+        //     //         }
+        //     //         super::focus::OverlayFocus::BodySelector => {}
+        //     //     }
+        //     // }
+
+        //     // FIXME: call on_change_state only when the global_pane_state was changed
+        //     self.method_url_bar_view.on_change_state(&reader);
+
+        //     self.request_editor_view.on_change_state(&reader);
+        // }
     }
 
     fn on_change_state(&mut self, _state: &Self::State) {}

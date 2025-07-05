@@ -65,6 +65,22 @@ impl Idx {
     pub fn is_child(&self) -> bool {
         matches!(self, Idx::Child(_, _))
     }
+
+    pub fn parent_idx(&self) -> usize {
+        if let Idx::Parent(i) = self {
+            *i
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn child_idx(&self) -> (usize, usize) {
+        if let Idx::Child(i, sub_i) = self {
+            (*i, *sub_i)
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 pub struct CollectionsState<Identifier> {
