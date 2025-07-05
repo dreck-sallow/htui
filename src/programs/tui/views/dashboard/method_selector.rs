@@ -8,13 +8,16 @@ use ratatui::{
 
 use crate::{
     programs::tui::{
-        element_view::ElementView,
-        elements::dropdown::{OverlayDropdown, OverlayDropdownData},
+        element_view::{Drawable, ElementView, Interactive},
+        elements::dropdown::{OverlayDropdown, OverlayDropdownData, OverlayDropdown_v2},
     },
     store::models::HttpMethod,
 };
 
-use super::{global_pane_state::GlobalPaneState, pane_state::history::MutationCollector};
+use super::{
+    global_pane_state::GlobalPaneState,
+    pane_state::{history::MutationCollector, PaneState},
+};
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,

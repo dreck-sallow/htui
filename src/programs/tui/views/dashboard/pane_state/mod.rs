@@ -93,6 +93,10 @@ impl<'a> PaneState {
         self.element_focus = element_focus;
     }
 
+    pub fn focus(&self) -> &ElementFocus {
+        &self.element_focus
+    }
+
     pub fn focus_overlay(&mut self, overlay_focus: OverlayFocus) {
         self.overlay_focus = Some(overlay_focus);
     }

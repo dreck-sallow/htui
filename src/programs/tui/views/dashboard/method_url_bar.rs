@@ -1,180 +1,194 @@
-use std::{cell::RefCell, rc::Rc};
-
-use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     text::Span,
     widgets::Block,
 };
-use tui_textarea::{Input, TextArea};
+use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
     programs::tui::{
-        element_view::ElementView,
-        elements::{
-            dropdown::{OverlayDropdownData, SharedDropdown},
-            utils::expand,
-            Separator,
-        },
+        element_view::{Drawable, Interactive},
+        elements::{dropdown::OverlayDropdown_v2, utils::expand, Separator},
     },
     store::models::HttpMethod,
 };
 
-use super::{
-    global_pane_state::GlobalPaneState,
-    method_selector::MethodSelectorView,
-    pane_state::{
-        history::MutationCollector,
-        mutations::{FocusNavigation, SetFocus},
-    },
+use super::pane_state::{
+    history::MutationCollector,
+    mutations::{FocusNavigation, SetFocus},
+    PaneState,
 };
 
-pub struct MethodUrlBarView {
+const METHODS: [HttpMethod; 7] = [
+    HttpMethod::Get,
+    HttpMethod::Post,
+    HttpMethod::Put,
+    HttpMethod::Patch,
+    HttpMethod::Delete,
+    HttpMethod::Head,
+    HttpMethod::Options,
+];
+
+pub struct MethodUrlBarComponent {
     render_area: Rect,
-    dropdown_data_ref: SharedDropdown<HttpMethod>,
+    method: HttpMethod,
     url_input: TextArea<'static>,
-    is_sending: bool,
-    request_idx: (usize, usize),
+    dropdown: OverlayDropdown_v2<HttpMethod>,
+    show_dropdown: bool,
 }
 
-impl MethodUrlBarView {
-    pub fn new_with_dropdown() -> (Self, MethodSelectorView) {
-        let dropdown_data = Rc::new(RefCell::new(OverlayDropdownData::new(HttpMethod::Get)));
-
+impl MethodUrlBarComponent {
+    pub fn new() -> Self {
         let mut url_input = TextArea::default();
         url_input.set_cursor_line_style(Style::default());
         url_input.set_placeholder_text("Enter a url");
-        url_input.insert_str("https://");
+        // url_input.insert_str("https://");
 
-        let this = Self {
+        Self {
             render_area: Rect::default(),
-            dropdown_data_ref: Rc::clone(&dropdown_data),
+            method: HttpMethod::Get,
             url_input,
-            is_sending: false,
-            request_idx: (0, 0),
-        };
-
-        (this, MethodSelectorView::new(dropdown_data))
+            dropdown: OverlayDropdown_v2::with_items(HttpMethod::Get, METHODS)
+                .with_highlight_style(Style::default().on_light_blue()),
+            show_dropdown: false,
+        }
     }
 
     fn clean_url(&mut self) {
-        self.url_input.move_cursor(tui_textarea::CursorMove::End);
+        self.url_input.move_cursor(CursorMove::End);
         self.url_input.delete_line_by_head();
     }
 }
 
-impl<'a> ElementView<'a> for MethodUrlBarView {
-    type State = GlobalPaneState;
-    type Collector = MutationCollector<'a>;
+impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for MethodUrlBarComponent {
+    type State = PaneState;
 
-    fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
-        let request = state.current_request().unwrap();
-        let is_focus = state.is_focus(super::focus::ElementFocus::MethodUrlBar);
+    fn draw(
+        &'a self,
+        painter: &mut crate::programs::tui::element_view::Painter<'painter>,
+        state: &'a Self::State,
+    ) {
+        painter.render(|frame| {
+            let is_focus = state.is_focused(super::focus::ElementFocus::MethodUrlBar);
 
-        let border_style = is_focus
-            .then_some(Style::default().blue())
-            .unwrap_or_default();
+            let border_style = is_focus
+                .then_some(Style::default().blue())
+                .unwrap_or_default();
 
-        let line_block = Block::bordered().border_style(border_style);
+            let line_block = Block::bordered().border_style(border_style);
 
-        let area = line_block.inner(self.render_area);
-        frame.render_widget(line_block, self.render_area);
+            let area = line_block.inner(self.render_area);
+            frame.render_widget(line_block, self.render_area);
 
-        let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
-            Layout::horizontal([
-                Constraint::Length(11),
-                Constraint::Length(1),
-                Constraint::Min(10),
-                Constraint::Length(1),
-                Constraint::Length(10),
-            ])
-            .areas(area);
+            let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
+                Layout::horizontal([
+                    Constraint::Length(11),
+                    Constraint::Length(1),
+                    Constraint::Min(10),
+                    Constraint::Length(1),
+                    Constraint::Length(10),
+                ])
+                .areas(area);
 
-        frame.render_widget(
-            Separator::default().style(border_style),
-            left_separator_area,
-        );
-        frame.render_widget(
-            Separator::default().style(border_style),
-            right_reparator_area,
-        );
+            frame.render_widget(
+                Separator::default().style(border_style),
+                left_separator_area,
+            );
+            frame.render_widget(
+                Separator::default().style(border_style),
+                right_reparator_area,
+            );
 
-        frame.render_widget(
-            Span::from(expand(request.method().as_ref(), " ", 10))
-                .style(Style::new().on_light_red())
-                .black(),
-            method_area,
-        );
+            frame.render_widget(
+                Span::from(expand(self.method.as_ref(), " ", 10))
+                    .style(Style::new().on_light_red())
+                    .black(),
+                method_area,
+            );
 
-        frame.render_widget(&self.url_input, url_area);
-        frame.render_widget(
-            Span::from(expand(if self.is_sending { "--" } else { "Send" }, " ", 10))
+            frame.render_widget(&self.url_input, url_area);
+            frame.render_widget(
+                Span::from(expand(
+                    if self.show_dropdown { "--" } else { "Send" },
+                    " ",
+                    10,
+                ))
                 .on_light_green()
                 .black(),
-            indicator_area,
-        );
+                indicator_area,
+            );
+        });
+
+        if self.show_dropdown {
+            painter.render_last(|frame| {
+                let area = Rect {
+                    x: self.render_area.left(),
+                    y: self.render_area.bottom(),
+                    width: 11,
+                    height: METHODS.len() as u16 + 1,
+                };
+                frame.render_widget(&self.dropdown, area);
+            });
+        }
     }
 
-    fn set_area(&mut self, area: Rect) {
-        self.render_area = area;
+    fn set_render_area(&mut self, _area: Rect) {
+        self.render_area = _area;
     }
+}
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, collector: &mut Self::Collector) {
+impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for MethodUrlBarComponent {
+    type Mutator = MutationCollector<'a>;
+
+    fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, _state: &Self::State) {
         if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Tab => {
-                    collector.add(SetFocus::new(FocusNavigation::Next));
-                    // state.set_focus(super::focus::ElementFocus::RequestBuilder);
-                    // let url = self.url_input.lines()[0].clone();
-                    // state.change_url_from_state(url);
-                }
-                KeyCode::BackTab => {
-                    collector.add(SetFocus::new(FocusNavigation::Prev));
-                    // state.set_focus(super::focus::ElementFocus::Collections);
-                    // let url = self.url_input.lines()[0].clone();
-                    // state.change_url_from_state(url);
-                }
-                KeyCode::Enter => {
-                    // Change to pending
-                    if key.modifiers == KeyModifiers::ALT {
-                        // Open the method picker
-                        // state.set_overlay(super::focus::OverlayFocus::MethodSelector);
-                        // let method = state.current_request().unwrap().method();
-
-                        let mut dropdown_mut = self.dropdown_data_ref.borrow_mut();
-
-                        dropdown_mut.set_area(Rect {
-                            x: self.render_area.left(),
-                            y: self.render_area.bottom(),
-                            width: 11, // length of the largest httpMethod
-                            height: 8, // options + 1 (border)
-                        });
-                        // dropdown_mut.select(method);
-                    } else {
-                        self.is_sending = !self.is_sending;
+            if self.show_dropdown {
+                match key.code {
+                    KeyCode::Enter => {
+                        self.method = self.dropdown.selected().clone();
+                        self.show_dropdown = false;
+                    }
+                    KeyCode::Esc => {
+                        self.show_dropdown = false;
+                    }
+                    _ => {
+                        self.dropdown.handle_key(key);
                     }
                 }
+            } else {
+                match key.code {
+                    KeyCode::Tab => {
+                        mutator.add(SetFocus::new(FocusNavigation::Next));
+                    }
+                    KeyCode::BackTab => {
+                        mutator.add(SetFocus::new(FocusNavigation::Prev));
+                    }
+                    KeyCode::Enter => {
+                        // Change to pending
+                        if key.modifiers == KeyModifiers::ALT {
+                            self.show_dropdown = true;
+                        }
+                    }
 
-                _ => {
-                    let key_input = Input::from(key);
-                    self.url_input.input(key_input);
+                    _ => {
+                        let key_input = Input::from(key);
+                        self.url_input.input(key_input);
+                    }
                 }
             }
         }
     }
 
-    fn on_change_state(&mut self, state: &Self::State) {
-        match state.current_request_idx {
-            Some(idx) => {
-                if self.request_idx != idx {
-                    let new_url = state.current_request().unwrap().url();
-                    self.clean_url();
-                    self.url_input.insert_str(new_url);
-                    self.request_idx = idx;
-                }
-            }
-            None => {}
-        };
+    fn on_change_state(&mut self, _state: &Self::State) {
+        let reader = _state.reader();
+
+        if let Some(req) = reader.current_request() {
+            // FIXME: check for previous request, or react only when change request index not on all mutations
+            self.clean_url();
+            self.url_input.insert_str(req.url());
+            self.method = req.method();
+        }
     }
 }

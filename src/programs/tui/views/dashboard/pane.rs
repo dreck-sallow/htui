@@ -11,9 +11,8 @@ use crate::{
 
 use super::{
     body_type_selector::BodyTypeSelectorView,
-    collections::{CollectionsComponent, CollectionsView},
-    method_selector::MethodSelectorView,
-    method_url_bar::MethodUrlBarView,
+    collections::CollectionsComponent,
+    method_url_bar::MethodUrlBarComponent,
     pane_state::{history::MutationsHistory, PaneState},
     placeholder::PlaceholderView,
     request_editor::RequestEditorView,
@@ -25,36 +24,39 @@ pub struct PaneView<'a> {
     render_area: Rect,
     pane_state: PaneState,
     mutations_history: MutationsHistory<'a>,
-    collections_view: CollectionsView,
-    method_url_bar_view: MethodUrlBarView,
+    // collections_view: CollectionsView,
+    // method_url_bar_view: MethodUrlBarView,
     request_editor_view: RequestEditorView,
     response_viewer_view: ResponseViewerView,
     upsert_item_view: UpsertItemView,
-    method_selector_view: MethodSelectorView,
-    body_selector_view: BodyTypeSelectorView,
+    // method_selector_view: MethodSelectorView,
+    // body_selector_view: BodyTypeSelectorView,
     placeholder_view: PlaceholderView,
 
-    __collections_component: CollectionsComponent,
+    collections_component: CollectionsComponent,
+    method_url_bar_component: MethodUrlBarComponent,
 }
 
 impl PaneView<'_> {
     pub fn new(project: ProjectModel) -> Self {
-        let (method_url_bar_view, method_selector_view) = MethodUrlBarView::new_with_dropdown();
+        // let (method_url_bar_view, method_selector_view) = MethodUrlBarView::new_with_dropdown();
         let (request_editor_view, body_selector_view) = RequestEditorView::new_with_dropdown();
 
         Self {
             render_area: Rect::default(),
-            __collections_component: CollectionsComponent::new(&project),
+            collections_component: CollectionsComponent::new(&project),
+            method_url_bar_component: MethodUrlBarComponent::new(),
+
             pane_state: PaneState::new(project),
             mutations_history: MutationsHistory::new(),
             // global_pane_state: GlobalPaneState::new(project),
-            collections_view: CollectionsView::new(),
+            // collections_view: CollectionsView::new(),
             upsert_item_view: UpsertItemView::new(),
-            method_url_bar_view,
+            // method_url_bar_view,
             request_editor_view,
             response_viewer_view: ResponseViewerView::new(),
-            method_selector_view,
-            body_selector_view,
+            // method_selector_view,
+            // body_selector_view,
             placeholder_view: PlaceholderView::new(),
         }
     }
@@ -70,7 +72,10 @@ impl<'a> ElementView<'a> for PaneView<'_> {
 
     fn draw(&self, frame: &mut Frame, _state: &Self::State) {
         let mut painter = Painter::new();
-        self.__collections_component
+        self.collections_component
+            .draw(&mut painter, &self.pane_state);
+
+        self.method_url_bar_component
             .draw(&mut painter, &self.pane_state);
 
         painter.draw(frame);
@@ -119,10 +124,11 @@ impl<'a> ElementView<'a> for PaneView<'_> {
 
             (collections_area, content_area, right_areas)
         };
-        self.__collections_component
-            .set_render_area(collections_area);
-        self.collections_view.set_area(collections_area);
-        self.method_url_bar_view.set_area(content_areas[0]);
+        self.collections_component.set_render_area(collections_area);
+        // self.collections_view.set_area(collections_area);
+        self.method_url_bar_component
+            .set_render_area(content_areas[0]);
+        // self.method_url_bar_view.set_area(content_areas[0]);
         self.request_editor_view.set_area(content_areas[1]);
         self.response_viewer_view.set_area(content_areas[2]);
         self.placeholder_view.set_area(placeholder_area);
@@ -133,14 +139,28 @@ impl<'a> ElementView<'a> for PaneView<'_> {
     fn on_key(&mut self, key: KeyEvent, _state: &mut Self::State) {
         let mut mutations_collector = self.mutations_history.collector();
 
-        self.__collections_component
-            .on_key(key, &mut mutations_collector, &self.pane_state);
+        match self.pane_state.focus() {
+            super::focus::ElementFocus::Collections => {
+                self.collections_component
+                    .on_key(key, &mut mutations_collector, &self.pane_state);
+            }
+            super::focus::ElementFocus::MethodUrlBar => {
+                self.method_url_bar_component.on_key(
+                    key,
+                    &mut mutations_collector,
+                    &self.pane_state,
+                );
+            }
+            super::focus::ElementFocus::RequestBuilder => todo!(),
+            super::focus::ElementFocus::ResponseViewer => todo!(),
+        }
 
         if mutations_collector.has_content() {
             self.mutations_history
                 .apply_from_collector(mutations_collector, &mut self.pane_state);
 
-            self.__collections_component
+            self.collections_component.on_change_state(&self.pane_state);
+            self.method_url_bar_component
                 .on_change_state(&self.pane_state);
         }
 
