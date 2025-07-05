@@ -22,8 +22,6 @@ pub struct PaneView<'a> {
     render_area: Rect,
     pane_state: PaneState,
     mutations_history: MutationsHistory<'a>,
-    // request_editor_view: RequestEditorView,
-    // response_viewer_view: ResponseViewerView,
     placeholder_view: PlaceholderView,
 
     collections_component: CollectionsComponent,
@@ -39,11 +37,10 @@ impl PaneView<'_> {
             collections_component: CollectionsComponent::new(&project),
             method_url_bar_component: MethodUrlBarComponent::new(),
             request_editor_component: RequestEditorComponent::new(),
+            response_viewer_component: ResponseViewerComponent::new(),
 
             pane_state: PaneState::new(project),
             mutations_history: MutationsHistory::new(),
-            // request_editor_view,
-            response_viewer_component: ResponseViewerComponent::new(),
             placeholder_view: PlaceholderView::new(),
         }
     }
@@ -62,14 +59,19 @@ impl<'a> ElementView<'a> for PaneView<'_> {
         self.collections_component
             .draw(&mut painter, &self.pane_state);
 
-        self.method_url_bar_component
-            .draw(&mut painter, &self.pane_state);
+        if self.pane_state.reader().current_request_idx().is_some() {
+            self.method_url_bar_component
+                .draw(&mut painter, &self.pane_state);
 
-        self.request_editor_component
-            .draw(&mut painter, &self.pane_state);
+            self.request_editor_component
+                .draw(&mut painter, &self.pane_state);
 
-        self.response_viewer_component
-            .draw(&mut painter, &self.pane_state);
+            self.response_viewer_component
+                .draw(&mut painter, &self.pane_state);
+        } else {
+            // TODO: update to new rendering flow
+            self.placeholder_view.draw(frame);
+        }
 
         painter.draw(frame);
     }

@@ -17,7 +17,7 @@ use crate::{
 
 use super::pane_state::{
     history::MutationCollector,
-    mutations::{FocusNavigation, SetFocus},
+    mutations::{EditRequest, FocusNavigation, RequestEditType, SetFocus},
     PaneState,
 };
 
@@ -43,8 +43,7 @@ impl MethodUrlBarComponent {
     pub fn new() -> Self {
         let mut url_input = TextArea::default();
         url_input.set_cursor_line_style(Style::default());
-        url_input.set_placeholder_text("Enter a url");
-        // url_input.insert_str("https://");
+        url_input.set_placeholder_text("https://");
 
         Self {
             render_area: Rect::default(),
@@ -158,12 +157,26 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for MethodUrlBarComponent
                     }
                 }
             } else {
+                let mut mutate_on_blur = |focus_navigation: FocusNavigation| {
+                    let request_idx = _state.reader().current_request_idx().unwrap();
+                    mutator.add(EditRequest::new(
+                        request_idx,
+                        RequestEditType::Url(self.url_input.lines()[0].to_string()),
+                    ));
+
+                    mutator.add(EditRequest::new(
+                        request_idx,
+                        RequestEditType::Method(self.method),
+                    ));
+                    mutator.add(SetFocus::new(focus_navigation));
+                };
+
                 match key.code {
                     KeyCode::Tab => {
-                        mutator.add(SetFocus::new(FocusNavigation::Next));
+                        mutate_on_blur(FocusNavigation::Next);
                     }
                     KeyCode::BackTab => {
-                        mutator.add(SetFocus::new(FocusNavigation::Prev));
+                        mutate_on_blur(FocusNavigation::Prev);
                     }
                     KeyCode::Enter => {
                         // Change to pending

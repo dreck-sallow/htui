@@ -65,6 +65,10 @@ impl TextEditor {
         self.mode = mode;
     }
 
+    pub fn lines(&self) -> &[String] {
+        self.textarea.lines()
+    }
+
     pub fn clean_lines(&mut self) {
         let lines_count = self.textarea.lines().len();
         self.textarea.move_cursor(CursorMove::Bottom);

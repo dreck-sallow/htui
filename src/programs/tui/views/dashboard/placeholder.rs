@@ -3,10 +3,6 @@ use ratatui::{
     text::Span,
 };
 
-use crate::programs::tui::element_view::ElementView;
-
-use super::global_pane_state::GlobalPaneState;
-
 pub struct PlaceholderView {
     render_area: Rect,
 }
@@ -17,13 +13,8 @@ impl PlaceholderView {
             render_area: Rect::default(),
         }
     }
-}
 
-impl ElementView<'_> for PlaceholderView {
-    type State = GlobalPaneState;
-    type Collector = ();
-
-    fn draw(&self, frame: &mut ratatui::Frame, _state: &Self::State) {
+    pub fn draw(&self, frame: &mut ratatui::Frame) {
         let [x_area] = Layout::horizontal([Constraint::Percentage(40)])
             .flex(ratatui::layout::Flex::Center)
             .areas(self.render_area);
@@ -45,7 +36,7 @@ impl ElementView<'_> for PlaceholderView {
         );
     }
 
-    fn set_area(&mut self, area: Rect) {
+    pub fn set_area(&mut self, area: Rect) {
         self.render_area = area;
     }
 }
