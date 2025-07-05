@@ -315,7 +315,7 @@ impl TryFrom<&str> for HttpMethod {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BodyContent {
     Empty,
     File(PathBuf),

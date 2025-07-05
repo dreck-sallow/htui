@@ -109,7 +109,7 @@ impl<'a> ElementView<'a> for RequestEditorView {
         if key.kind == KeyEventKind::Press {
             let is_editing = match self.tab {
                 RequestTab::Headers => self.headers_editor.mode().is_write_mode(),
-                RequestTab::Body => false,
+                RequestTab::Body => self.body_editor.is_editable(),
             };
 
             match key.code {

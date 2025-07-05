@@ -10,53 +10,39 @@ use crate::{
 };
 
 use super::{
-    body_type_selector::BodyTypeSelectorView,
     collections::CollectionsComponent,
     method_url_bar::MethodUrlBarComponent,
     pane_state::{history::MutationsHistory, PaneState},
     placeholder::PlaceholderView,
-    request_editor::RequestEditorView,
+    request_builder::RequestEditorComponent,
     response_viewer::ResponseViewerView,
-    upsert_item::UpsertItemView,
 };
 
 pub struct PaneView<'a> {
     render_area: Rect,
     pane_state: PaneState,
     mutations_history: MutationsHistory<'a>,
-    // collections_view: CollectionsView,
-    // method_url_bar_view: MethodUrlBarView,
-    request_editor_view: RequestEditorView,
+    // request_editor_view: RequestEditorView,
     response_viewer_view: ResponseViewerView,
-    upsert_item_view: UpsertItemView,
-    // method_selector_view: MethodSelectorView,
-    // body_selector_view: BodyTypeSelectorView,
     placeholder_view: PlaceholderView,
 
     collections_component: CollectionsComponent,
     method_url_bar_component: MethodUrlBarComponent,
+    request_editor_component: RequestEditorComponent,
 }
 
 impl PaneView<'_> {
     pub fn new(project: ProjectModel) -> Self {
-        // let (method_url_bar_view, method_selector_view) = MethodUrlBarView::new_with_dropdown();
-        let (request_editor_view, body_selector_view) = RequestEditorView::new_with_dropdown();
-
         Self {
             render_area: Rect::default(),
             collections_component: CollectionsComponent::new(&project),
             method_url_bar_component: MethodUrlBarComponent::new(),
+            request_editor_component: RequestEditorComponent::new(),
 
             pane_state: PaneState::new(project),
             mutations_history: MutationsHistory::new(),
-            // global_pane_state: GlobalPaneState::new(project),
-            // collections_view: CollectionsView::new(),
-            upsert_item_view: UpsertItemView::new(),
-            // method_url_bar_view,
-            request_editor_view,
+            // request_editor_view,
             response_viewer_view: ResponseViewerView::new(),
-            // method_selector_view,
-            // body_selector_view,
             placeholder_view: PlaceholderView::new(),
         }
     }
@@ -76,6 +62,9 @@ impl<'a> ElementView<'a> for PaneView<'_> {
             .draw(&mut painter, &self.pane_state);
 
         self.method_url_bar_component
+            .draw(&mut painter, &self.pane_state);
+
+        self.request_editor_component
             .draw(&mut painter, &self.pane_state);
 
         painter.draw(frame);
@@ -125,14 +114,13 @@ impl<'a> ElementView<'a> for PaneView<'_> {
             (collections_area, content_area, right_areas)
         };
         self.collections_component.set_render_area(collections_area);
-        // self.collections_view.set_area(collections_area);
         self.method_url_bar_component
             .set_render_area(content_areas[0]);
-        // self.method_url_bar_view.set_area(content_areas[0]);
-        self.request_editor_view.set_area(content_areas[1]);
+        self.request_editor_component
+            .set_render_area(content_areas[1]);
+
         self.response_viewer_view.set_area(content_areas[2]);
         self.placeholder_view.set_area(placeholder_area);
-        self.upsert_item_view.set_area(area);
         self.render_area = area;
     }
 
@@ -151,8 +139,14 @@ impl<'a> ElementView<'a> for PaneView<'_> {
                     &self.pane_state,
                 );
             }
-            super::focus::ElementFocus::RequestBuilder => todo!(),
-            super::focus::ElementFocus::ResponseViewer => todo!(),
+            super::focus::ElementFocus::RequestBuilder => {
+                self.request_editor_component.on_key(
+                    key,
+                    &mut mutations_collector,
+                    &self.pane_state,
+                );
+            }
+            super::focus::ElementFocus::ResponseViewer => {}
         }
 
         if mutations_collector.has_content() {
@@ -161,6 +155,9 @@ impl<'a> ElementView<'a> for PaneView<'_> {
 
             self.collections_component.on_change_state(&self.pane_state);
             self.method_url_bar_component
+                .on_change_state(&self.pane_state);
+
+            self.request_editor_component
                 .on_change_state(&self.pane_state);
         }
 

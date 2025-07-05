@@ -9,6 +9,7 @@ use ratatui::{
 
 use crate::{programs::tui::element_view::ElementView, store::models::ProjectModel};
 
+mod body_editor;
 mod body_type_selector;
 mod collections;
 mod editor;
