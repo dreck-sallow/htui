@@ -145,7 +145,6 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for RequestEditorComponen
                         }
                     }
                 },
-
                 KeyCode::BackTab => match self.tab {
                     Tab::Headers => {
                         if is_editing {

@@ -17,11 +17,7 @@ use crate::{
 
 use super::{
     editor::TextEditor,
-    pane_state::{
-        history::MutationCollector,
-        mutations::{FocusNavigation, SetFocus},
-        PaneState,
-    },
+    pane_state::{history::MutationCollector, PaneState},
 };
 
 /// Body content type
@@ -91,8 +87,7 @@ impl BodyEditorComponent {
             return match self.body_content {
                 BodyContent::Empty => false,
                 BodyContent::File(_) => false,
-                BodyContent::Form(_) => true,
-                BodyContent::Text(_) => true,
+                _ => self.text_editor.mode().is_write_mode(),
             };
         }
         false
@@ -202,7 +197,7 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for BodyEditorComponent {
     fn on_key(
         &mut self,
         key: crossterm::event::KeyEvent,
-        mutator: &mut Self::Mutator,
+        _mutator: &mut Self::Mutator,
         _state: &Self::State,
     ) {
         if self.show_dropdown {
@@ -224,15 +219,7 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for BodyEditorComponent {
                 }
             }
         } else {
-            let is_editing = self.is_editing() && self.text_editor.mode().is_write_mode();
-
             match key.code {
-                KeyCode::Tab if !is_editing => {
-                    mutator.add(SetFocus::new(FocusNavigation::Next));
-                }
-                KeyCode::BackTab if !is_editing => {
-                    mutator.add(SetFocus::new(FocusNavigation::Prev));
-                }
                 KeyCode::Enter if key.modifiers == KeyModifiers::ALT => {
                     self.show_dropdown = true;
                     self.dropdown.select(BodyType::from(&self.body_content));

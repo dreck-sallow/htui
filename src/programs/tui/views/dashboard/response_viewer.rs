@@ -5,182 +5,146 @@ use ratatui::{
     widgets::{Block, Borders, Tabs},
 };
 
-use crate::{programs::tui::element_view::ElementView, store::models::BodyContent};
+use crate::programs::tui::element_view::{Drawable, Interactive};
 
 use super::{
+    body_editor::BodyEditorComponent,
     editor::TextEditor,
-    global_pane_state::GlobalPaneState,
-    http_payload_editor::body_editor::BodyEditor,
-    pane_state::{history::MutationCollector, mutations::SetFocus},
+    pane_state::{history::MutationCollector, mutations::SetFocus, PaneState},
 };
 
 #[derive(Clone, Copy)]
-pub enum ResponseTab {
+pub enum Tab {
     Headers,
     Response,
 }
 
-impl Into<&str> for ResponseTab {
-    fn into(self) -> &'static str {
+impl Tab {
+    pub fn as_idx(&self) -> usize {
         match self {
-            ResponseTab::Headers => " Headers ",
-            ResponseTab::Response => " Response ",
+            Tab::Headers => 1,
+            Tab::Response => 0,
         }
     }
 }
 
-pub struct ResponseViewerView {
+impl AsRef<str> for Tab {
+    fn as_ref(&self) -> &str {
+        match self {
+            Tab::Headers => "Headers",
+            Tab::Response => "Response",
+        }
+    }
+}
+
+pub struct ResponseViewerComponent {
     render_area: Rect,
     header_area: Rect,
     content_area: Rect,
-    tab: ResponseTab,
+    tab: Tab,
     headers_editor: TextEditor,
-    body_editor: BodyEditor,
-    request_idx: (usize, usize),
+    body_editor: BodyEditorComponent,
 }
 
-impl ResponseViewerView {
+impl ResponseViewerComponent {
     pub fn new() -> Self {
         Self {
             render_area: Rect::default(),
             header_area: Rect::default(),
             content_area: Rect::default(),
-            tab: ResponseTab::Response,
+            tab: Tab::Response,
             headers_editor: TextEditor::new(false),
-            body_editor: BodyEditor::new_readable(),
-            request_idx: (0, 0),
-        }
-    }
-
-    pub fn tab_idx(&self) -> usize {
-        match self.tab {
-            ResponseTab::Headers => 1,
-            ResponseTab::Response => 0,
+            body_editor: BodyEditorComponent::new(false),
         }
     }
 }
 
-impl<'a> ElementView<'a> for ResponseViewerView {
-    type State = GlobalPaneState;
-    type Collector = MutationCollector<'a>;
+impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for ResponseViewerComponent {
+    type State = PaneState;
 
-    fn draw(&self, frame: &mut ratatui::Frame, state: &Self::State) {
-        let style = if state.is_focus(super::focus::ElementFocus::ResponseViewer) {
-            Style::default().blue()
-        } else {
-            Style::default()
-        };
-        let block = Block::bordered().border_style(style);
-        frame.render_widget(block, self.render_area);
-
-        let tabs = Tabs::new([
-            Into::<&str>::into(ResponseTab::Response),
-            Into::<&str>::into(ResponseTab::Headers),
-        ])
-        .select(self.tab_idx())
-        .block(Block::new().borders(Borders::BOTTOM).border_style(style))
-        .highlight_style(Style::default().blue());
-
-        frame.render_widget(tabs, self.header_area);
-
-        match self.tab {
-            ResponseTab::Headers => {
-                frame.render_widget(&self.headers_editor, self.content_area);
-            }
-            ResponseTab::Response => {
-                self.body_editor.draw(frame, &BodyContent::Empty);
-            }
-        }
-    }
-
-    fn on_key(&mut self, key: crossterm::event::KeyEvent, collector: &mut Self::Collector) {
-        if key.kind == KeyEventKind::Press {
-            let is_editing = match self.tab {
-                ResponseTab::Headers => self.headers_editor.mode().is_write_mode(),
-                ResponseTab::Response => false,
+    fn draw(
+        &'a self,
+        painter: &mut crate::programs::tui::element_view::Painter<'painter>,
+        state: &'a Self::State,
+    ) {
+        painter.render(|frame| {
+            let style = if state.is_focused(super::focus::ElementFocus::ResponseViewer) {
+                Style::default().blue()
+            } else {
+                Style::default()
             };
 
-            match key.code {
-                KeyCode::Tab => match self.tab {
-                    ResponseTab::Headers => {
-                        if is_editing {
-                            self.headers_editor.handle_key(key)
-                        } else {
-                            collector.add(SetFocus::for_next());
-                        }
-                    }
-                    ResponseTab::Response => {
-                        if is_editing {
-                            // self.body_editor.on_key(key, &mut BodyContent::Empty);
-                        } else {
-                            self.tab = ResponseTab::Headers;
-                        }
-                    }
-                },
+            let block = Block::bordered().border_style(style);
+            frame.render_widget(block, self.render_area);
 
-                KeyCode::BackTab => match self.tab {
-                    ResponseTab::Headers => {
-                        if is_editing {
-                            self.headers_editor.handle_key(key);
-                        } else {
-                            self.tab = ResponseTab::Response;
-                        }
-                    }
-                    ResponseTab::Response => {
-                        if is_editing {
-                            // self.body_editor.on_key(key, &mut BodyContent::Empty);
-                        } else {
-                            collector.add(SetFocus::for_previous());
-                        }
-                    }
-                },
-                _ => match self.tab {
-                    ResponseTab::Headers => self.headers_editor.handle_key(key),
-                    ResponseTab::Response => {
-                        // self.body_editor.on_key(
-                        //                         key,
-                        //                         &mut BodyContent::Text(String::from(
-                        //                             "{'name': 'dikson Aranda'\n, 'age': 'other name'}",
-                        //                         )),
-                        //                     )
-                    }
-                },
+            let tabs = Tabs::new([
+                format!(" {} ", Tab::Response.as_ref()),
+                format!(" {} ", Tab::Headers.as_ref()),
+            ])
+            .select(self.tab.as_idx())
+            .block(Block::new().borders(Borders::BOTTOM).border_style(style))
+            .highlight_style(Style::default().blue());
+
+            frame.render_widget(tabs, self.header_area);
+        });
+
+        match self.tab {
+            Tab::Headers => {
+                painter.render(|frame| {
+                    frame.render_widget(&self.headers_editor, self.content_area);
+                });
+            }
+            Tab::Response => {
+                self.body_editor.draw(painter, state);
             }
         }
     }
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_render_area(&mut self, area: Rect) {
         let main_areas = Layout::vertical([Constraint::Length(2), Constraint::Fill(50)])
             .split(area.inner(Margin::new(1, 1)));
 
         self.render_area = area;
         self.header_area = main_areas[0];
         self.content_area = main_areas[1];
-        self.body_editor.set_area(main_areas[1]);
+        self.body_editor.set_render_area(main_areas[1]);
     }
+}
 
-    fn on_change_state(&mut self, state: &Self::State) {
-        match state.current_request_idx {
-            Some(idx) => {
-                if self.request_idx != idx {
-                    // Save the request data into "Request"
+impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for ResponseViewerComponent {
+    type Mutator = MutationCollector<'a>;
 
-                    // Start from zero
-                    self.headers_editor.clean_lines();
-                    {
-                        let mut headers_text = String::new();
-                        for (k, v) in state.current_request().unwrap().headers() {
-                            headers_text.push_str(&format!("{k}:{v}\n"));
-                        }
-
-                        self.headers_editor.insert_str(&headers_text);
+    fn on_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        mutator: &mut Self::Mutator,
+        state: &Self::State,
+    ) {
+        if key.kind == KeyEventKind::Press {
+            match key.code {
+                KeyCode::Tab => match self.tab {
+                    Tab::Headers => {
+                        mutator.add(SetFocus::for_next());
                     }
-
-                    self.tab = ResponseTab::Headers;
-                    self.request_idx = idx;
-                }
+                    Tab::Response => {
+                        self.tab = Tab::Headers;
+                    }
+                },
+                KeyCode::BackTab => match self.tab {
+                    Tab::Headers => {
+                        self.tab = Tab::Response;
+                    }
+                    Tab::Response => {
+                        mutator.add(SetFocus::for_previous());
+                    }
+                },
+                _ => match self.tab {
+                    Tab::Headers => self.headers_editor.handle_key(key),
+                    Tab::Response => {
+                        self.body_editor.on_key(key, mutator, state);
+                    }
+                },
             }
-            None => {}
         }
     }
 }

@@ -15,7 +15,7 @@ use super::{
     pane_state::{history::MutationsHistory, PaneState},
     placeholder::PlaceholderView,
     request_builder::RequestEditorComponent,
-    response_viewer::ResponseViewerView,
+    response_viewer::ResponseViewerComponent,
 };
 
 pub struct PaneView<'a> {
@@ -23,12 +23,13 @@ pub struct PaneView<'a> {
     pane_state: PaneState,
     mutations_history: MutationsHistory<'a>,
     // request_editor_view: RequestEditorView,
-    response_viewer_view: ResponseViewerView,
+    // response_viewer_view: ResponseViewerView,
     placeholder_view: PlaceholderView,
 
     collections_component: CollectionsComponent,
     method_url_bar_component: MethodUrlBarComponent,
     request_editor_component: RequestEditorComponent,
+    response_viewer_component: ResponseViewerComponent,
 }
 
 impl PaneView<'_> {
@@ -42,7 +43,7 @@ impl PaneView<'_> {
             pane_state: PaneState::new(project),
             mutations_history: MutationsHistory::new(),
             // request_editor_view,
-            response_viewer_view: ResponseViewerView::new(),
+            response_viewer_component: ResponseViewerComponent::new(),
             placeholder_view: PlaceholderView::new(),
         }
     }
@@ -67,34 +68,10 @@ impl<'a> ElementView<'a> for PaneView<'_> {
         self.request_editor_component
             .draw(&mut painter, &self.pane_state);
 
+        self.response_viewer_component
+            .draw(&mut painter, &self.pane_state);
+
         painter.draw(frame);
-
-        // let state_reader = self.pane_state.reader();
-        // self.collections_view.draw(frame, &state_reader);
-
-        // if state_reader.current_request_idx().is_some() {
-        //     self.method_url_bar_view.draw(frame, &state_reader);
-
-        //     self.request_editor_view.draw(frame, &state_reader);
-
-        //     self.response_viewer_view.draw(frame, &state_reader);
-        // } else {
-        //     self.placeholder_view.draw(frame, &state_reader);
-        // }
-
-        // if let Some(overlay_focus) = self.global_pane_state.overlay() {
-        //     match overlay_focus {
-        //         super::focus::OverlayFocus::UpsertItem => {
-        //             self.upsert_item_view.draw(frame, &self.global_pane_state)
-        //         }
-        //         super::focus::OverlayFocus::MethodSelector => self
-        //             .method_selector_view
-        //             .draw(frame, &self.global_pane_state),
-        //         super::focus::OverlayFocus::BodySelector => {
-        //             self.body_selector_view.draw(frame, &self.global_pane_state)
-        //         }
-        //     }
-        // }
     }
 
     fn set_area(&mut self, area: Rect) {
@@ -119,7 +96,8 @@ impl<'a> ElementView<'a> for PaneView<'_> {
         self.request_editor_component
             .set_render_area(content_areas[1]);
 
-        self.response_viewer_view.set_area(content_areas[2]);
+        self.response_viewer_component
+            .set_render_area(content_areas[2]);
         self.placeholder_view.set_area(placeholder_area);
         self.render_area = area;
     }
@@ -146,7 +124,13 @@ impl<'a> ElementView<'a> for PaneView<'_> {
                     &self.pane_state,
                 );
             }
-            super::focus::ElementFocus::ResponseViewer => {}
+            super::focus::ElementFocus::ResponseViewer => {
+                self.response_viewer_component.on_key(
+                    key,
+                    &mut mutations_collector,
+                    &self.pane_state,
+                );
+            }
         }
 
         if mutations_collector.has_content() {
@@ -159,56 +143,10 @@ impl<'a> ElementView<'a> for PaneView<'_> {
 
             self.request_editor_component
                 .on_change_state(&self.pane_state);
+
+            self.response_viewer_component
+                .on_change_state(&self.pane_state);
         }
-
-        // if let Some(overlay_focus) = self.global_pane_state.overlay() {
-        //     match overlay_focus {
-        //         super::focus::OverlayFocus::UpsertItem => self
-        //             .upsert_item_view
-        //             .on_key(key, &mut self.global_pane_state),
-        //         super::focus::OverlayFocus::MethodSelector => {
-        //             self.method_selector_view
-        //                 .on_key(key, &mut self.global_pane_state);
-        //         }
-        //         super::focus::OverlayFocus::BodySelector => self
-        //             .body_selector_view
-        //             .on_key(key, &mut self.global_pane_state),
-        //     }
-        // } else {
-        //     match self.global_pane_state.element_focus() {
-        //         super::focus::ElementFocus::Collections => self
-        //             .collections_view
-        //             .on_key(key, &mut self.global_pane_state),
-        //         super::focus::ElementFocus::MethodUrlBar => self
-        //             .method_url_bar_view
-        //             .on_key(key, &mut self.global_pane_state),
-        //         super::focus::ElementFocus::RequestBuilder => {
-        //             self.request_editor_view
-        //                 .on_key(key, &mut self.global_pane_state);
-        //         }
-        //         super::focus::ElementFocus::ResponseViewer => self
-        //             .response_viewer_view
-        //             .on_key(key, &mut self.global_pane_state),
-        //     }
-
-        //     // TODO: when open a overlay, react to the previous changes
-        //     // if let Some(overlay_focus) = self.global_pane_state.overlay() {
-        //     //     match overlay_focus {
-        //     //         super::focus::OverlayFocus::UpsertItem => {
-        //     //             self.upsert_item_view.set_inner(&self.global_pane_state)
-        //     //         }
-        //     //         super::focus::OverlayFocus::MethodSelector => {
-        //     //             // self.method_selector_view.draw(frame)
-        //     //         }
-        //     //         super::focus::OverlayFocus::BodySelector => {}
-        //     //     }
-        //     // }
-
-        //     // FIXME: call on_change_state only when the global_pane_state was changed
-        //     self.method_url_bar_view.on_change_state(&reader);
-
-        //     self.request_editor_view.on_change_state(&reader);
-        // }
     }
 
     fn on_change_state(&mut self, _state: &Self::State) {}
