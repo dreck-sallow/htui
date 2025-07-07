@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     programs::tui::views::dashboard::focus::ElementFocus,
-    store::models::{CollectionsModel, HttpMethod, RequestModel},
+    store::models::{BodyContent, CollectionsModel, HttpMethod, RequestModel},
 };
 
 use super::PaneState;
@@ -251,6 +251,7 @@ pub enum RequestEditType {
     Url(String),
     Method(HttpMethod),
     Headers(HashMap<String, String>),
+    Body(BodyContent),
 }
 
 pub struct EditRequest {
@@ -302,6 +303,12 @@ impl PaneStateMutation for EditRequest {
                     req.set_headers(hash_map.clone());
                 });
             }
+            RequestEditType::Body(body_content) => {
+                self.previous_action = RequestEditType::Body(req.body().clone());
+                state.edit_request(self.idx, |req| {
+                    req.set_body(body_content.clone());
+                });
+            }
         }
     }
 
@@ -325,6 +332,11 @@ impl PaneStateMutation for EditRequest {
             RequestEditType::Headers(hash_map) => {
                 state.edit_request(self.idx, |req| {
                     req.set_headers(hash_map.clone());
+                });
+            }
+            RequestEditType::Body(body_content) => {
+                state.edit_request(self.idx, |req| {
+                    req.set_body(body_content.clone());
                 });
             }
         }

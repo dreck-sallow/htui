@@ -73,7 +73,7 @@ impl TextEditor {
         let lines_count = self.textarea.lines().len();
         self.textarea.move_cursor(CursorMove::Bottom);
 
-        for _i in [lines_count..0] {
+        for _i in 0..lines_count {
             self.textarea.delete_line_by_head();
             self.textarea.delete_newline();
         }

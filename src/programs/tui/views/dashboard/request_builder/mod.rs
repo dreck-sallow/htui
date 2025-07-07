@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
@@ -10,7 +12,11 @@ use crate::programs::tui::element_view::{Drawable, Interactive};
 use super::{
     body_editor::BodyEditorComponent,
     editor::TextEditor,
-    pane_state::{history::MutationCollector, mutations::SetFocus, PaneState},
+    pane_state::{
+        history::MutationCollector,
+        mutations::{EditRequest, FocusNavigation, RequestEditType, SetFocus},
+        PaneState,
+    },
 };
 
 pub mod request_builder_state;
@@ -128,6 +134,32 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for RequestEditorComponen
                 Tab::Body => self.body_editor.is_editing(),
             };
 
+            let mut mutate_on_blur = |focus_navigation: FocusNavigation| {
+                let idx = state.reader().current_request_idx().unwrap();
+                let headers = {
+                    let mut map = HashMap::new();
+
+                    for line in self.headers_editor.lines() {
+                        let mut parts = line.splitn(1, ':');
+                        let key = parts.next().map(|txt| txt.trim().to_string());
+                        let value = parts.next().map(|txt| txt.trim().to_string());
+
+                        if let (Some(k), Some(v)) = (key, value) {
+                            map.insert(k, v);
+                        }
+                    }
+
+                    map
+                };
+
+                mutator.add(EditRequest::new(idx, RequestEditType::Headers(headers)));
+                mutator.add(EditRequest::new(
+                    idx,
+                    RequestEditType::Body(self.body_editor.body_type().clone()),
+                ));
+                mutator.add(SetFocus::new(focus_navigation));
+            };
+
             match key.code {
                 KeyCode::Tab => match self.tab {
                     Tab::Headers => {
@@ -141,7 +173,7 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for RequestEditorComponen
                         if is_editing {
                             self.body_editor.on_key(key, mutator, state);
                         } else {
-                            mutator.add(SetFocus::for_next());
+                            mutate_on_blur(FocusNavigation::Next);
                         }
                     }
                 },
@@ -150,7 +182,7 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for RequestEditorComponen
                         if is_editing {
                             self.headers_editor.handle_key(key);
                         } else {
-                            mutator.add(SetFocus::for_previous());
+                            mutate_on_blur(FocusNavigation::Prev);
                         }
                     }
                     Tab::Body => {

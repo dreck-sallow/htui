@@ -199,6 +199,10 @@ impl RequestModel {
         &self.body
     }
 
+    pub fn set_body(&mut self, body: BodyContent) {
+        self.body = body;
+    }
+
     pub fn method(&self) -> HttpMethod {
         self.method
     }

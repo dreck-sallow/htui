@@ -93,9 +93,35 @@ impl BodyEditorComponent {
         false
     }
 
-    // pub fn body_type(&self) -> &BodyContent {
-    //     &self.body_content
-    // }
+    pub fn body_type(&self) -> BodyContent {
+        match &self.body_content {
+            BodyContent::Form(_) => {
+                let mut map = HashMap::new();
+
+                for line in self.text_editor.lines() {
+                    let mut parts = line.splitn(2, '=');
+                    let key = parts.next().map(|txt| txt.trim().to_string());
+                    let value = parts.next().map(|txt| txt.trim().to_string());
+
+                    if let (Some(k), Some(v)) = (key, value) {
+                        map.insert(k, v);
+                    }
+                }
+
+                BodyContent::Form(map)
+            }
+            BodyContent::Text(_) => {
+                let mut text = String::new();
+                for line in self.text_editor.lines() {
+                    text.push_str(line);
+                    text.push('\n');
+                }
+
+                BodyContent::Text(text)
+            }
+            body => body.clone(),
+        }
+    }
 
     pub fn draw_header_line(&self, line_area: Rect, frame: &mut ratatui::Frame) {
         let title = Span::from(format!(" Type: {} ", self.body_content.as_tag())).italic();
@@ -210,6 +236,7 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for BodyEditorComponent {
                         BodyType::Form => BodyContent::Form(HashMap::new()),
                         BodyType::Text => BodyContent::Text(String::new()),
                     };
+                    self.text_editor.clean_lines();
                 }
                 KeyCode::Esc => {
                     self.show_dropdown = false;
@@ -244,12 +271,16 @@ impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for BodyEditorComponent {
             self.body_content = req.body().clone();
 
             match &self.body_content {
-                BodyContent::Empty => {}
-                BodyContent::File(_) => {}
+                BodyContent::Empty => {
+                    self.body_content = BodyContent::Empty;
+                }
+                BodyContent::File(p) => {
+                    self.body_content = BodyContent::File(p.to_owned());
+                }
                 BodyContent::Form(map) => {
                     self.text_editor.clean_lines();
                     for (k, v) in map {
-                        self.text_editor.insert_str(&format!("{k}: {v}"));
+                        self.text_editor.insert_str(&format!("{k}= {v}\n"));
                     }
                 }
                 BodyContent::Text(txt) => {
