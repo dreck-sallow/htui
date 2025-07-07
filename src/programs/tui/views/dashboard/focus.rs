@@ -5,10 +5,3 @@ pub enum ElementFocus {
     RequestBuilder,
     ResponseViewer,
 }
-
-#[derive(PartialEq, Eq)]
-pub enum OverlayFocus {
-    UpsertItem,
-    MethodSelector,
-    BodySelector,
-}

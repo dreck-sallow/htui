@@ -19,8 +19,6 @@ use super::{
     },
 };
 
-pub mod request_builder_state;
-
 #[derive(Clone, Copy)]
 pub enum Tab {
     Headers,

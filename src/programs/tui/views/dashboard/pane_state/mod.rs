@@ -1,6 +1,6 @@
 use crate::store::models::{CollectionsModel, ProjectModel, RequestModel};
 
-use super::focus::{ElementFocus, OverlayFocus};
+use super::focus::ElementFocus;
 
 pub mod history;
 pub mod mutations;
@@ -8,7 +8,6 @@ pub mod mutations;
 pub struct PaneState {
     project: ProjectModel,
     element_focus: ElementFocus,
-    overlay_focus: Option<OverlayFocus>,
     current_request_idx: Option<(usize, usize)>,
 }
 
@@ -24,7 +23,6 @@ impl<'a> PaneState {
         Self {
             project,
             element_focus: ElementFocus::Collections,
-            overlay_focus: None,
             current_request_idx: request_idx,
         }
     }
@@ -97,14 +95,6 @@ impl<'a> PaneState {
         &self.element_focus
     }
 
-    pub fn focus_overlay(&mut self, overlay_focus: OverlayFocus) {
-        self.overlay_focus = Some(overlay_focus);
-    }
-
-    pub fn hidden_overlay(&mut self) {
-        self.overlay_focus = None;
-    }
-
     pub fn is_focused(&self, element_focus: ElementFocus) -> bool {
         self.element_focus == element_focus
     }
@@ -117,10 +107,6 @@ pub struct PaneStateReader<'a> {
 impl<'a> PaneStateReader<'a> {
     fn new(state: &'a PaneState) -> Self {
         Self { state }
-    }
-
-    pub fn project_name(&self) -> &str {
-        self.state.project.name()
     }
 
     pub fn current_request_idx(&self) -> Option<(usize, usize)> {

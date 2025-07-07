@@ -4,26 +4,22 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     widgets::{Block, Clear},
-    Frame,
 };
 use tui_textarea::Input;
 use upsert_item_menu::{UpsertItemMenu, UpsertMethod};
 
 use crate::{
-    programs::tui::element_view::{Drawable, ElementView, Interactive, Painter},
+    programs::tui::element_view::{Drawable, Interactive, Painter},
     store::models::{CollectionsModel, ProjectModel, RequestModel},
 };
 
-use super::{
-    global_pane_state::GlobalPaneState,
-    pane_state::{
-        history::MutationCollector,
-        mutations::{
-            AddCollection, AddRequest, EditCollectionName, EditRequest, FocusNavigation,
-            RemoveCollection, RemoveRequest, RequestEditType, SetFocus, SetRquestIdx,
-        },
-        PaneState,
+use super::pane_state::{
+    history::MutationCollector,
+    mutations::{
+        AddCollection, AddRequest, EditCollectionName, EditRequest, FocusNavigation,
+        RemoveCollection, RemoveRequest, RequestEditType, SetFocus, SetRquestIdx,
     },
+    PaneState,
 };
 
 mod collections;
