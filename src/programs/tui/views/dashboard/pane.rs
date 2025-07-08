@@ -5,7 +5,7 @@ use ratatui::{
 };
 
 use crate::{
-    programs::tui::element_view::{Drawable, ElementView, Interactive, Painter},
+    programs::tui::element_view::{Drawable, Interactive, Painter},
     store::models::ProjectModel,
 };
 
@@ -50,11 +50,8 @@ impl PaneView<'_> {
     }
 }
 
-impl<'a> ElementView<'a> for PaneView<'_> {
-    type State = ();
-    type Collector = ();
-
-    fn draw(&self, frame: &mut Frame, _state: &Self::State) {
+impl PaneView<'_> {
+    pub fn draw(&self, frame: &mut Frame) {
         let mut painter = Painter::new();
         self.collections_component
             .draw(&mut painter, &self.pane_state);
@@ -76,7 +73,7 @@ impl<'a> ElementView<'a> for PaneView<'_> {
         painter.draw(frame);
     }
 
-    fn set_area(&mut self, area: Rect) {
+    pub fn set_area(&mut self, area: Rect) {
         let (collections_area, placeholder_area, content_areas) = {
             let [collections_area, content_area] =
                 Layout::horizontal([Constraint::Percentage(25), Constraint::Fill(1)])
@@ -104,7 +101,7 @@ impl<'a> ElementView<'a> for PaneView<'_> {
         self.render_area = area;
     }
 
-    fn on_key(&mut self, key: KeyEvent, _state: &mut Self::State) {
+    pub fn on_key(&mut self, key: KeyEvent) {
         let mut mutations_collector = self.mutations_history.collector();
 
         match self.pane_state.focus() {
@@ -150,6 +147,4 @@ impl<'a> ElementView<'a> for PaneView<'_> {
                 .on_change_state(&self.pane_state);
         }
     }
-
-    fn on_change_state(&mut self, _state: &Self::State) {}
 }

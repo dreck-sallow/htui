@@ -1,16 +1,6 @@
 use crossterm::event::KeyEvent;
 use ratatui::{layout::Rect, Frame};
 
-pub trait ElementView<'a> {
-    type State;
-    type Collector;
-
-    fn set_area(&mut self, _area: Rect) {}
-    fn draw(&self, frame: &mut Frame, state: &Self::State);
-    fn on_key(&mut self, _key: KeyEvent, collector: &mut Self::Collector) {}
-    fn on_change_state(&mut self, _state: &Self::State) {}
-}
-
 pub struct Painter<'a> {
     renders: Vec<Box<dyn FnMut(&mut Frame) + 'a>>,
     last_renders: Vec<Box<dyn FnMut(&mut Frame) + 'a>>,

@@ -7,24 +7,18 @@ use ratatui::{
     Frame,
 };
 
-use crate::{programs::tui::element_view::ElementView, store::models::ProjectModel};
+use crate::store::models::ProjectModel;
 
 mod body_editor;
-mod body_type_selector;
 mod collections;
 mod editor;
 mod focus;
-mod global_pane_state;
-mod http_payload_editor;
-mod method_selector;
 mod method_url_bar;
 mod pane;
 mod pane_state;
 mod placeholder;
 mod request_builder;
-mod request_editor;
 mod response_viewer;
-mod upsert_item;
 
 pub struct DashboardView<'a> {
     panes: Vec<PaneView<'a>>,
@@ -80,13 +74,13 @@ impl<'a> DashboardView<'a> {
 
         // Draw the current selected pane
         if let Some(pane) = self.current_pane_mut() {
-            pane.draw(frame, &mut ());
+            pane.draw(frame);
         }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
         if let Some(pane) = self.current_pane_mut() {
-            pane.on_key(key, &mut ());
+            pane.on_key(key);
         }
     }
 }
