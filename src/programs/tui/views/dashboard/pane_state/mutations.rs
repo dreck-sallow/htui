@@ -1,11 +1,23 @@
-use std::collections::HashMap;
-
-use crate::{
-    programs::tui::views::dashboard::focus::ElementFocus,
-    store::models::{BodyContent, CollectionsModel, HttpMethod, RequestModel},
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
 };
 
-use super::PaneState;
+use reqwest::{ClientBuilder, Url};
+use tokio::{sync::mpsc, time::Instant};
+
+use crate::{
+    programs::tui::{events::Event, views::dashboard::focus::ElementFocus},
+    store::models::{
+        BodyContent, CollectionsModel, HttpMethod, RequestModel, ResponseModel, SendRequest,
+        SendRequestId,
+    },
+};
+
+use super::{
+    responses::{RequestTask, SendRequestResponse},
+    PaneState,
+};
 
 // TODO:  For previous values, I should use Cow
 
@@ -341,4 +353,96 @@ impl PaneStateMutation for EditRequest {
             }
         }
     }
+}
+
+pub struct SendRequestMutation {
+    send_request_id: SendRequestId,
+}
+
+impl SendRequestMutation {
+    pub fn new(id: SendRequestId) -> Self {
+        Self {
+            send_request_id: id,
+        }
+    }
+
+    pub fn send(
+        &self,
+        req: &RequestModel,
+        send_request: SendRequestResponse,
+        send_events: mpsc::UnboundedSender<Event>,
+    ) -> RequestTask {
+        let (tx, tr) = tokio::sync::oneshot::channel();
+
+        let url = Url::parse(req.url()).unwrap();
+        let method = match req.method() {
+            HttpMethod::Options => reqwest::Method::OPTIONS,
+            HttpMethod::Get => reqwest::Method::GET,
+            HttpMethod::Post => reqwest::Method::POST,
+            HttpMethod::Put => reqwest::Method::PUT,
+            HttpMethod::Delete => reqwest::Method::DELETE,
+            HttpMethod::Head => reqwest::Method::HEAD,
+            HttpMethod::Patch => reqwest::Method::PATCH,
+        };
+
+        let mut client_builder = ClientBuilder::new()
+            .referer(false)
+            .build()
+            .unwrap()
+            .request(method, url);
+
+        for (key, value) in req.headers_map() {
+            client_builder = client_builder.header(key, value);
+        }
+
+        let jh = tokio::spawn(async move {
+            let timer = Instant::now();
+            tokio::select! {
+                result = client_builder.send() => {
+                    match result {
+                        Ok(res) => {
+                            let response = ResponseModel { duration: timer.elapsed(),  status: res.status().as_u16(), body: "BODY", headers: HashMap::new() };
+                            *send_request.write().unwrap() = SendRequest::Finish(response);
+                        }
+                        Err(_e) => {
+                        }
+                    }
+                }
+                _ = tr => {
+                }
+            }
+            let _ = send_events.send(Event::Draw);
+        });
+
+        RequestTask::new(tx, jh)
+    }
+}
+
+impl PaneStateMutation for SendRequestMutation {
+    fn apply(&mut self, state: &mut PaneState) {
+        let send_req = match state.responses.stop(&self.send_request_id) {
+            Some(req) => {
+                *req.write().unwrap() = SendRequest::Pending;
+                req
+            }
+            None => Arc::new(RwLock::new(SendRequest::Pending)),
+        };
+
+        let current_req = state
+            .project
+            .request_by_idx(state.current_request_idx.unwrap())
+            .unwrap();
+
+        let request_task = self.send(
+            current_req,
+            Arc::clone(&send_req),
+            state.__send_event.clone(),
+        );
+
+        state
+            .responses
+            .add(self.send_request_id.clone(), send_req, request_task);
+    }
+
+    fn undo(&mut self, _state: &mut PaneState) {}
 }

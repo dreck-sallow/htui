@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Tabs},
 };
 
-use crate::programs::tui::element_view::{Drawable, Interactive};
+use crate::programs::tui::element_view::{Drawable, InteractiveV2};
 
 use super::{
     body_editor::BodyEditorComponent,
@@ -62,10 +62,10 @@ impl ResponseViewerComponent {
 impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for ResponseViewerComponent {
     type State = PaneState;
 
-    fn draw(
+    fn draw<'b: 'painter>(
         &'a self,
         painter: &mut crate::programs::tui::element_view::Painter<'painter>,
-        state: &'a Self::State,
+        state: &'b Self::State,
     ) {
         painter.render(|frame| {
             let style = if state.is_focused(super::focus::ElementFocus::ResponseViewer) {
@@ -111,8 +111,9 @@ impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for ResponseViewerComponent 
     }
 }
 
-impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for ResponseViewerComponent {
-    type Mutator = MutationCollector<'a>;
+impl InteractiveV2 for ResponseViewerComponent {
+    type State = PaneState;
+    type Mutator = MutationCollector;
 
     fn on_key(
         &mut self,

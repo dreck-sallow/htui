@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::{
     programs::tui::{
-        element_view::{Drawable, Interactive},
+        element_view::{Drawable, InteractiveV2},
         elements::dropdown::OverlayDropdown_v2,
     },
     store::models::BodyContent,
@@ -145,10 +145,10 @@ impl BodyEditorComponent {
 impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for BodyEditorComponent {
     type State = PaneState;
 
-    fn draw(
+    fn draw<'b: 'painter>(
         &'a self,
         painter: &mut crate::programs::tui::element_view::Painter<'painter>,
-        _state: &'a Self::State,
+        _state: &'b Self::State,
     ) {
         painter.render(|frame| {
             let content_area = {
@@ -217,8 +217,9 @@ impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for BodyEditorComponent {
     }
 }
 
-impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for BodyEditorComponent {
-    type Mutator = MutationCollector<'a>;
+impl InteractiveV2 for BodyEditorComponent {
+    type State = PaneState;
+    type Mutator = MutationCollector;
 
     fn on_key(
         &mut self,

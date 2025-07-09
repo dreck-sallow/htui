@@ -9,7 +9,7 @@ use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
     programs::tui::{
-        element_view::{Drawable, Interactive},
+        element_view::{Drawable, InteractiveV2},
         elements::{dropdown::OverlayDropdown_v2, utils::expand, Separator},
     },
     store::models::HttpMethod,
@@ -64,10 +64,10 @@ impl MethodUrlBarComponent {
 impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for MethodUrlBarComponent {
     type State = PaneState;
 
-    fn draw(
+    fn draw<'b: 'painter>(
         &'a self,
         painter: &mut crate::programs::tui::element_view::Painter<'painter>,
-        state: &'a Self::State,
+        state: &'b Self::State,
     ) {
         painter.render(|frame| {
             let is_focus = state.is_focused(super::focus::ElementFocus::MethodUrlBar);
@@ -138,8 +138,78 @@ impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for MethodUrlBarComponent {
     }
 }
 
-impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for MethodUrlBarComponent {
-    type Mutator = MutationCollector<'a>;
+// impl<'a: 'painter, 'painter> Interactive<'a, 'painter> for MethodUrlBarComponent {
+//     type Mutator = MutationCollector<'a>;
+
+//     fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, _state: &Self::State) {
+//         if key.kind == KeyEventKind::Press {
+//             if self.show_dropdown {
+//                 match key.code {
+//                     KeyCode::Enter => {
+//                         self.method = self.dropdown.selected().clone();
+//                         self.show_dropdown = false;
+//                     }
+//                     KeyCode::Esc => {
+//                         self.show_dropdown = false;
+//                     }
+//                     _ => {
+//                         self.dropdown.handle_key(key);
+//                     }
+//                 }
+//             } else {
+//                 let mut mutate_on_blur = |focus_navigation: FocusNavigation| {
+//                     let request_idx = _state.reader().current_request_idx().unwrap();
+//                     mutator.add(EditRequest::new(
+//                         request_idx,
+//                         RequestEditType::Url(self.url_input.lines()[0].to_string()),
+//                     ));
+
+//                     mutator.add(EditRequest::new(
+//                         request_idx,
+//                         RequestEditType::Method(self.method),
+//                     ));
+//                     mutator.add(SetFocus::new(focus_navigation));
+//                 };
+
+//                 match key.code {
+//                     KeyCode::Tab => {
+//                         mutate_on_blur(FocusNavigation::Next);
+//                     }
+//                     KeyCode::BackTab => {
+//                         mutate_on_blur(FocusNavigation::Prev);
+//                     }
+//                     KeyCode::Enter => {
+//                         // Change to pending
+//                         if key.modifiers == KeyModifiers::ALT {
+//                             self.show_dropdown = true;
+//                         }
+//                     }
+
+//                     _ => {
+//                         let key_input = Input::from(key);
+//                         self.url_input.input(key_input);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     fn on_change_state(&mut self, _state: &Self::State) {
+//         let reader = _state.reader();
+
+//         if let Some(req) = reader.current_request() {
+//             // FIXME: check for previous request, or react only when change request index not on all mutations
+//             self.clean_url();
+//             self.url_input.insert_str(req.url());
+//             self.method = req.method();
+//         }
+//     }
+// }
+
+impl InteractiveV2 for MethodUrlBarComponent {
+    type State = PaneState;
+
+    type Mutator = MutationCollector;
 
     fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, _state: &Self::State) {
         if key.kind == KeyEventKind::Press {

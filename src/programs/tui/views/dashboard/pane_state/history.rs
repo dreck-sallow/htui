@@ -1,11 +1,11 @@
 use super::{mutations::PaneStateMutation, PaneState};
 
-pub struct MutationsHistory<'a> {
-    stack: Vec<Box<dyn PaneStateMutation + 'a>>,
+pub struct MutationsHistory {
+    stack: Vec<Box<dyn PaneStateMutation + 'static>>,
     cursor: Option<usize>,
 }
 
-impl<'a> MutationsHistory<'a> {
+impl MutationsHistory {
     pub fn new() -> Self {
         Self {
             stack: Vec::new(),
@@ -13,21 +13,17 @@ impl<'a> MutationsHistory<'a> {
         }
     }
 
-    pub fn collector(&self) -> MutationCollector<'a> {
+    pub fn collector(&self) -> MutationCollector {
         MutationCollector::new()
     }
 
-    pub fn apply_from_collector(
-        &mut self,
-        collector: MutationCollector<'a>,
-        state: &mut PaneState,
-    ) {
+    pub fn apply_from_collector(&mut self, collector: MutationCollector, state: &mut PaneState) {
         for mutation in collector.mutations {
             self.apply(mutation, state);
         }
     }
 
-    fn apply(&mut self, mut mutation: Box<dyn PaneStateMutation + 'a>, state: &mut PaneState) {
+    fn apply(&mut self, mut mutation: Box<dyn PaneStateMutation + 'static>, state: &mut PaneState) {
         mutation.apply(state);
         self.stack.push(mutation);
 
@@ -64,18 +60,18 @@ impl<'a> MutationsHistory<'a> {
     }
 }
 
-pub struct MutationCollector<'a> {
-    mutations: Vec<Box<dyn PaneStateMutation + 'a>>,
+pub struct MutationCollector {
+    mutations: Vec<Box<dyn PaneStateMutation + 'static>>,
 }
 
-impl<'a> MutationCollector<'a> {
+impl MutationCollector {
     fn new() -> Self {
         Self {
             mutations: Vec::new(),
         }
     }
 
-    pub fn add<M: PaneStateMutation + 'a>(&mut self, mutation: M) {
+    pub fn add<M: PaneStateMutation + 'static>(&mut self, mutation: M) {
         self.mutations.push(Box::new(mutation));
     }
 

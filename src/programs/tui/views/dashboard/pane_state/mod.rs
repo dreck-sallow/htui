@@ -1,18 +1,27 @@
-use crate::store::models::{CollectionsModel, ProjectModel, RequestModel};
+use responses::Responses;
+use tokio::sync::mpsc;
+
+use crate::{
+    programs::tui::events::Event,
+    store::models::{CollectionsModel, ProjectModel, RequestModel, SendRequestId},
+};
 
 use super::focus::ElementFocus;
 
 pub mod history;
 pub mod mutations;
+pub mod responses;
 
 pub struct PaneState {
     project: ProjectModel,
     element_focus: ElementFocus,
     current_request_idx: Option<(usize, usize)>,
+    responses: Responses,
+    __send_event: mpsc::UnboundedSender<Event>,
 }
 
 impl<'a> PaneState {
-    pub fn new(project: ProjectModel) -> Self {
+    pub fn new(project: ProjectModel, __send_event: mpsc::UnboundedSender<Event>) -> Self {
         let request_idx =
             if project.collections().is_empty() || project.collections()[0].requests().is_empty() {
                 None
@@ -24,6 +33,8 @@ impl<'a> PaneState {
             project,
             element_focus: ElementFocus::Collections,
             current_request_idx: request_idx,
+            responses: Responses::new(),
+            __send_event,
         }
     }
 
@@ -98,6 +109,10 @@ impl<'a> PaneState {
     pub fn is_focused(&self, element_focus: ElementFocus) -> bool {
         self.element_focus == element_focus
     }
+
+    pub fn send_redraw(&self) {
+        let _ = self.__send_event.send(Event::Draw);
+    }
 }
 
 pub struct PaneStateReader<'a> {
@@ -122,5 +137,15 @@ impl<'a> PaneStateReader<'a> {
 
     pub fn collections(&self) -> &[CollectionsModel] {
         self.state.project.collections()
+    }
+
+    pub fn is_sending_request(&self, id: SendRequestId) -> bool {
+        match self.state.responses.get(&id) {
+            Some(send_req) => match &*send_req.read().unwrap() {
+                crate::store::models::SendRequest::Pending => true,
+                crate::store::models::SendRequest::Finish(_) => false,
+            },
+            None => false,
+        }
     }
 }

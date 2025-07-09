@@ -27,7 +27,7 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     events.listen();
 
     let mut dashboard_view = DashboardView::new();
-    dashboard_view.add_pane_from_project(project);
+    dashboard_view.add_pane_from_project(project, events.sender());
 
     dashboard_view.calculate_areas(Rect {
         x: 0,
@@ -43,11 +43,13 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     loop {
         if let Some(ev) = events.next_event().await {
             match ev {
-                events::Event::Input(key_event) => {
-                    dashboard_view.handle_key(key_event);
+                events::Event::Draw => {
                     terminal.draw(|frame| {
                         dashboard_view.draw(frame);
                     })?;
+                }
+                events::Event::Input(key_event) => {
+                    dashboard_view.handle_key(key_event);
                 }
                 events::Event::KeyBinding(_key_event, _key_event1) => todo!(),
                 events::Event::Quit => break,

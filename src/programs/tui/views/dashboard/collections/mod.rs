@@ -9,8 +9,8 @@ use tui_textarea::Input;
 use upsert_item_menu::{UpsertItemMenu, UpsertMethod};
 
 use crate::{
-    programs::tui::element_view::{Drawable, Interactive, Painter},
-    store::models::{CollectionsModel, ProjectModel, RequestModel},
+    programs::tui::element_view::{Drawable, InteractiveV2, Painter},
+    store::models::{CollectionsModel, ProjectModel, RequestModel, SendRequestId},
 };
 
 use super::pane_state::{
@@ -61,18 +61,23 @@ impl CollectionsComponent {
 impl<'a: 'painter_fn, 'painter_fn> Drawable<'a, 'painter_fn> for CollectionsComponent {
     type State = PaneState;
 
-    fn draw(&'a self, painter: &mut Painter<'painter_fn>, state: &'a Self::State) {
+    fn draw<'b: 'painter_fn>(&'a self, painter: &mut Painter<'painter_fn>, state: &'b Self::State) {
         painter.render(move |frame| {
             let reader = state.reader();
             let is_focus = state.is_focused(super::focus::ElementFocus::Collections);
             let items: Vec<Item<'_>> = reader
                 .collections()
                 .iter()
-                .map(|coll| {
+                .enumerate()
+                .map(|(i, coll)| {
                     let mut itm = Item::new(coll.name());
 
-                    for req in coll.requests() {
-                        itm.add_child(Item::new(req.name()));
+                    for (sub_i, req) in coll.requests().iter().enumerate() {
+                        let name = match reader.is_sending_request(SendRequestId(i, sub_i)) {
+                            true => format!("pending {}", req.name()),
+                            false => req.name().to_string(),
+                        };
+                        itm.add_child(Item::new(name));
                     }
 
                     itm
@@ -120,8 +125,139 @@ impl<'a: 'painter_fn, 'painter_fn> Drawable<'a, 'painter_fn> for CollectionsComp
     }
 }
 
-impl<'a: 'painter_fn, 'painter_fn> Interactive<'a, 'painter_fn> for CollectionsComponent {
-    type Mutator = MutationCollector<'a>;
+// impl<'a: 'painter_fn, 'painter_fn> Interactive<'a, 'painter_fn> for CollectionsComponent {
+//     type Mutator = MutationCollector<'a>;
+
+//     fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, state: &Self::State) {
+//         if key.kind == KeyEventKind::Press {
+//             if self.show_popup {
+//                 match key.code {
+//                     KeyCode::Enter => {
+//                         let idx = self.state.idx();
+//                         let text = self.menu.text();
+
+//                         match self.menu.method_type() {
+//                             UpsertMethod::CreateRequest => {
+//                                 mutator.add(AddRequest::new(
+//                                     idx.parent_idx(),
+//                                     RequestModel::new(text),
+//                                 ));
+//                             }
+//                             UpsertMethod::CreateCollection => {
+//                                 mutator.add(AddCollection::new(CollectionsModel::new(text)));
+//                             }
+//                             UpsertMethod::EditRequest => {
+//                                 mutator.add(EditRequest::new(
+//                                     idx.child_idx(),
+//                                     RequestEditType::Name(text),
+//                                 ));
+//                             }
+//                             UpsertMethod::EditCollection => {
+//                                 mutator.add(EditCollectionName::new(text, idx.parent_idx()));
+//                             }
+//                         }
+
+//                         self.show_popup = false;
+//                     }
+//                     KeyCode::Esc => {
+//                         self.show_popup = false;
+//                     }
+//                     _ => {
+//                         self.menu.handle_input(Input::from(key));
+//                     }
+//                 }
+//             } else {
+//                 match key.code {
+//                     KeyCode::Tab => {
+//                         mutator.add(SetFocus::new(FocusNavigation::Next));
+//                     }
+//                     KeyCode::Enter => match self.state.idx() {
+//                         Idx::Child(i, sub_i) => mutator.add(SetRquestIdx::new(Some((i, sub_i)))),
+//                         _ => {}
+//                     },
+//                     KeyCode::BackTab => {
+//                         mutator.add(SetFocus::new(FocusNavigation::Prev));
+//                     }
+//                     KeyCode::Left | KeyCode::Char('h') => {
+//                         self.state.close_collection(true);
+//                     }
+//                     KeyCode::Right | KeyCode::Char('l') => {
+//                         self.state.open_collection(true);
+//                     }
+//                     KeyCode::Down | KeyCode::Char('j') => {
+//                         self.state.next();
+//                     }
+//                     KeyCode::Up | KeyCode::Char('k') => {
+//                         self.state.prev();
+//                     }
+//                     KeyCode::Char('d') | KeyCode::Delete => {
+//                         match self.state.idx() {
+//                             state::Idx::None => {}
+//                             state::Idx::Parent(i) => {
+//                                 // SUGGEST: not delete, or react on on_change_state
+//                                 self.state.delete_collection();
+//                                 mutator.add(RemoveCollection::new(i));
+//                             }
+//                             state::Idx::Child(i, sub_i) => {
+//                                 // SUGGEST: not delete, or react on on_change_state
+//                                 self.state.delete_request();
+//                                 mutator.add(RemoveRequest::new((i, sub_i)));
+//                             }
+//                         }
+//                     }
+//                     KeyCode::Char('c') => {
+//                         self.show_popup = true;
+//                         self.menu.set_state(UpsertMethod::CreateCollection, "");
+//                     }
+//                     KeyCode::Char('r') => {
+//                         self.show_popup = true;
+//                         if !self.state.idx().is_none() {
+//                             self.menu.set_state(UpsertMethod::CreateRequest, "");
+//                         }
+//                     }
+//                     KeyCode::Char('e') => {
+//                         let reader = state.reader();
+
+//                         match self.state.idx() {
+//                             state::Idx::None => {}
+//                             state::Idx::Parent(i) => {
+//                                 let name = reader.collections()[i].name();
+//                                 self.menu.set_state(UpsertMethod::EditCollection, name);
+//                                 self.show_popup = true;
+//                             }
+//                             state::Idx::Child(i, sub_i) => {
+//                                 let name = reader.collections()[i].requests()[sub_i].name();
+//                                 self.menu.set_state(UpsertMethod::EditRequest, name);
+//                                 self.show_popup = true;
+//                             }
+//                         }
+//                     }
+//                     _ => {}
+//                 }
+//             }
+//         }
+//     }
+
+//     fn on_change_state(&mut self, state: &Self::State) {
+//         let reader = state.reader();
+
+//         for collection in reader.collections() {
+//             let children = collection
+//                 .requests()
+//                 .iter()
+//                 .map(|req| req.id().to_string())
+//                 .collect();
+
+//             self.state
+//                 .add_collection((collection.id().to_string(), children));
+//         }
+//     }
+// }
+
+impl InteractiveV2 for CollectionsComponent {
+    type State = PaneState;
+
+    type Mutator = MutationCollector;
 
     fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, state: &Self::State) {
         if key.kind == KeyEventKind::Press {

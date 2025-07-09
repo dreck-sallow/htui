@@ -1,45 +1,48 @@
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     Frame,
 };
+use tokio::sync::mpsc;
 
 use crate::{
-    programs::tui::element_view::{Drawable, Interactive, Painter},
-    store::models::ProjectModel,
+    programs::tui::{
+        element_view::{Drawable, InteractiveV2, Painter},
+        events::Event,
+    },
+    store::models::{ProjectModel, SendRequestId},
 };
 
 use super::{
     collections::CollectionsComponent,
     method_url_bar::MethodUrlBarComponent,
-    pane_state::{history::MutationsHistory, PaneState},
+    pane_state::{history::MutationsHistory, mutations::SendRequestMutation, PaneState},
     placeholder::PlaceholderView,
-    request_builder::RequestEditorComponent,
-    response_viewer::ResponseViewerComponent,
+    // request_builder::RequestEditorComponent,
+    // response_viewer::ResponseViewerComponent,
 };
 
-pub struct PaneView<'a> {
+pub struct PaneView {
     render_area: Rect,
     pane_state: PaneState,
-    mutations_history: MutationsHistory<'a>,
+    mutations_history: MutationsHistory,
     placeholder_view: PlaceholderView,
 
     collections_component: CollectionsComponent,
     method_url_bar_component: MethodUrlBarComponent,
-    request_editor_component: RequestEditorComponent,
-    response_viewer_component: ResponseViewerComponent,
+    // request_editor_component: RequestEditorComponent,
+    // response_viewer_component: ResponseViewerComponent,
 }
 
-impl PaneView<'_> {
-    pub fn new(project: ProjectModel) -> Self {
+impl PaneView {
+    pub fn new(project: ProjectModel, sender_event: mpsc::UnboundedSender<Event>) -> Self {
         Self {
             render_area: Rect::default(),
             collections_component: CollectionsComponent::new(&project),
             method_url_bar_component: MethodUrlBarComponent::new(),
-            request_editor_component: RequestEditorComponent::new(),
-            response_viewer_component: ResponseViewerComponent::new(),
-
-            pane_state: PaneState::new(project),
+            // request_editor_component: RequestEditorComponent::new(),
+            // response_viewer_component: ResponseViewerComponent::new(),
+            pane_state: PaneState::new(project, sender_event),
             mutations_history: MutationsHistory::new(),
             placeholder_view: PlaceholderView::new(),
         }
@@ -50,7 +53,7 @@ impl PaneView<'_> {
     }
 }
 
-impl PaneView<'_> {
+impl PaneView {
     pub fn draw(&self, frame: &mut Frame) {
         let mut painter = Painter::new();
         self.collections_component
@@ -60,11 +63,11 @@ impl PaneView<'_> {
             self.method_url_bar_component
                 .draw(&mut painter, &self.pane_state);
 
-            self.request_editor_component
-                .draw(&mut painter, &self.pane_state);
+            // self.request_editor_component
+            //     .draw(&mut painter, &self.pane_state);
 
-            self.response_viewer_component
-                .draw(&mut painter, &self.pane_state);
+            // self.response_viewer_component
+            //     .draw(&mut painter, &self.pane_state);
         } else {
             // TODO: update to new rendering flow
             self.placeholder_view.draw(frame);
@@ -92,43 +95,57 @@ impl PaneView<'_> {
         self.collections_component.set_render_area(collections_area);
         self.method_url_bar_component
             .set_render_area(content_areas[0]);
-        self.request_editor_component
-            .set_render_area(content_areas[1]);
+        // self.request_editor_component
+        //     .set_render_area(content_areas[1]);
 
-        self.response_viewer_component
-            .set_render_area(content_areas[2]);
+        // self.response_viewer_component
+        //     .set_render_area(content_areas[2]);
         self.placeholder_view.set_area(placeholder_area);
         self.render_area = area;
     }
 
     pub fn on_key(&mut self, key: KeyEvent) {
         let mut mutations_collector = self.mutations_history.collector();
+        let is_send_key_pressed = if let KeyEventKind::Press = key.kind {
+            KeyCode::Char('x') == key.code && KeyModifiers::ALT == key.modifiers
+        } else {
+            false
+        };
 
-        match self.pane_state.focus() {
-            super::focus::ElementFocus::Collections => {
-                self.collections_component
-                    .on_key(key, &mut mutations_collector, &self.pane_state);
+        if is_send_key_pressed {
+            if let Some(idx) = self.pane_state.reader().current_request_idx() {
+                mutations_collector.add(SendRequestMutation::new(SendRequestId::from(idx)));
             }
-            super::focus::ElementFocus::MethodUrlBar => {
-                self.method_url_bar_component.on_key(
-                    key,
-                    &mut mutations_collector,
-                    &self.pane_state,
-                );
-            }
-            super::focus::ElementFocus::RequestBuilder => {
-                self.request_editor_component.on_key(
-                    key,
-                    &mut mutations_collector,
-                    &self.pane_state,
-                );
-            }
-            super::focus::ElementFocus::ResponseViewer => {
-                self.response_viewer_component.on_key(
-                    key,
-                    &mut mutations_collector,
-                    &self.pane_state,
-                );
+        } else {
+            match self.pane_state.focus() {
+                super::focus::ElementFocus::Collections => {
+                    self.collections_component.on_key(
+                        key,
+                        &mut mutations_collector,
+                        &self.pane_state,
+                    );
+                }
+                super::focus::ElementFocus::MethodUrlBar => {
+                    self.method_url_bar_component.on_key(
+                        key,
+                        &mut mutations_collector,
+                        &self.pane_state,
+                    );
+                }
+                super::focus::ElementFocus::RequestBuilder => {
+                    // self.request_editor_component.on_key(
+                    //     key,
+                    //     &mut mutations_collector,
+                    //     &self.pane_state,
+                    // );
+                }
+                super::focus::ElementFocus::ResponseViewer => {
+                    // self.response_viewer_component.on_key(
+                    //     key,
+                    //     &mut mutations_collector,
+                    //     &self.pane_state,
+                    // );
+                }
             }
         }
 
@@ -140,11 +157,13 @@ impl PaneView<'_> {
             self.method_url_bar_component
                 .on_change_state(&self.pane_state);
 
-            self.request_editor_component
-                .on_change_state(&self.pane_state);
+            // self.request_editor_component
+            //     .on_change_state(&self.pane_state);
 
-            self.response_viewer_component
-                .on_change_state(&self.pane_state);
+            // self.response_viewer_component
+            //     .on_change_state(&self.pane_state);
         }
+
+        self.pane_state.send_redraw();
     }
 }

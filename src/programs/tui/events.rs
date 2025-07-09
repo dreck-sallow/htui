@@ -8,6 +8,7 @@ pub trait Source {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Event {
+    Draw,
     Input(KeyEvent),
     KeyBinding(KeyEvent, KeyEvent),
     Quit,
@@ -45,6 +46,10 @@ impl<'a> Events<'a> {
         for source in &mut self.sources {
             source.start_process();
         }
+    }
+
+    pub fn sender(&self) -> mpsc::UnboundedSender<Event> {
+        self.tx.clone()
     }
 
     pub async fn next_event(&mut self) -> Option<Event> {

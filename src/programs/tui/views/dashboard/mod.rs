@@ -6,11 +6,13 @@ use ratatui::{
     widgets::{Block, Borders, Tabs},
     Frame,
 };
+use tokio::sync::mpsc;
 
-use crate::store::models::ProjectModel;
+use crate::{programs::tui::events::Event, store::models::ProjectModel};
 
 mod body_editor;
 mod collections;
+mod context;
 mod editor;
 mod focus;
 mod method_url_bar;
@@ -20,13 +22,13 @@ mod placeholder;
 mod request_builder;
 mod response_viewer;
 
-pub struct DashboardView<'a> {
-    panes: Vec<PaneView<'a>>,
+pub struct DashboardView {
+    panes: Vec<PaneView>,
     selected: Option<usize>,
     tabs_area: Rect,
 }
 
-impl<'a> DashboardView<'a> {
+impl DashboardView {
     pub fn new() -> Self {
         Self {
             panes: Vec::new(),
@@ -35,12 +37,12 @@ impl<'a> DashboardView<'a> {
         }
     }
 
-    pub fn add_pane(&mut self, pane: PaneView<'a>) {
+    pub fn add_pane(&mut self, pane: PaneView) {
         self.panes.push(pane);
         self.selected = self.selected.is_none().then_some(0);
     }
 
-    fn current_pane_mut(&mut self) -> Option<&mut PaneView<'a>> {
+    fn current_pane_mut(&mut self) -> Option<&mut PaneView> {
         if let Some(i) = self.selected {
             return self.panes.get_mut(i);
         }
@@ -58,8 +60,12 @@ impl<'a> DashboardView<'a> {
         }
     }
 
-    pub fn add_pane_from_project(&mut self, project: ProjectModel) {
-        self.add_pane(PaneView::new(project));
+    pub fn add_pane_from_project(
+        &mut self,
+        project: ProjectModel,
+        sender: mpsc::UnboundedSender<Event>,
+    ) {
+        self.add_pane(PaneView::new(project, sender));
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {

@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use serde::{
@@ -405,4 +405,27 @@ impl<'de> Deserialize<'de> for BodyContent {
     {
         deserializer.deserialize_any(BodyVisitor)
     }
+}
+
+pub struct ResponseModel {
+    pub duration: Duration,
+    pub status: u16,
+    pub body: &'static str, //FIXME: temporal value
+    pub headers: HashMap<String, String>,
+}
+
+/// Used for track the request that is currently tracked on async tasks
+/// Is using the index for collection & request
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct SendRequestId(pub usize, pub usize);
+
+impl From<(usize, usize)> for SendRequestId {
+    fn from(value: (usize, usize)) -> Self {
+        SendRequestId(value.0, value.1)
+    }
+}
+
+pub enum SendRequest {
+    Pending,
+    Finish(ResponseModel),
 }
