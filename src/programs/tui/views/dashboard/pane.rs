@@ -18,8 +18,8 @@ use super::{
     method_url_bar::MethodUrlBarComponent,
     pane_state::{history::MutationsHistory, mutations::SendRequestMutation, PaneState},
     placeholder::PlaceholderView,
-    // request_builder::RequestEditorComponent,
-    // response_viewer::ResponseViewerComponent,
+    request_builder::RequestEditorComponent,
+    response_viewer::ResponseViewerComponent,
 };
 
 pub struct PaneView {
@@ -30,8 +30,8 @@ pub struct PaneView {
 
     collections_component: CollectionsComponent,
     method_url_bar_component: MethodUrlBarComponent,
-    // request_editor_component: RequestEditorComponent,
-    // response_viewer_component: ResponseViewerComponent,
+    request_editor_component: RequestEditorComponent,
+    response_viewer_component: ResponseViewerComponent,
 }
 
 impl PaneView {
@@ -40,8 +40,8 @@ impl PaneView {
             render_area: Rect::default(),
             collections_component: CollectionsComponent::new(&project),
             method_url_bar_component: MethodUrlBarComponent::new(),
-            // request_editor_component: RequestEditorComponent::new(),
-            // response_viewer_component: ResponseViewerComponent::new(),
+            request_editor_component: RequestEditorComponent::new(),
+            response_viewer_component: ResponseViewerComponent::new(),
             pane_state: PaneState::new(project, sender_event),
             mutations_history: MutationsHistory::new(),
             placeholder_view: PlaceholderView::new(),
@@ -63,11 +63,11 @@ impl PaneView {
             self.method_url_bar_component
                 .draw(&mut painter, &self.pane_state);
 
-            // self.request_editor_component
-            //     .draw(&mut painter, &self.pane_state);
+            self.request_editor_component
+                .draw(&mut painter, &self.pane_state);
 
-            // self.response_viewer_component
-            //     .draw(&mut painter, &self.pane_state);
+            self.response_viewer_component
+                .draw(&mut painter, &self.pane_state);
         } else {
             // TODO: update to new rendering flow
             self.placeholder_view.draw(frame);
@@ -95,11 +95,11 @@ impl PaneView {
         self.collections_component.set_render_area(collections_area);
         self.method_url_bar_component
             .set_render_area(content_areas[0]);
-        // self.request_editor_component
-        //     .set_render_area(content_areas[1]);
+        self.request_editor_component
+            .set_render_area(content_areas[1]);
 
-        // self.response_viewer_component
-        //     .set_render_area(content_areas[2]);
+        self.response_viewer_component
+            .set_render_area(content_areas[2]);
         self.placeholder_view.set_area(placeholder_area);
         self.render_area = area;
     }
@@ -133,18 +133,18 @@ impl PaneView {
                     );
                 }
                 super::focus::ElementFocus::RequestBuilder => {
-                    // self.request_editor_component.on_key(
-                    //     key,
-                    //     &mut mutations_collector,
-                    //     &self.pane_state,
-                    // );
+                    self.request_editor_component.on_key(
+                        key,
+                        &mut mutations_collector,
+                        &self.pane_state,
+                    );
                 }
                 super::focus::ElementFocus::ResponseViewer => {
-                    // self.response_viewer_component.on_key(
-                    //     key,
-                    //     &mut mutations_collector,
-                    //     &self.pane_state,
-                    // );
+                    self.response_viewer_component.on_key(
+                        key,
+                        &mut mutations_collector,
+                        &self.pane_state,
+                    );
                 }
             }
         }
