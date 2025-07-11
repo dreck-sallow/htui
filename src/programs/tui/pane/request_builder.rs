@@ -1,22 +1,15 @@
-use std::collections::HashMap;
-
-use crossterm::event::{KeyCode, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
     widgets::{Block, Borders, Tabs},
 };
 
-use crate::programs::tui::element_view::{Drawable, InteractiveV2};
+use crate::programs::tui::element_view::Painter;
 
 use super::{
-    body_editor::BodyEditorComponent,
-    editor::TextEditor,
-    pane_state::{
-        history::MutationCollector,
-        mutations::{EditRequest, FocusNavigation, RequestEditType, SetFocus},
-        PaneState,
-    },
+    body_editor::BodyEditorView, mutation_history::MutationCollector, state::PaneState,
+    text_editor::TextEditor,
 };
 
 #[derive(Clone, Copy)]
@@ -43,16 +36,16 @@ impl AsRef<str> for Tab {
     }
 }
 
-pub struct RequestEditorComponent {
+pub struct RequestEditorView {
     render_area: Rect,
     header_area: Rect,
     content_area: Rect,
     tab: Tab,
     headers_editor: TextEditor,
-    body_editor: BodyEditorComponent,
+    body_editor: BodyEditorView,
 }
 
-impl RequestEditorComponent {
+impl RequestEditorView {
     pub fn new() -> Self {
         Self {
             render_area: Rect::default(),
@@ -60,21 +53,17 @@ impl RequestEditorComponent {
             content_area: Rect::default(),
             tab: Tab::Headers,
             headers_editor: TextEditor::new(true),
-            body_editor: BodyEditorComponent::new(true),
+            body_editor: BodyEditorView::new(true),
         }
     }
-}
 
-impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for RequestEditorComponent {
-    type State = PaneState;
-
-    fn draw<'b: 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::element_view::Painter<'painter>,
-        state: &'b Self::State,
+    pub fn draw<'painter, 'this: 'painter, 'state: 'painter>(
+        &'this self,
+        painter: &mut Painter<'painter>,
+        state: &'state PaneState,
     ) {
         painter.render(|frame| {
-            let style = if state.is_focused(super::focus::ElementFocus::RequestBuilder) {
+            let style = if state.is_focus(super::state::ElementFocus::RequestBuilder) {
                 Style::default().blue()
             } else {
                 Style::default()
@@ -101,31 +90,26 @@ impl<'a: 'painter, 'painter> Drawable<'a, 'painter> for RequestEditorComponent {
                 });
             }
             Tab::Body => {
-                self.body_editor.draw(painter, state);
+                // self.body_editor.draw(painter, state);
             }
         }
     }
 
-    fn set_render_area(&mut self, area: Rect) {
+    pub fn set_render_area(&mut self, area: Rect) {
         let main_areas = Layout::vertical([Constraint::Length(2), Constraint::Fill(50)])
             .split(area.inner(Margin::new(1, 1)));
 
         self.render_area = area;
         self.header_area = main_areas[0];
         self.content_area = main_areas[1];
-        self.body_editor.set_render_area(main_areas[1]);
+        // self.body_editor.set_render_area(main_areas[1]);
     }
-}
 
-impl InteractiveV2 for RequestEditorComponent {
-    type State = PaneState;
-    type Mutator = MutationCollector;
-
-    fn on_key(
+    pub fn handle_key(
         &mut self,
-        key: crossterm::event::KeyEvent,
-        mutator: &mut Self::Mutator,
-        state: &Self::State,
+        key: KeyEvent,
+        collector: &mut MutationCollector,
+        state: &PaneState,
     ) {
         if key.kind == KeyEventKind::Press {
             let is_editing = match self.tab {
@@ -133,31 +117,31 @@ impl InteractiveV2 for RequestEditorComponent {
                 Tab::Body => self.body_editor.is_editing(),
             };
 
-            let mut mutate_on_blur = |focus_navigation: FocusNavigation| {
-                let idx = state.reader().current_request_idx().unwrap();
-                let headers = {
-                    let mut map = HashMap::new();
+            // let mut mutate_on_blur = |focus_navigation: FocusNavigation| {
+            //     let idx = state.reader().current_request_idx().unwrap();
+            //     let headers = {
+            //         let mut map = HashMap::new();
 
-                    for line in self.headers_editor.lines() {
-                        let mut parts = line.splitn(1, ':');
-                        let key = parts.next().map(|txt| txt.trim().to_string());
-                        let value = parts.next().map(|txt| txt.trim().to_string());
+            //         for line in self.headers_editor.lines() {
+            //             let mut parts = line.splitn(1, ':');
+            //             let key = parts.next().map(|txt| txt.trim().to_string());
+            //             let value = parts.next().map(|txt| txt.trim().to_string());
 
-                        if let (Some(k), Some(v)) = (key, value) {
-                            map.insert(k, v);
-                        }
-                    }
+            //             if let (Some(k), Some(v)) = (key, value) {
+            //                 map.insert(k, v);
+            //             }
+            //         }
 
-                    map
-                };
+            //         map
+            //     };
 
-                mutator.add(EditRequest::new(idx, RequestEditType::Headers(headers)));
-                mutator.add(EditRequest::new(
-                    idx,
-                    RequestEditType::Body(self.body_editor.body_type().clone()),
-                ));
-                mutator.add(SetFocus::new(focus_navigation));
-            };
+            //     mutator.add(EditRequest::new(idx, RequestEditType::Headers(headers)));
+            //     mutator.add(EditRequest::new(
+            //         idx,
+            //         RequestEditType::Body(self.body_editor.body_type().clone()),
+            //     ));
+            //     mutator.add(SetFocus::new(focus_navigation));
+            // };
 
             match key.code {
                 KeyCode::Tab => match self.tab {
@@ -170,9 +154,9 @@ impl InteractiveV2 for RequestEditorComponent {
                     }
                     Tab::Body => {
                         if is_editing {
-                            self.body_editor.on_key(key, mutator, state);
+                            // self.body_editor.on_key(key, mutator, state);
                         } else {
-                            mutate_on_blur(FocusNavigation::Next);
+                            // mutate_on_blur(FocusNavigation::Next);
                         }
                     }
                 },
@@ -181,12 +165,12 @@ impl InteractiveV2 for RequestEditorComponent {
                         if is_editing {
                             self.headers_editor.handle_key(key);
                         } else {
-                            mutate_on_blur(FocusNavigation::Prev);
+                            // mutate_on_blur(FocusNavigation::Prev);
                         }
                     }
                     Tab::Body => {
                         if is_editing {
-                            self.body_editor.on_key(key, mutator, state);
+                            // self.body_editor.on_key(key, mutator, state);
                         } else {
                             self.tab = Tab::Headers;
                         }
@@ -195,20 +179,10 @@ impl InteractiveV2 for RequestEditorComponent {
                 _ => match self.tab {
                     Tab::Headers => self.headers_editor.handle_key(key),
                     Tab::Body => {
-                        self.body_editor.on_key(key, mutator, state);
+                        // self.body_editor.on_key(key, mutator, state);
                     }
                 },
             }
         }
-    }
-
-    fn on_change_state(&mut self, state: &Self::State) {
-        if let Some(req) = state.reader().current_request() {
-            self.headers_editor.clean_lines();
-            for (k, v) in req.headers_map() {
-                self.headers_editor.insert_str(&format!("{k}:{v}"));
-            }
-        }
-        self.body_editor.on_change_state(state);
     }
 }

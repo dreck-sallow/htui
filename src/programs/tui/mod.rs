@@ -17,7 +17,7 @@ mod elements;
 mod events;
 mod pane;
 mod sources;
-mod views;
+// mod views;
 
 pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     let project = load_project(project_name).await.unwrap();
@@ -36,19 +36,9 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
         width: terminal.size().unwrap().width,
         height: terminal.size().unwrap().height,
     });
-    // let mut dashboard_view = DashboardView::new();
-    // dashboard_view.add_pane_from_project(project, events.sender());
-
-    // dashboard_view.calculate_areas(Rect {
-    //     x: 0,
-    //     y: 0,
-    //     width: terminal.size().unwrap().width,
-    //     height: terminal.size().unwrap().height,
-    // });
 
     terminal.draw(|frame| {
         app.handle_draw(frame);
-        // dashboard_view.draw(frame);
     })?;
 
     loop {
@@ -56,17 +46,14 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
             match ev {
                 events::Event::Draw => {
                     terminal.draw(|frame| {
-                        // dashboard_view.draw(frame);
                         app.handle_draw(frame);
                     })?;
                 }
                 events::Event::Input(key_event) => {
                     app.handle_key(key_event);
                     terminal.draw(|frame| {
-                        // dashboard_view.draw(frame);
                         app.handle_draw(frame);
                     })?;
-                    // dashboard_view.handle_key(key_event);
                 }
                 events::Event::KeyBinding(_key_event, _key_event1) => todo!(),
                 events::Event::Quit => break,

@@ -36,7 +36,7 @@ impl PlaceholderView {
         );
     }
 
-    pub fn set_area(&mut self, area: Rect) {
+    pub fn set_render_area(&mut self, area: Rect) {
         self.render_area = area;
     }
 }
