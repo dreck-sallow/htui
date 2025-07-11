@@ -6,6 +6,8 @@ pub trait Source {
     fn start_process(&mut self);
 }
 
+pub type EventSender = mpsc::UnboundedSender<Event>;
+
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Event {
     Draw,
@@ -15,7 +17,7 @@ pub enum Event {
 }
 
 pub struct Events<'a> {
-    tx: mpsc::UnboundedSender<Event>,
+    tx: EventSender,
     rx: mpsc::UnboundedReceiver<Event>,
     sources: Vec<Box<dyn Source + 'a>>,
     _started_process: bool,

@@ -21,8 +21,8 @@ pub fn time_as_id() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ProjectModel {
     id: String,
-    name: String,
-    collections: Vec<CollectionsModel>,
+    pub name: String,
+    pub collections: Vec<CollectionsModel>,
 }
 
 impl ProjectModel {
@@ -105,8 +105,8 @@ impl Default for ProjectModel {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct CollectionsModel {
     id: String,
-    name: String,
-    requests: Vec<RequestModel>,
+    pub name: String,
+    pub requests: Vec<RequestModel>,
 }
 
 impl CollectionsModel {
@@ -136,6 +136,10 @@ impl CollectionsModel {
 
     pub fn get_request_mut(&mut self, i: usize) -> Option<&mut RequestModel> {
         self.requests.get_mut(i)
+    }
+
+    pub fn remove_request(&mut self, idx: usize) -> RequestModel {
+        self.requests.remove(idx)
     }
 }
 

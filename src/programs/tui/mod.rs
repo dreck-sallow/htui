@@ -1,18 +1,21 @@
 use std::io;
 
+use app::App;
 use events::Events;
 use ratatui::layout::Rect;
 use sources::TerminalSource;
-use views::dashboard::DashboardView;
+// use views::dashboard::DashboardView;
 
 use crate::{
     paths::Paths,
     store::{models::ProjectModel, LocalStore, Store, StoreError, StoreResult},
 };
 
+mod app;
 mod element_view;
 mod elements;
 mod events;
+mod pane;
 mod sources;
 mod views;
 
@@ -26,18 +29,26 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
 
     events.listen();
 
-    let mut dashboard_view = DashboardView::new();
-    dashboard_view.add_pane_from_project(project, events.sender());
-
-    dashboard_view.calculate_areas(Rect {
+    let mut app = App::new_from_project(project, events.sender());
+    app.viewport_area(Rect {
         x: 0,
         y: 0,
         width: terminal.size().unwrap().width,
         height: terminal.size().unwrap().height,
     });
+    // let mut dashboard_view = DashboardView::new();
+    // dashboard_view.add_pane_from_project(project, events.sender());
+
+    // dashboard_view.calculate_areas(Rect {
+    //     x: 0,
+    //     y: 0,
+    //     width: terminal.size().unwrap().width,
+    //     height: terminal.size().unwrap().height,
+    // });
 
     terminal.draw(|frame| {
-        dashboard_view.draw(frame);
+        app.handle_draw(frame);
+        // dashboard_view.draw(frame);
     })?;
 
     loop {
@@ -45,11 +56,17 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
             match ev {
                 events::Event::Draw => {
                     terminal.draw(|frame| {
-                        dashboard_view.draw(frame);
+                        // dashboard_view.draw(frame);
+                        app.handle_draw(frame);
                     })?;
                 }
                 events::Event::Input(key_event) => {
-                    dashboard_view.handle_key(key_event);
+                    app.handle_key(key_event);
+                    terminal.draw(|frame| {
+                        // dashboard_view.draw(frame);
+                        app.handle_draw(frame);
+                    })?;
+                    // dashboard_view.handle_key(key_event);
                 }
                 events::Event::KeyBinding(_key_event, _key_event1) => todo!(),
                 events::Event::Quit => break,

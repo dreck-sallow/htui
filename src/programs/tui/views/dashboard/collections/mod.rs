@@ -269,13 +269,18 @@ impl InteractiveV2 for CollectionsComponent {
 
                         match self.menu.method_type() {
                             UpsertMethod::CreateRequest => {
-                                mutator.add(AddRequest::new(
-                                    idx.parent_idx(),
-                                    RequestModel::new(text),
-                                ));
+                                let req = RequestModel::new(text);
+                                let coll_id = state.reader().collections()[idx.parent_idx()]
+                                    .id()
+                                    .to_string();
+                                self.state.add_request(coll_id, req.id().to_string());
+                                mutator.add(AddRequest::new(idx.parent_idx(), req));
                             }
                             UpsertMethod::CreateCollection => {
-                                mutator.add(AddCollection::new(CollectionsModel::new(text)));
+                                let coll = CollectionsModel::new(text);
+                                self.state
+                                    .add_collection((coll.id().to_string(), Vec::new()));
+                                mutator.add(AddCollection::new(coll));
                             }
                             UpsertMethod::EditRequest => {
                                 mutator.add(EditRequest::new(
@@ -369,18 +374,18 @@ impl InteractiveV2 for CollectionsComponent {
         }
     }
 
-    fn on_change_state(&mut self, state: &Self::State) {
-        let reader = state.reader();
+    // fn on_change_state(&mut self, state: &Self::State) {
+    //     let reader = state.reader();
 
-        for collection in reader.collections() {
-            let children = collection
-                .requests()
-                .iter()
-                .map(|req| req.id().to_string())
-                .collect();
+    //     for collection in reader.collections() {
+    //         let children = collection
+    //             .requests()
+    //             .iter()
+    //             .map(|req| req.id().to_string())
+    //             .collect();
 
-            self.state
-                .add_collection((collection.id().to_string(), children));
-        }
-    }
+    //         self.state
+    //             .add_collection((collection.id().to_string(), children));
+    //     }
+    // }
 }

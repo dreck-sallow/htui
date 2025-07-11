@@ -1,4 +1,4 @@
-use std::{collections::HashSet, ops::Not};
+use std::{collections::HashSet, fmt::Debug, ops::Not};
 
 /// Specific enum index type for only 1 level or nesting
 #[derive(Default, Debug, Clone, PartialEq, Eq, Copy)]
@@ -67,10 +67,9 @@ impl Idx {
     }
 
     pub fn parent_idx(&self) -> usize {
-        if let Idx::Parent(i) = self {
-            *i
-        } else {
-            unreachable!()
+        match self {
+            Idx::Parent(i) | Idx::Child(i, _) => *i,
+            Idx::None => unreachable!(),
         }
     }
 
@@ -89,7 +88,7 @@ pub struct CollectionsState<Identifier> {
     opened: HashSet<usize>,
 }
 
-impl<Identifier: PartialEq + Eq> CollectionsState<Identifier> {
+impl<Identifier: PartialEq + Eq + Debug> CollectionsState<Identifier> {
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
@@ -115,7 +114,7 @@ impl<Identifier: PartialEq + Eq> CollectionsState<Identifier> {
     }
 
     pub fn add_request(&mut self, collection: Identifier, request: Identifier) {
-        while let Some((coll, requests)) = self.items.iter_mut().next() {
+        for (coll, requests) in self.items.iter_mut() {
             if *coll == collection {
                 requests.push(request);
                 break;
