@@ -1,7 +1,6 @@
-use collections::CollectionsView;
+use collections::{state::Idx, CollectionsView};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use method_url_bar::MethodUrlBarView;
-use mutation_history::{MutationCollector, MutationsHistory};
 use placeholder::PlaceholderView;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -10,6 +9,7 @@ use ratatui::{
 use request_builder::RequestEditorView;
 use response_viewer::ResponseViewerView;
 use state::PaneState;
+use store::{mutator::MutationsHistoryV2, PaneStore};
 
 use crate::store::models::ProjectModel;
 
@@ -25,13 +25,15 @@ mod request_builder;
 mod response_viewer;
 mod responses;
 mod state;
+mod store;
 mod text_editor;
 
 pub struct Pane {
-    mutations_history: MutationsHistory,
+    mutations_history: MutationsHistoryV2,
     project_id: String,
     project_name: String,
-    state: PaneState,
+    // state: PaneState,
+    store: PaneStore,
     collections_view: CollectionsView,
     placeholder_view: PlaceholderView,
     method_url_view: MethodUrlBarView,
@@ -42,12 +44,18 @@ pub struct Pane {
 
 impl Pane {
     pub fn from_project(project: ProjectModel, sender: EventSender) -> Self {
+        let idx = if project.collections.is_empty() {
+            Idx::None
+        } else {
+            Idx::Parent(0)
+        };
         Self {
-            mutations_history: MutationsHistory::new(),
+            mutations_history: MutationsHistoryV2::new(),
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
-            state: PaneState::from_collections(project.collections),
-            collections_view: CollectionsView::new(),
+            // state: PaneState::from_collections(project.collections),
+            store: PaneStore::from_collections(project.collections),
+            collections_view: CollectionsView::new(idx),
             method_url_view: MethodUrlBarView::new(),
             request_editor_view: RequestEditorView::new(),
             response_viewer: ResponseViewerView::new(),
@@ -85,12 +93,12 @@ impl Pane {
 
     pub fn draw(&self, frame: &mut Frame) {
         let mut painter = Painter::new();
-        self.collections_view.draw(&mut painter, &self.state);
+        self.collections_view.draw(&mut painter, &self.store);
 
-        if self.state.current_request().is_some() {
-            self.method_url_view.draw(&mut painter, &self.state);
-            self.request_editor_view.draw(&mut painter, &self.state);
-            self.response_viewer.draw(&mut painter, &self.state);
+        if self.store.current_request().is_some() {
+            // self.method_url_view.draw(&mut painter, &self.state);
+            // self.request_editor_view.draw(&mut painter, &self.state);
+            // self.response_viewer.draw(&mut painter, &self.state);
         } else {
             self.placeholder_view.draw(frame);
         }
@@ -100,32 +108,31 @@ impl Pane {
 
     pub fn handle_key(&mut self, key: KeyEvent) {
         if KeyCode::Char('u') == key.code && key.modifiers == KeyModifiers::ALT {
-            self.mutations_history
-                .go_back(&mut self.state, &self._sender);
+            self.mutations_history.go_back(&mut self.store);
+        } else if KeyCode::Char('y') == key.code && key.modifiers == KeyModifiers::ALT {
+            self.mutations_history.go_forward(&mut self.store);
         } else {
-            let mut mutation_collector = MutationCollector::new();
-
-            match self.state.focus() {
+            let actions = match self.store.focus() {
                 state::ElementFocus::Collections => {
-                    self.collections_view
-                        .handle_key(key, &mut mutation_collector, &self.state)
+                    self.collections_view.handle_key(key, &self.store)
                 }
                 state::ElementFocus::MethodUrlBar => {
-                    self.method_url_view
-                        .handle_key(key, &mut mutation_collector, &self.state)
+                    todo!()
+                    // self.method_url_view
+                    //     .handle_key(key, &mut mutation_collector, &self.state)
                 }
                 state::ElementFocus::RequestBuilder => {
-                    self.request_editor_view
-                        .handle_key(key, &mut mutation_collector, &self.state)
+                    todo!()
+                    // self.request_editor_view
+                    //     .handle_key(key, &mut mutation_collector, &self.state)
                 }
-                state::ElementFocus::ResponseViewer => {}
-            }
+                state::ElementFocus::ResponseViewer => {
+                    todo!()
+                }
+            };
 
-            self.mutations_history.apply_from_collector(
-                mutation_collector,
-                &mut self.state,
-                &self._sender,
-            );
+            self.mutations_history
+                .apply_from_list(actions, &mut self.store);
         }
     }
 }

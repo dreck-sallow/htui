@@ -7,7 +7,7 @@ use super::{
     responses::Responses,
 };
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum ElementFocus {
     Collections,
     MethodUrlBar,
