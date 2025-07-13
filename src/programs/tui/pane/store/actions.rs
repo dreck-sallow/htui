@@ -30,6 +30,10 @@ pub enum Action {
         request: RequestModel,
     },
     DeleteRequest((usize, usize)),
+    EditRequestName {
+        idx: (usize, usize),
+        name: String,
+    },
     EditRequestMethod {
         idx: (usize, usize),
         method: HttpMethod,

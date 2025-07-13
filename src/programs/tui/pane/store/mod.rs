@@ -39,6 +39,10 @@ impl PaneStore {
         self.focus
     }
 
+    pub fn current_request_idx(&self) -> Option<(usize, usize)> {
+        self.current_request_idx
+    }
+
     pub fn current_request(&self) -> Option<&RequestModel> {
         self.current_request_idx
             .and_then(|idx| self.collections.get_request(idx))

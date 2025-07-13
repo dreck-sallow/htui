@@ -143,12 +143,21 @@ impl CollectionsModel {
     }
 }
 
+#[derive(Clone)]
+pub struct KeyValueParam {
+    /// Property for indicate if its value will applied to the request
+    apply: bool,
+    key: String,
+    value: String,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RequestModel {
     id: String,
     name: String,
     url: String,
     headers: HashMap<String, String>,
+    // params: Vec<KeyValueParam>,
     method: HttpMethod,
     body: BodyContent,
 }
@@ -160,6 +169,7 @@ impl RequestModel {
             name,
             url: String::from("https://"),
             headers: HashMap::default(),
+            // params: Vec::new(),
             method: HttpMethod::Get,
             body: BodyContent::Empty,
         }

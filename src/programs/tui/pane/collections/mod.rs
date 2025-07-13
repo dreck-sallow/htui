@@ -41,7 +41,7 @@ impl CollectionsView {
         }
     }
 
-    pub fn next_collection(&mut self, collections: &[CollectionsModel]) {
+    fn next_collection(&mut self, collections: &[CollectionsModel]) {
         let idx = match self.idx {
             Idx::None => collections.is_empty().not().then_some(0),
             Idx::Parent(i) | Idx::Child(i, _) => (i < collections.len() - 1).then_some(i + 1),
@@ -52,7 +52,7 @@ impl CollectionsView {
         }
     }
 
-    pub fn next_request(&mut self, collections: &[CollectionsModel]) {
+    fn next_request(&mut self, collections: &[CollectionsModel]) {
         let child_idx = match self.idx {
             Idx::None => collections
                 .first()
@@ -76,7 +76,7 @@ impl CollectionsView {
         }
     }
 
-    pub fn next(&mut self, collections: &[CollectionsModel]) {
+    fn next(&mut self, collections: &[CollectionsModel]) {
         match self.idx {
             Idx::None => self.next_collection(collections),
             _ => {
@@ -90,7 +90,7 @@ impl CollectionsView {
         }
     }
 
-    pub fn prev_collection(&mut self) {
+    fn prev_collection(&mut self) {
         let idx = match self.idx {
             Idx::None => None,
             Idx::Parent(i) => (i > 0).then(|| i - 1),
@@ -102,7 +102,7 @@ impl CollectionsView {
         }
     }
 
-    pub fn prev_request(&mut self, collections: &[CollectionsModel]) {
+    fn prev_request(&mut self, collections: &[CollectionsModel]) {
         let idx = match self.idx {
             Idx::None => None,
             Idx::Parent(i) => i
@@ -120,7 +120,7 @@ impl CollectionsView {
         }
     }
 
-    pub fn prev(&mut self, collections: &[CollectionsModel]) {
+    fn prev(&mut self, collections: &[CollectionsModel]) {
         match self.idx {
             Idx::None => {}
             _ => {
@@ -219,13 +219,16 @@ impl CollectionsView {
                             }
                             UpsertMethod::CreateCollection => {
                                 actions.push(Action::CreateCollection(text));
+                                if self.idx == Idx::None {
+                                    self.idx = Idx::Parent(0);
+                                }
+                                self.openeds.insert(state.collections().len());
                             }
                             UpsertMethod::EditRequest => {
-                                // actions.push(Action::EditRequestMethod { idx: (), method: () });
-                                // mutator.add(EditRequest::new(
-                                //     idx.child_idx(),
-                                //     RequestEditType::Name(text),
-                                // ));
+                                actions.push(Action::EditRequestName {
+                                    idx: self.idx.child_idx(),
+                                    name: text,
+                                });
                             }
                             UpsertMethod::EditCollection => {
                                 actions.push(Action::EditCollectionName {
@@ -276,9 +279,30 @@ impl CollectionsView {
                         state::Idx::None => {}
                         state::Idx::Parent(i) => {
                             actions.push(Action::DeleteCollection { idx: i });
+                            self.openeds.remove(&i);
+
+                            // So I need set the idx on self!
+                            let collections = state.collections();
+
+                            if i == collections.len() - 1 {
+                                if i == 0 {
+                                    self.idx = Idx::None;
+                                } else {
+                                    self.idx = Idx::Parent(i - 1);
+                                }
+                            }
                         }
                         state::Idx::Child(i, sub_i) => {
                             actions.push(Action::DeleteRequest((i, sub_i)));
+                            let requests_len = state.collections()[i].requests.len();
+
+                            if sub_i == requests_len - 1 {
+                                if sub_i == 0 {
+                                    self.idx = Idx::Parent(i);
+                                } else {
+                                    self.idx = Idx::Child(i, sub_i - 1);
+                                }
+                            }
                         }
                     },
                     KeyCode::Char('c') => {
@@ -293,10 +317,11 @@ impl CollectionsView {
                     }
                     KeyCode::Char('e') => match self.idx {
                         state::Idx::None => {}
-                        state::Idx::Parent(_) => {
-                            // let name = state.current_collection().unwrap().name();
-                            // self.menu.set_state(UpsertMethod::EditCollection, name);
-                            // self.show_popup = true;
+                        state::Idx::Parent(i) => {
+                            let collection = state.collections().get(i).unwrap();
+                            self.menu
+                                .set_state(UpsertMethod::EditCollection, &collection.name);
+                            self.show_popup = true;
                         }
                         state::Idx::Child(_, _) => {
                             let name = state.current_request().unwrap().name();

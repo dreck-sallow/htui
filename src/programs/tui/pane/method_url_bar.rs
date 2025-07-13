@@ -15,11 +15,7 @@ use crate::{
     store::models::HttpMethod,
 };
 
-use super::{
-    mutation_history::MutationCollector,
-    mutations::{EditRequest, RequestEditType, SetFocus},
-    state::PaneState,
-};
+use super::store::{actions::Action, PaneStore};
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,
@@ -65,7 +61,7 @@ impl MethodUrlBarView {
     pub fn draw<'painter, 'this: 'painter, 'state: 'painter>(
         &'this self,
         painter: &mut Painter<'painter>,
-        state: &'state PaneState,
+        state: &'state PaneStore,
     ) {
         painter.render(|frame| {
             let req = state.current_request().unwrap();
@@ -132,21 +128,17 @@ impl MethodUrlBarView {
         }
     }
 
-    pub fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        collector: &mut MutationCollector,
-        state: &PaneState,
-    ) {
+    pub fn handle_key(&mut self, key: KeyEvent, state: &PaneStore) -> Vec<Action> {
+        let mut actions = Vec::new();
         if key.kind == KeyEventKind::Press {
             if self.show_dropdown {
                 match key.code {
                     KeyCode::Enter => {
-                        let request_idx = state.idx().child_idx();
-                        collector.add(EditRequest::new(
-                            request_idx,
-                            RequestEditType::Method(self.dropdown.selected().clone()),
-                        ));
+                        // let request_idx = state.idx().child_idx();
+                        // collector.add(EditRequest::new(
+                        //     request_idx,
+                        //     RequestEditType::Method(self.dropdown.selected().clone()),
+                        // ));
                         self.show_dropdown = false;
                     }
                     KeyCode::Esc => {
@@ -158,18 +150,23 @@ impl MethodUrlBarView {
                 }
             } else {
                 let mut mutate_on_blur = |next: bool| {
-                    let request_idx = state.idx().child_idx();
+                    let request_idx = state.current_request_idx().unwrap();
 
-                    collector.add(if next {
-                        SetFocus::for_next()
+                    if next {
+                        actions.push(Action::NextFocus);
                     } else {
-                        SetFocus::for_previous()
+                        actions.push(Action::PreviousFocus);
+                    }
+
+                    actions.push(Action::EditRequestMethod {
+                        idx: state.current_request_idx().unwrap(),
+                        method: self.dropdown.selected().clone(),
                     });
 
-                    collector.add(EditRequest::new(
-                        request_idx,
-                        RequestEditType::Url(self.url_input.lines()[0].to_string()),
-                    ));
+                    actions.push(Action::EditRequestUrl {
+                        idx: state.current_request_idx().unwrap(),
+                        url: self.url_input.lines()[0].to_string(),
+                    });
                 };
 
                 match key.code {
@@ -193,6 +190,8 @@ impl MethodUrlBarView {
                 }
             }
         }
+
+        actions
     }
 
     pub fn set_render_area(&mut self, area: Rect) {

@@ -1,4 +1,4 @@
-use std::mem;
+use std::{mem, thread, time::Duration};
 
 use crate::{
     programs::tui::pane::{state::ElementFocus, store::collections_store::MutableList},
@@ -9,7 +9,7 @@ use super::{actions::Action, PaneStore};
 
 pub struct MutationsHistoryV2 {
     stack: Vec<Action>,
-    cursor: Option<usize>,
+    pub(crate) cursor: Option<usize>,
 }
 
 impl MutationsHistoryV2 {
@@ -21,6 +21,10 @@ impl MutationsHistoryV2 {
     }
 
     pub fn apply_from_list(&mut self, actions: Vec<Action>, store: &mut PaneStore) {
+        if !actions.is_empty() && !self.stack.is_empty() {
+            self.cursor = Some(self.stack.len() - 1);
+        }
+
         for action in actions {
             if let Some(dif_action) = apply_action(action, store) {
                 self.stack.push(dif_action);
@@ -91,6 +95,21 @@ fn apply_action(action: Action, store: &mut PaneStore) -> Option<Action> {
             Some(Action::DeleteCollection { idx: idx })
         }
         Action::DeleteCollection { idx } => {
+            // println!(
+            //     "collection len: {}, idx: {}",
+            //     store.collections().len(),
+            //     idx
+            // );
+
+            if let None = store.collections.get_collection(idx) {
+                println!(
+                    "collections len: {}, idx: {}",
+                    store.collections().len(),
+                    idx
+                );
+                thread::sleep(Duration::from_secs(5));
+            }
+
             let collection = store.collections.remove_collection(idx).unwrap();
             Some(Action::InsertCollection { idx, collection })
         }
@@ -121,9 +140,21 @@ fn apply_action(action: Action, store: &mut PaneStore) -> Option<Action> {
         }
         Action::DeleteRequest(idx) => {
             let request = store.collections.remove_request(idx).unwrap();
-            store.collections.remove_request(idx);
 
             Some(Action::InsertRequest { idx: idx, request })
+        }
+        Action::EditRequestName { idx, name } => {
+            let request = store.collections.get_request_mut(idx).unwrap();
+            let previous_name = request.name().to_string();
+
+            store.collections.edit_request(idx, |req| {
+                req.set_name(name.clone());
+            });
+
+            Some(Action::EditRequestName {
+                idx,
+                name: previous_name,
+            })
         }
         Action::EditRequestMethod { idx, method } => {
             let request = store.collections.get_request_mut(idx).unwrap();
@@ -177,7 +208,6 @@ fn apply_action(action: Action, store: &mut PaneStore) -> Option<Action> {
                 body: previous_body,
             })
         }
-
         Action::NextFocus => {
             let focus = match store.focus {
                 ElementFocus::Collections => ElementFocus::MethodUrlBar,
@@ -204,5 +234,50 @@ fn apply_action(action: Action, store: &mut PaneStore) -> Option<Action> {
             store.set_current_idx(idx);
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        programs::tui::pane::store::{actions::Action, mutator::MutationsHistoryV2, PaneStore},
+        store::models::CollectionsModel,
+    };
+
+    #[test]
+    fn test_history() {
+        let mut store = PaneStore::from_collections(vec![
+            CollectionsModel::new("Test1".into()),
+            CollectionsModel::new("Test2".into()),
+        ]);
+
+        let mut history = MutationsHistoryV2::new();
+
+        history.apply_from_list(
+            vec![
+                Action::DeleteCollection { idx: 1 },
+                Action::DeleteCollection { idx: 0 },
+            ],
+            &mut store,
+        );
+
+        history.go_back(&mut store);
+        history.go_back(&mut store);
+
+        history.apply_from_list(
+            vec![
+                Action::DeleteCollection { idx: 1 },
+                Action::DeleteCollection { idx: 0 },
+            ],
+            &mut store,
+        );
+
+        history.go_back(&mut store);
+
+        assert_eq!(history.cursor, Some(2));
+
+        history.go_back(&mut store);
+
+        assert_eq!(history.cursor, Some(1));
     }
 }

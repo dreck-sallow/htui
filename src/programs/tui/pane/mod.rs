@@ -20,6 +20,7 @@ mod collections;
 mod method_url_bar;
 mod mutation_history;
 mod mutations;
+// mod params_table;
 mod placeholder;
 mod request_builder;
 mod response_viewer;
@@ -32,7 +33,6 @@ pub struct Pane {
     mutations_history: MutationsHistoryV2,
     project_id: String,
     project_name: String,
-    // state: PaneState,
     store: PaneStore,
     collections_view: CollectionsView,
     placeholder_view: PlaceholderView,
@@ -53,7 +53,6 @@ impl Pane {
             mutations_history: MutationsHistoryV2::new(),
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
-            // state: PaneState::from_collections(project.collections),
             store: PaneStore::from_collections(project.collections),
             collections_view: CollectionsView::new(idx),
             method_url_view: MethodUrlBarView::new(),
@@ -96,7 +95,7 @@ impl Pane {
         self.collections_view.draw(&mut painter, &self.store);
 
         if self.store.current_request().is_some() {
-            // self.method_url_view.draw(&mut painter, &self.state);
+            self.method_url_view.draw(&mut painter, &self.store);
             // self.request_editor_view.draw(&mut painter, &self.state);
             // self.response_viewer.draw(&mut painter, &self.state);
         } else {
@@ -117,9 +116,7 @@ impl Pane {
                     self.collections_view.handle_key(key, &self.store)
                 }
                 state::ElementFocus::MethodUrlBar => {
-                    todo!()
-                    // self.method_url_view
-                    //     .handle_key(key, &mut mutation_collector, &self.state)
+                    self.method_url_view.handle_key(key, &self.store)
                 }
                 state::ElementFocus::RequestBuilder => {
                     todo!()
@@ -131,8 +128,24 @@ impl Pane {
                 }
             };
 
+            // // Handle the onchange for after
+            // let (collections, method_url_bar, request_builder, response_viewer) = (
+            //     (
+            //         self.collections_view.can_react_to_action(&actions),
+            //         &mut self.collections_view,
+            //     ),
+            //     (
+            //         self.collections_view.can_react_to_action(&actions),
+            //         &mut self.collections_view,
+            //     ),
+            // );
+
             self.mutations_history
                 .apply_from_list(actions, &mut self.store);
+
+            // if collections.0 {
+            //     // collections.1
+            // }
         }
     }
 }
