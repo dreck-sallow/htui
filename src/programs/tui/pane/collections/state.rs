@@ -2,6 +2,22 @@ use std::{collections::HashSet, fmt::Debug, ops::Not};
 
 use crate::store::models::{CollectionsModel, RequestModel};
 
+pub trait MutableList {
+    fn insert_collection(&mut self, idx: usize, collection: CollectionsModel);
+    fn insert_request(&mut self, collection_idx: usize, idx: usize, req: RequestModel);
+
+    fn remove_collection(&mut self, idx: usize) -> Option<CollectionsModel>;
+    fn remove_request(&mut self, idx: (usize, usize)) -> Option<RequestModel>;
+
+    fn get_collection(&self, idx: usize) -> Option<&CollectionsModel>;
+    fn get_request(&self, idx: (usize, usize)) -> Option<&RequestModel>;
+
+    fn get_collection_mut(&mut self, idx: usize) -> Option<&mut CollectionsModel>;
+    fn get_request_mut(&mut self, idx: (usize, usize)) -> Option<&mut RequestModel>;
+
+    fn edit_request<F: FnMut(&mut RequestModel)>(&mut self, idx: (usize, usize), f: F);
+}
+
 pub struct CollectionsState {
     collections: Vec<CollectionsModel>,
     idx: Idx,
@@ -185,30 +201,30 @@ impl CollectionsState {
         }
     }
 
-    pub fn delete_collection(&mut self) -> Option<CollectionsModel> {
-        match self.idx {
-            Idx::Parent(i) => self.remove_collection_by_idx(i),
-            _ => None,
-        }
-    }
+    // pub fn delete_collection(&mut self) -> Option<CollectionsModel> {
+    //     match self.idx {
+    //         Idx::Parent(i) => self.remove_collection_by_idx(i),
+    //         _ => None,
+    //     }
+    // }
 
-    pub fn remove_collection_by_idx(&mut self, idx: usize) -> Option<CollectionsModel> {
-        // TODO: Move the idx
-        if idx < self.collections.len() {
-            self.opened.remove(&idx);
-            Some(self.collections.remove(idx))
-        } else {
-            None
-        }
-    }
+    // pub fn remove_collection_by_idx(&mut self, idx: usize) -> Option<CollectionsModel> {
+    //     // TODO: Move the idx
+    //     if idx < self.collections.len() {
+    //         self.opened.remove(&idx);
+    //         Some(self.collections.remove(idx))
+    //     } else {
+    //         None
+    //     }
+    // }
 
-    pub fn remove_request(&mut self) -> Option<RequestModel> {
-        // TODO: move the idx on deletion
-        match self.idx {
-            Idx::Child(i, sub_i) => self.remove_request_by_idx((i, sub_i)),
-            _ => None,
-        }
-    }
+    // pub fn remove_request(&mut self) -> Option<RequestModel> {
+    //     // TODO: move the idx on deletion
+    //     match self.idx {
+    //         Idx::Child(i, sub_i) => self.remove_request_by_idx((i, sub_i)),
+    //         _ => None,
+    //     }
+    // }
 
     pub fn remove_request_by_idx(&mut self, (i, sub_i): (usize, usize)) -> Option<RequestModel> {
         // TODO: Move the idx
@@ -221,19 +237,83 @@ impl CollectionsState {
         None
     }
 
-    pub fn delete(&mut self) {
-        if self.idx.is_parent() {
-            self.delete_collection();
-        } else if self.idx.is_child() {
-            self.remove_request();
-        }
-    }
+    // pub fn delete(&mut self) {
+    //     if self.idx.is_parent() {
+    //         self.delete_collection();
+    //     } else if self.idx.is_child() {
+    //         self.remove_request();
+    //     }
+    // }
 
     pub fn current_request(&self) -> Option<&RequestModel> {
         match self.idx {
             Idx::None => None,
             Idx::Parent(_) => None,
             Idx::Child(i, sub_i) => self.collections[i].requests.get(sub_i),
+        }
+    }
+}
+
+impl MutableList for CollectionsState {
+    fn insert_collection(&mut self, idx: usize, collection: CollectionsModel) {
+        self.collections.insert(idx, collection);
+
+        if self.idx.is_none() {
+            self.idx = Idx::Parent(0);
+        }
+    }
+
+    fn insert_request(&mut self, collection_idx: usize, idx: usize, req: RequestModel) {
+        if let Some(coll) = self.collections.get_mut(collection_idx) {
+            coll.requests.insert(idx, req);
+        }
+    }
+
+    fn remove_collection(&mut self, idx: usize) -> Option<CollectionsModel> {
+        // TODO: calculate the idx
+        if idx < self.collections.len() {
+            self.opened.remove(&idx);
+            Some(self.collections.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    fn remove_request(&mut self, (i, sub_i): (usize, usize)) -> Option<RequestModel> {
+        // TODO: calculate the idx
+        if let Some(coll) = self.collections.get_mut(i) {
+            if sub_i < coll.requests.len() {
+                return Some(coll.requests.remove(sub_i));
+            }
+        }
+
+        None
+    }
+
+    fn get_collection(&self, idx: usize) -> Option<&CollectionsModel> {
+        self.collections.get(idx)
+    }
+
+    fn get_request(&self, (i, sub_i): (usize, usize)) -> Option<&RequestModel> {
+        if let Some(coll) = self.collections.get(i) {
+            return coll.requests.get(sub_i);
+        }
+        None
+    }
+
+    fn get_collection_mut(&mut self, idx: usize) -> Option<&mut CollectionsModel> {
+        self.collections.get_mut(idx)
+    }
+
+    fn get_request_mut(&mut self, idx: (usize, usize)) -> Option<&mut RequestModel> {
+        self.collections
+            .get_mut(idx.0)
+            .and_then(|coll| coll.requests.get_mut(idx.1))
+    }
+
+    fn edit_request<F: FnMut(&mut RequestModel)>(&mut self, idx: (usize, usize), mut f: F) {
+        if let Some(req) = self.get_request_mut(idx) {
+            f(req)
         }
     }
 }

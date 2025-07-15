@@ -112,7 +112,8 @@ impl PaneState {
     }
 
     pub fn remove_collection(&mut self, idx: usize) -> Option<CollectionsModel> {
-        self.collections.remove_collection_by_idx(idx)
+        // self.collections.remove_collection_by_idx(idx)
+        todo!()
     }
 
     pub fn current_collection_mut(&mut self, idx: usize) -> Option<&mut CollectionsModel> {

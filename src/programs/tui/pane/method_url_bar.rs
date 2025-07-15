@@ -63,57 +63,57 @@ impl MethodUrlBarView {
         painter: &mut Painter<'painter>,
         state: &'state PaneStore,
     ) {
-        painter.render(|frame| {
-            let req = state.current_request().unwrap();
-            let is_focus = state.is_focus(super::state::ElementFocus::MethodUrlBar);
+        // painter.render(|frame| {
+        //     let req = state.current_request_idx().unwrap();
+        //     let is_focus = state.is_focus(super::state::ElementFocus::MethodUrlBar);
 
-            let border_style = is_focus
-                .then_some(Style::default().blue())
-                .unwrap_or_default();
+        //     let border_style = is_focus
+        //         .then_some(Style::default().blue())
+        //         .unwrap_or_default();
 
-            let line_block = Block::bordered().border_style(border_style);
+        //     let line_block = Block::bordered().border_style(border_style);
 
-            let area = line_block.inner(self.render_area);
-            frame.render_widget(line_block, self.render_area);
+        //     let area = line_block.inner(self.render_area);
+        //     frame.render_widget(line_block, self.render_area);
 
-            let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
-                Layout::horizontal([
-                    Constraint::Length(11),
-                    Constraint::Length(1),
-                    Constraint::Min(10),
-                    Constraint::Length(1),
-                    Constraint::Length(10),
-                ])
-                .areas(area);
+        //     let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
+        //         Layout::horizontal([
+        //             Constraint::Length(11),
+        //             Constraint::Length(1),
+        //             Constraint::Min(10),
+        //             Constraint::Length(1),
+        //             Constraint::Length(10),
+        //         ])
+        //         .areas(area);
 
-            frame.render_widget(
-                Separator::default().style(border_style),
-                left_separator_area,
-            );
-            frame.render_widget(
-                Separator::default().style(border_style),
-                right_reparator_area,
-            );
+        //     frame.render_widget(
+        //         Separator::default().style(border_style),
+        //         left_separator_area,
+        //     );
+        //     frame.render_widget(
+        //         Separator::default().style(border_style),
+        //         right_reparator_area,
+        //     );
 
-            frame.render_widget(
-                Span::from(expand(req.method().as_ref(), " ", 10))
-                    .style(Style::new().on_light_red())
-                    .black(),
-                method_area,
-            );
+        //     frame.render_widget(
+        //         Span::from(expand(req.method().as_ref(), " ", 10))
+        //             .style(Style::new().on_light_red())
+        //             .black(),
+        //         method_area,
+        //     );
 
-            frame.render_widget(&self.url_input, url_area);
-            frame.render_widget(
-                Span::from(expand(
-                    if self.show_dropdown { "--" } else { "Send" },
-                    " ",
-                    10,
-                ))
-                .on_light_green()
-                .black(),
-                indicator_area,
-            );
-        });
+        //     frame.render_widget(&self.url_input, url_area);
+        //     frame.render_widget(
+        //         Span::from(expand(
+        //             if self.show_dropdown { "--" } else { "Send" },
+        //             " ",
+        //             10,
+        //         ))
+        //         .on_light_green()
+        //         .black(),
+        //         indicator_area,
+        //     );
+        // });
 
         if self.show_dropdown {
             painter.render_last(|frame| {

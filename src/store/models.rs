@@ -102,7 +102,7 @@ impl Default for ProjectModel {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CollectionsModel {
     id: String,
     pub name: String,
@@ -143,7 +143,7 @@ impl CollectionsModel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct KeyValueParam {
     /// Property for indicate if its value will applied to the request
     apply: bool,
@@ -151,13 +151,13 @@ pub struct KeyValueParam {
     value: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct RequestModel {
     id: String,
     name: String,
     url: String,
     headers: HashMap<String, String>,
-    // params: Vec<KeyValueParam>,
+    pub params: Vec<KeyValueParam>,
     method: HttpMethod,
     body: BodyContent,
 }
@@ -169,7 +169,7 @@ impl RequestModel {
             name,
             url: String::from("https://"),
             headers: HashMap::default(),
-            // params: Vec::new(),
+            params: Vec::new(),
             method: HttpMethod::Get,
             body: BodyContent::Empty,
         }

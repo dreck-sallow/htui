@@ -36,31 +36,10 @@ impl<'a> Painter<'a> {
     }
 }
 
-pub trait Drawable<'a, 'painter_fn> {
-    type State;
-    fn set_render_area(&mut self, _area: Rect) {}
-    fn draw<'b: 'painter_fn>(&'a self, painter: &mut Painter<'painter_fn>, state: &'b Self::State);
-}
-
-pub trait Interactive<'a: 'painter_fn, 'painter_fn>: Drawable<'a, 'painter_fn> {
-    type Mutator;
-
-    fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, _state: &Self::State);
-    fn on_change_state(&mut self, _state: &Self::State) {}
-}
-
-pub trait InteractiveV2 {
-    type State;
-    type Mutator;
-
-    fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, _state: &Self::State);
-    fn on_change_state(&mut self, _state: &Self::State) {}
-}
-
-// pub trait Drawable<'a: 'painter_fn, 'painter_fn> {
+// pub trait Drawable<'a, 'painter_fn> {
 //     type State;
 //     fn set_render_area(&mut self, _area: Rect) {}
-//     fn draw(&'a self, painter: &mut Painter<'painter_fn>, state: &'a Self::State);
+//     fn draw<'b: 'painter_fn>(&'a self, painter: &mut Painter<'painter_fn>, state: &'b Self::State);
 // }
 
 // pub trait Interactive<'a: 'painter_fn, 'painter_fn>: Drawable<'a, 'painter_fn> {
@@ -69,3 +48,13 @@ pub trait InteractiveV2 {
 //     fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, _state: &Self::State);
 //     fn on_change_state(&mut self, _state: &Self::State) {}
 // }
+
+// pub trait InteractiveV2 {
+//     type State;
+//     type Mutator;
+
+//     fn on_key(&mut self, key: KeyEvent, mutator: &mut Self::Mutator, _state: &Self::State);
+//     fn on_change_state(&mut self, _state: &Self::State) {}
+// }
+
+// pub trait

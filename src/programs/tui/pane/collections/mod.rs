@@ -1,4 +1,4 @@
-use std::{collections::HashSet, ops::Not};
+use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use list::{CollectionList, Item};
@@ -7,159 +7,68 @@ use ratatui::{
     style::{Style, Stylize},
     widgets::{Block, Clear},
 };
-use state::Idx;
+use state::{CollectionsState, MutableList};
 use tui_textarea::Input;
 use upsert_item::{UpsertItemPopup, UpsertMethod};
 
 use crate::{
-    programs::tui::element_view::Painter,
-    store::models::{CollectionsModel, SendRequestId},
+    programs::tui::common::{
+        action_history::{ActionHistory, History, TrackAction},
+        component::{Drawable, Interactive, WithHistory},
+    },
+    store::models::{BodyContent, CollectionsModel, HttpMethod, RequestModel},
 };
 
-use super::store::{actions::Action, PaneStore};
+use super::state::ElementFocus;
 
 mod list;
 pub mod state;
 mod upsert_item;
 
-pub struct CollectionsView {
+pub struct CollectionsComponent {
     render_area: Rect,
+    state: CollectionsState,
     menu: UpsertItemPopup,
     show_popup: bool,
-    openeds: HashSet<usize>,
-    idx: Idx,
+    _history: ActionHistory<CollectionAction>,
 }
 
-impl CollectionsView {
-    pub fn new(idx: Idx) -> Self {
+impl CollectionsComponent {
+    pub fn new(collections: Vec<CollectionsModel>) -> Self {
         Self {
+            state: CollectionsState::from_list(collections),
             render_area: Rect::default(),
             menu: UpsertItemPopup::new(),
             show_popup: false,
-            openeds: HashSet::new(),
-            idx,
-        }
-    }
-
-    fn next_collection(&mut self, collections: &[CollectionsModel]) {
-        let idx = match self.idx {
-            Idx::None => collections.is_empty().not().then_some(0),
-            Idx::Parent(i) | Idx::Child(i, _) => (i < collections.len() - 1).then_some(i + 1),
-        };
-
-        if let Some(i) = idx {
-            self.idx = Idx::Parent(i);
-        }
-    }
-
-    fn next_request(&mut self, collections: &[CollectionsModel]) {
-        let child_idx = match self.idx {
-            Idx::None => collections
-                .first()
-                .and_then(|coll| (!coll.requests.is_empty()).then_some((0, 0))),
-            Idx::Parent(i) => {
-                if self.openeds.contains(&i) {
-                    let coll = &collections[i];
-                    (!coll.requests.is_empty()).then_some((i, 0))
-                } else {
-                    None
-                }
-            }
-            Idx::Child(i, sub_i) => {
-                let coll = &collections[i];
-                (sub_i < coll.requests.len() - 1).then_some((i, sub_i + 1))
-            }
-        };
-
-        if let Some((i, sub_i)) = child_idx {
-            self.idx = Idx::Child(i, sub_i);
-        }
-    }
-
-    fn next(&mut self, collections: &[CollectionsModel]) {
-        match self.idx {
-            Idx::None => self.next_collection(collections),
-            _ => {
-                let previous_idx = self.idx.clone();
-                self.next_request(collections);
-
-                if self.idx == previous_idx {
-                    self.next_collection(collections);
-                }
-            }
-        }
-    }
-
-    fn prev_collection(&mut self) {
-        let idx = match self.idx {
-            Idx::None => None,
-            Idx::Parent(i) => (i > 0).then(|| i - 1),
-            Idx::Child(i, _) => Some(i),
-        };
-
-        if let Some(i) = idx {
-            self.idx = Idx::Parent(i);
-        }
-    }
-
-    fn prev_request(&mut self, collections: &[CollectionsModel]) {
-        let idx = match self.idx {
-            Idx::None => None,
-            Idx::Parent(i) => i
-                .checked_sub(1)
-                .and_then(|prev_i| self.openeds.contains(&prev_i).then_some(prev_i))
-                .and_then(|prev_i| Some((prev_i, &collections[prev_i])))
-                .and_then(|(prev_i, coll)| {
-                    (!coll.requests.is_empty()).then(|| (prev_i, coll.requests.len() - 1))
-                }),
-            Idx::Child(i, sub_i) => (sub_i > 0).then(|| (i, sub_i - 1)),
-        };
-
-        if let Some((i, sub_i)) = idx {
-            self.idx = Idx::Child(i, sub_i);
-        }
-    }
-
-    fn prev(&mut self, collections: &[CollectionsModel]) {
-        match self.idx {
-            Idx::None => {}
-            _ => {
-                let previous_idx = self.idx.clone();
-                self.prev_request(collections);
-
-                if self.idx == previous_idx {
-                    self.prev_collection();
-                }
-            }
+            _history: ActionHistory::new(),
         }
     }
 }
 
-impl CollectionsView {
-    pub fn set_render_area(&mut self, area: Rect) {
-        self.render_area = area;
-    }
+impl Drawable for CollectionsComponent {
+    type Params = ElementFocus;
 
-    pub fn draw<'painter, 'this: 'painter, 'state: 'painter>(
-        &'this self,
-        painter: &mut Painter<'painter>,
-        state: &'state PaneStore,
+    fn draw<'a: 'painter, 'painter>(
+        &'a self,
+        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
+        focus: Self::Params,
     ) {
         painter.render(move |frame| {
-            let is_focus = state.is_focus(super::state::ElementFocus::Collections);
-            let items: Vec<Item<'_>> = state
+            let is_focus = focus == super::state::ElementFocus::Collections;
+            let items: Vec<Item<'_>> = self
+                .state
                 .collections()
                 .iter()
                 .enumerate()
-                .map(|(i, coll)| {
+                .map(|(_i, coll)| {
                     let mut itm = Item::new(coll.name());
 
-                    for (sub_i, req) in coll.requests().iter().enumerate() {
-                        let name = match state.is_sending_request(SendRequestId(i, sub_i)) {
-                            true => format!("pending {}", req.name()),
-                            false => req.name().to_string(),
-                        };
-                        itm.add_child(Item::new(name));
+                    for (_sub_i, req) in coll.requests().iter().enumerate() {
+                        // let name = match state.is_sending_request(SendRequestId(i, sub_i)) {
+                        //     true => format!("pending {}", req.name()),
+                        //     false => req.name().to_string(),
+                        // };
+                        itm.add_child(Item::new(req.name()));
                     }
 
                     itm
@@ -175,8 +84,8 @@ impl CollectionsView {
                             .unwrap_or_default(),
                     ),
                 )
-                .set_openeds(self.openeds.clone())
-                .set_idx(self.idx)
+                .set_openeds(self.state.openeds().clone())
+                .set_idx(self.state.idx())
                 .set_highlight_style(Style::default().green());
 
             frame.render_widget(collections, self.render_area);
@@ -202,8 +111,17 @@ impl CollectionsView {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &PaneStore) -> Vec<Action> {
-        let mut actions = Vec::new();
+    fn set_area(&mut self, area: Rect) {
+        self.render_area = area;
+    }
+}
+
+impl Interactive for CollectionsComponent {
+    type Effect = ();
+
+    fn on_key(&mut self, key: KeyEvent) -> Vec<Self::Effect> {
+        let effects = Vec::new();
+
         if key.kind == KeyEventKind::Press {
             if self.show_popup {
                 match key.code {
@@ -212,29 +130,37 @@ impl CollectionsView {
 
                         match self.menu.method_type() {
                             UpsertMethod::CreateRequest => {
-                                actions.push(Action::CreateRequest {
-                                    coll_idx: self.idx.parent_idx(),
-                                    name: text,
-                                });
+                                self._history.apply(
+                                    CollectionAction::CreateRequest {
+                                        coll_idx: self.state.idx().parent_idx(),
+                                        name: text,
+                                    },
+                                    &mut self.state,
+                                );
                             }
                             UpsertMethod::CreateCollection => {
-                                actions.push(Action::CreateCollection(text));
-                                if self.idx == Idx::None {
-                                    self.idx = Idx::Parent(0);
-                                }
-                                self.openeds.insert(state.collections().len());
+                                self._history.apply(
+                                    CollectionAction::CreateCollection(text),
+                                    &mut self.state,
+                                );
                             }
                             UpsertMethod::EditRequest => {
-                                actions.push(Action::EditRequestName {
-                                    idx: self.idx.child_idx(),
-                                    name: text,
-                                });
+                                self._history.apply(
+                                    CollectionAction::EditRequestName {
+                                        idx: self.state.idx().child_idx(),
+                                        name: text,
+                                    },
+                                    &mut self.state,
+                                );
                             }
                             UpsertMethod::EditCollection => {
-                                actions.push(Action::EditCollectionName {
-                                    idx: self.idx.parent_idx(),
-                                    new_name: text,
-                                });
+                                self._history.apply(
+                                    CollectionAction::EditCollectionName {
+                                        idx: self.state.idx().parent_idx(),
+                                        new_name: text,
+                                    },
+                                    &mut self.state,
+                                );
                             }
                         }
 
@@ -250,59 +176,40 @@ impl CollectionsView {
             } else {
                 match key.code {
                     KeyCode::Tab => {
-                        actions.push(Action::NextFocus);
+                        // actions.push(Action::NextFocus);
                     }
                     // KeyCode::Enter => match state.idx() {
                     //     Idx::Child(i, sub_i) => mutator.add(SetRquestIdx::new(Some((i, sub_i)))),
                     //     _ => {}
                     // },
                     KeyCode::BackTab => {
-                        actions.push(Action::PreviousFocus);
+                        // actions.push(Action::PreviousFocus);
                     }
                     KeyCode::Left | KeyCode::Char('h') => {
-                        if let Idx::Parent(i) = self.idx {
-                            self.openeds.remove(&i);
-                        }
+                        self.state.close_collection(true);
                     }
                     KeyCode::Right | KeyCode::Char('l') => {
-                        if let Idx::Parent(i) = self.idx {
-                            self.openeds.insert(i);
-                        }
+                        self.state.open_collection(true);
                     }
                     KeyCode::Down | KeyCode::Char('j') => {
-                        self.next(state.collections());
+                        self.state.next();
                     }
                     KeyCode::Up | KeyCode::Char('k') => {
-                        self.prev(state.collections());
+                        self.state.prev();
                     }
-                    KeyCode::Char('d') | KeyCode::Delete => match self.idx {
+                    KeyCode::Char('d') | KeyCode::Delete => match self.state.idx() {
                         state::Idx::None => {}
                         state::Idx::Parent(i) => {
-                            actions.push(Action::DeleteCollection { idx: i });
-                            self.openeds.remove(&i);
-
-                            // So I need set the idx on self!
-                            let collections = state.collections();
-
-                            if i == collections.len() - 1 {
-                                if i == 0 {
-                                    self.idx = Idx::None;
-                                } else {
-                                    self.idx = Idx::Parent(i - 1);
-                                }
-                            }
+                            self._history.apply(
+                                CollectionAction::DeleteCollection { idx: i },
+                                &mut self.state,
+                            );
                         }
                         state::Idx::Child(i, sub_i) => {
-                            actions.push(Action::DeleteRequest((i, sub_i)));
-                            let requests_len = state.collections()[i].requests.len();
-
-                            if sub_i == requests_len - 1 {
-                                if sub_i == 0 {
-                                    self.idx = Idx::Parent(i);
-                                } else {
-                                    self.idx = Idx::Child(i, sub_i - 1);
-                                }
-                            }
+                            self._history.apply(
+                                CollectionAction::DeleteRequest((i, sub_i)),
+                                &mut self.state,
+                            );
                         }
                     },
                     KeyCode::Char('c') => {
@@ -310,21 +217,21 @@ impl CollectionsView {
                         self.menu.set_state(UpsertMethod::CreateCollection, "");
                     }
                     KeyCode::Char('r') => {
-                        if !self.idx.is_none() {
+                        if !self.state.idx().is_none() {
                             self.show_popup = true;
                             self.menu.set_state(UpsertMethod::CreateRequest, "");
                         }
                     }
-                    KeyCode::Char('e') => match self.idx {
+                    KeyCode::Char('e') => match self.state.idx() {
                         state::Idx::None => {}
                         state::Idx::Parent(i) => {
-                            let collection = state.collections().get(i).unwrap();
+                            let collection = self.state.collections().get(i).unwrap();
                             self.menu
                                 .set_state(UpsertMethod::EditCollection, &collection.name);
                             self.show_popup = true;
                         }
                         state::Idx::Child(_, _) => {
-                            let name = state.current_request().unwrap().name();
+                            let name = self.state.current_request().unwrap().name();
                             self.menu.set_state(UpsertMethod::EditRequest, name);
                             self.show_popup = true;
                         }
@@ -334,6 +241,197 @@ impl CollectionsView {
             }
         }
 
-        actions
+        effects
+    }
+}
+
+enum CollectionAction {
+    // Collection actions
+    CreateCollection(String),
+    InsertCollection {
+        idx: usize,
+        collection: CollectionsModel,
+    },
+    DeleteCollection {
+        idx: usize,
+    },
+    EditCollectionName {
+        idx: usize,
+        new_name: String,
+    },
+
+    // Request actions
+    CreateRequest {
+        coll_idx: usize,
+        name: String,
+    },
+    InsertRequest {
+        idx: (usize, usize),
+        request: RequestModel,
+    },
+    DeleteRequest((usize, usize)),
+    EditRequestName {
+        idx: (usize, usize),
+        name: String,
+    },
+    EditRequestMethod {
+        idx: (usize, usize),
+        method: HttpMethod,
+    },
+    EditRequestUrl {
+        idx: (usize, usize),
+        url: String,
+    },
+    EditRequestHeaders {
+        idx: (usize, usize),
+        headers: HashMap<String, String>,
+    },
+    EditRequestBody {
+        idx: (usize, usize),
+        body: BodyContent,
+    },
+}
+
+impl TrackAction for CollectionAction {
+    type State = CollectionsState;
+
+    fn apply(&self, state: &mut Self::State) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match self {
+            CollectionAction::CreateCollection(name) => {
+                let collection = CollectionsModel::new(name.to_string());
+
+                let inserted_index = state.collections().len();
+                state.insert_collection(inserted_index, collection);
+
+                Some(CollectionAction::DeleteCollection {
+                    idx: inserted_index,
+                })
+            }
+            CollectionAction::InsertCollection { idx, collection } => {
+                state.insert_collection(*idx, collection.clone());
+
+                Some(CollectionAction::DeleteCollection { idx: *idx })
+            }
+            CollectionAction::DeleteCollection { idx } => {
+                let collection = state.remove_collection(*idx).unwrap();
+                Some(CollectionAction::InsertCollection {
+                    idx: *idx,
+                    collection,
+                })
+            }
+            CollectionAction::EditCollectionName { idx, new_name } => {
+                let collection = state.get_collection_mut(*idx).unwrap();
+                let previous_name = collection.name.to_string();
+
+                collection.name = new_name.to_string();
+
+                Some(CollectionAction::EditCollectionName {
+                    idx: *idx,
+                    new_name: previous_name,
+                })
+            }
+            CollectionAction::CreateRequest { coll_idx, name } => {
+                let collection = state.get_collection(*coll_idx).unwrap();
+                let req = RequestModel::new(name.to_string());
+                let inserted_i = collection.requests.len();
+
+                state.insert_request(*coll_idx, inserted_i, req);
+
+                Some(CollectionAction::DeleteRequest((*coll_idx, inserted_i)))
+            }
+            CollectionAction::InsertRequest { idx, request } => {
+                state.insert_request(idx.0, idx.1, request.clone());
+
+                Some(CollectionAction::DeleteRequest(*idx))
+            }
+            CollectionAction::DeleteRequest(idx) => {
+                let request = state.remove_request(idx.to_owned()).unwrap();
+
+                Some(CollectionAction::InsertRequest { idx: *idx, request })
+            }
+            CollectionAction::EditRequestName { idx, name } => {
+                let idx = idx.to_owned();
+                let request = state.get_request_mut(idx).unwrap();
+                let previous_name = request.name().to_string();
+
+                state.edit_request(idx, |req| {
+                    req.set_name(name.clone());
+                });
+
+                Some(CollectionAction::EditRequestName {
+                    idx,
+                    name: previous_name,
+                })
+            }
+            CollectionAction::EditRequestMethod { idx, method } => {
+                let idx = idx.to_owned();
+                let request = state.get_request_mut(idx).unwrap();
+                let previous_method = request.method().clone();
+
+                state.edit_request(idx, |req| {
+                    req.set_method(method.clone());
+                });
+
+                Some(CollectionAction::EditRequestMethod {
+                    idx,
+                    method: previous_method,
+                })
+            }
+            CollectionAction::EditRequestUrl { idx, url } => {
+                let idx = idx.to_owned();
+                let request = state.get_request_mut(idx).unwrap();
+                let previous_url = request.url().to_string();
+
+                state.edit_request(idx, |req| {
+                    req.set_url(url.clone());
+                });
+
+                Some(CollectionAction::EditRequestUrl {
+                    idx,
+                    url: previous_url,
+                })
+            }
+            CollectionAction::EditRequestHeaders { idx, headers } => {
+                let idx = idx.to_owned();
+                let request = state.get_request_mut(idx).unwrap();
+                let previous_headers = request.headers_map().clone();
+
+                state.edit_request(idx, |req| {
+                    req.set_headers(headers.clone());
+                });
+
+                Some(CollectionAction::EditRequestHeaders {
+                    idx,
+                    headers: previous_headers,
+                })
+            }
+            CollectionAction::EditRequestBody { idx, body } => {
+                let idx = idx.to_owned();
+                let request = state.get_request_mut(idx).unwrap();
+                let previous_body = request.body().clone();
+
+                state.edit_request(idx, |req| {
+                    req.set_body(body.clone());
+                });
+
+                Some(CollectionAction::EditRequestBody {
+                    idx,
+                    body: previous_body,
+                })
+            }
+        }
+    }
+}
+
+impl WithHistory for CollectionsComponent {
+    fn undo(&mut self) {
+        self._history.undo(&mut self.state);
+    }
+
+    fn redo(&mut self) {
+        self._history.redo(&mut self.state);
     }
 }

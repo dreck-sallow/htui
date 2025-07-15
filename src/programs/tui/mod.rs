@@ -12,6 +12,7 @@ use crate::{
 };
 
 mod app;
+mod common;
 mod element_view;
 mod elements;
 mod events;

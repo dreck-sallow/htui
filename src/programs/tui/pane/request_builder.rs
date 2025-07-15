@@ -22,7 +22,8 @@ impl Tab {
     pub fn as_idx(&self) -> usize {
         match self {
             Tab::Headers => 0,
-            Tab::Body => 1,
+            Tab::Body => 2,
+            // Tab::Params => 1,
         }
     }
 }
@@ -32,6 +33,7 @@ impl AsRef<str> for Tab {
         match self {
             Tab::Headers => "Headers",
             Tab::Body => "Body",
+            // Tab::Params => "Params",
         }
     }
 }
@@ -91,7 +93,7 @@ impl RequestEditorView {
             }
             Tab::Body => {
                 // self.body_editor.draw(painter, state);
-            }
+            } // Tab::Params => todo!(),
         }
     }
 
@@ -115,6 +117,7 @@ impl RequestEditorView {
             let is_editing = match self.tab {
                 Tab::Headers => self.headers_editor.mode().is_write_mode(),
                 Tab::Body => self.body_editor.is_editing(),
+                // Tab::Params => false,
             };
 
             // let mut mutate_on_blur = |focus_navigation: FocusNavigation| {

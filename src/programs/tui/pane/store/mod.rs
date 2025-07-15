@@ -11,25 +11,25 @@ pub mod mutator;
 mod responses_store;
 
 pub struct PaneStore {
-    collections: CollectionsStore,
+    // collections: CollectionsStore,
     current_request_idx: Option<(usize, usize)>,
     focus: ElementFocus,
     responses: Responses,
 }
 
 impl PaneStore {
-    pub fn from_collections(collections: Vec<CollectionsModel>) -> Self {
+    pub fn new() -> Self {
         Self {
             current_request_idx: None,
-            collections: CollectionsStore::new(collections),
+            // collections: CollectionsStore::new(collections),
             focus: ElementFocus::Collections,
             responses: Responses::new(),
         }
     }
 
-    pub fn collections(&self) -> &[CollectionsModel] {
-        self.collections.list()
-    }
+    // pub fn collections(&self) -> &[CollectionsModel] {
+    //     self.collections.list()
+    // }
 
     pub fn is_focus(&self, focus: ElementFocus) -> bool {
         self.focus == focus
@@ -43,10 +43,10 @@ impl PaneStore {
         self.current_request_idx
     }
 
-    pub fn current_request(&self) -> Option<&RequestModel> {
-        self.current_request_idx
-            .and_then(|idx| self.collections.get_request(idx))
-    }
+    // pub fn current_request(&self) -> Option<&RequestModel> {
+    //     self.current_request_idx
+    //         .and_then(|idx| self.collections.get_request(idx))
+    // }
 
     pub fn is_sending_request(&self, id: SendRequestId) -> bool {
         match self.responses.get(&id) {
