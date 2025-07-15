@@ -258,9 +258,9 @@ impl MutableList for CollectionsState {
     fn insert_collection(&mut self, idx: usize, collection: CollectionsModel) {
         self.collections.insert(idx, collection);
 
-        if self.idx.is_none() {
-            self.idx = Idx::Parent(0);
-        }
+        self.idx = Idx::Parent(idx);
+
+        self.opened.insert(idx);
     }
 
     fn insert_request(&mut self, collection_idx: usize, idx: usize, req: RequestModel) {

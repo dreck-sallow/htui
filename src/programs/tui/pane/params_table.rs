@@ -1,9 +1,192 @@
+use crossterm::event::KeyCode;
 use ratatui::{
     layout::Rect,
     style::{Style, Stylize},
     text::Span,
     widgets::Widget,
 };
+use tui_textarea::TextArea;
+
+use crate::{
+    programs::tui::common::{
+        action_history::{ActionHistory, History, TrackAction},
+        component::{Drawable, Interactive},
+    },
+    store::models::KeyValueParam,
+};
+
+pub struct TableParamState {
+    items: Vec<KeyValueParam>,
+    index_cell: Option<(usize, usize)>,
+}
+
+impl TableParamState {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            index_cell: None,
+        }
+    }
+
+    pub fn next_item(&mut self) {
+        match self.index_cell {
+            Some(idx) => {
+                if idx.0 < self.items.len() - 1 {
+                    self.index_cell = Some((idx.0 + 1, idx.1));
+                }
+            }
+            None => {
+                if !self.items.is_empty() {
+                    self.index_cell = Some((0, 0))
+                }
+            }
+        }
+    }
+
+    pub fn previous_item(&mut self) {
+        if let Some(idx) = self.index_cell {
+            if idx.0 > 0 {
+                self.index_cell = Some((idx.0 - 1, idx.1));
+            }
+        }
+    }
+
+    pub fn insert_param(&mut self, idx: usize, item: KeyValueParam) {
+        self.items.insert(idx, item);
+
+        if let None = self.index_cell {
+            self.index_cell = Some((0, 0));
+        }
+    }
+
+    pub fn remove_param(&mut self, idx: usize) -> Option<KeyValueParam> {
+        if self.items.get(idx).is_some() {
+            if idx == 0 {
+                self.index_cell = None;
+            } else if idx == self.items.len() - 1 {
+                let current_index = self.index_cell.unwrap();
+                self.index_cell = Some((current_index.0 - 1, current_index.1));
+            }
+
+            Some(self.items.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn edit_item<F: FnMut(&mut KeyValueParam)>(&mut self, idx: usize, mut f: F) {
+        if let Some(item) = self.items.get_mut(idx) {
+            f(item);
+        }
+    }
+}
+
+pub struct TableParams {
+    render_area: Rect,
+    state: TableParamState,
+    input: TextArea<'static>,
+    _history: ActionHistory<TableParamsAction>,
+}
+
+impl TableParams {
+    pub fn new() -> Self {
+        Self {
+            render_area: Rect::default(),
+            state: TableParamState::new(),
+            input: TextArea::new(Vec::new()),
+            _history: ActionHistory::new(),
+        }
+    }
+}
+
+impl Drawable for TableParams {
+    type Params = ();
+
+    fn set_area(&mut self, _area: Rect) {
+        self.render_area = _area;
+    }
+
+    fn draw<'a: 'painter, 'painter>(
+        &'a self,
+        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
+        _params: Self::Params,
+    ) {
+        painter.render(move |frame| {
+            let items = self
+                .state
+                .items
+                .iter()
+                .map(|itm| [Span::raw("*"), Span::from(&itm.key), Span::from(&itm.value)])
+                .collect();
+            let table = ParamsTable::new(items)
+                .title_style(Style::default().on_blue().white())
+                .index_style(Style::default().on_light_blue().white())
+                .index_cell(self.state.index_cell.clone());
+
+            frame.render_widget(table, self.render_area);
+        });
+    }
+}
+
+impl Interactive for TableParams {
+    type Effect = TableParamsEffect;
+
+    fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
+        match key.code {
+            KeyCode::Char('n') => self._history.apply(
+                TableParamsAction::AddItem(KeyValueParam::default()),
+                &mut self.state,
+            ),
+            _ => {}
+        }
+        None
+    }
+}
+
+enum TableParamsAction {
+    AddItem(KeyValueParam),
+    InsertItem(usize, KeyValueParam),
+    RemoveItem(usize),
+    MarkApply(usize, bool),
+}
+
+impl TrackAction for TableParamsAction {
+    type State = TableParamState;
+
+    fn apply(&self, state: &mut Self::State) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match self {
+            TableParamsAction::AddItem(key_value_param) => {
+                let idx = state.items.len();
+                state.insert_param(idx, key_value_param.clone());
+                Some(Self::RemoveItem(idx))
+            }
+            TableParamsAction::InsertItem(idx, key_value_param) => {
+                state.insert_param(*idx, key_value_param.clone());
+                Some(Self::RemoveItem(*idx))
+            }
+            TableParamsAction::RemoveItem(idx) => {
+                let param = state.remove_param(*idx).unwrap();
+
+                Some(Self::InsertItem(*idx, param))
+            }
+            TableParamsAction::MarkApply(idx, flag) => {
+                state.edit_item(*idx, |itm| {
+                    itm.apply = *flag;
+                });
+
+                Some(Self::MarkApply(*idx, !flag))
+            }
+        }
+    }
+}
+
+pub enum TableParamsEffect {
+    NextFocus,
+    PreviousFocus,
+}
 
 pub struct ParamsTable<'text> {
     header: [&'static str; 3],
@@ -23,6 +206,21 @@ impl<'text> ParamsTable<'text> {
             index_style: None,
             index_cell: if items_len > 0 { Some((0, 0)) } else { None },
         }
+    }
+
+    pub fn title_style(mut self, style: Style) -> Self {
+        self.title_style = style;
+        self
+    }
+
+    pub fn index_style(mut self, style: Style) -> Self {
+        self.index_style = Some(style);
+        self
+    }
+
+    pub fn index_cell(mut self, index: Option<(usize, usize)>) -> Self {
+        self.index_cell = index;
+        self
     }
 }
 

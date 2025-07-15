@@ -15,6 +15,26 @@ pub enum ElementFocus {
     ResponseViewer,
 }
 
+impl ElementFocus {
+    pub fn next(self) -> Self {
+        match self {
+            ElementFocus::Collections => ElementFocus::MethodUrlBar,
+            ElementFocus::MethodUrlBar => ElementFocus::RequestBuilder,
+            ElementFocus::RequestBuilder => ElementFocus::ResponseViewer,
+            ElementFocus::ResponseViewer => ElementFocus::Collections,
+        }
+    }
+
+    pub fn previous(self) -> Self {
+        match self {
+            ElementFocus::Collections => ElementFocus::ResponseViewer,
+            ElementFocus::MethodUrlBar => ElementFocus::Collections,
+            ElementFocus::RequestBuilder => ElementFocus::MethodUrlBar,
+            ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
+        }
+    }
+}
+
 pub struct PaneState {
     collections: CollectionsState,
     focus: ElementFocus,

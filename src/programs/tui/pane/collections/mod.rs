@@ -43,6 +43,14 @@ impl CollectionsComponent {
             _history: ActionHistory::new(),
         }
     }
+
+    pub fn current_request(&self) -> Option<&RequestModel> {
+        match self.state.idx() {
+            state::Idx::None => None,
+            state::Idx::Parent(_) => None,
+            state::Idx::Child(i, sub_i) => self.state.get_request((i, sub_i)),
+        }
+    }
 }
 
 impl Drawable for CollectionsComponent {
@@ -117,11 +125,9 @@ impl Drawable for CollectionsComponent {
 }
 
 impl Interactive for CollectionsComponent {
-    type Effect = ();
+    type Effect = CollectionEffect;
 
-    fn on_key(&mut self, key: KeyEvent) -> Vec<Self::Effect> {
-        let effects = Vec::new();
-
+    fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
         if key.kind == KeyEventKind::Press {
             if self.show_popup {
                 match key.code {
@@ -176,14 +182,14 @@ impl Interactive for CollectionsComponent {
             } else {
                 match key.code {
                     KeyCode::Tab => {
-                        // actions.push(Action::NextFocus);
+                        return Some(CollectionEffect::NextFocus);
                     }
                     // KeyCode::Enter => match state.idx() {
                     //     Idx::Child(i, sub_i) => mutator.add(SetRquestIdx::new(Some((i, sub_i)))),
                     //     _ => {}
                     // },
                     KeyCode::BackTab => {
-                        // actions.push(Action::PreviousFocus);
+                        return Some(CollectionEffect::PreviousFocus);
                     }
                     KeyCode::Left | KeyCode::Char('h') => {
                         self.state.close_collection(true);
@@ -195,7 +201,16 @@ impl Interactive for CollectionsComponent {
                         self.state.next();
                     }
                     KeyCode::Up | KeyCode::Char('k') => {
+                        // let prev_idx = self.state.idx();
                         self.state.prev();
+
+                        // if prev_idx != self.state.idx() {
+                        //     match self.state.idx() {
+                        //         state::Idx::None => todo!(),
+                        //         state::Idx::Parent(_) => todo!(),
+                        //         state::Idx::Child(_, _) => todo!(),
+                        //     }
+                        // }
                     }
                     KeyCode::Char('d') | KeyCode::Delete => match self.state.idx() {
                         state::Idx::None => {}
@@ -241,7 +256,7 @@ impl Interactive for CollectionsComponent {
             }
         }
 
-        effects
+        None
     }
 }
 
@@ -434,4 +449,10 @@ impl WithHistory for CollectionsComponent {
     fn redo(&mut self) {
         self._history.redo(&mut self.state);
     }
+}
+
+pub enum CollectionEffect {
+    NextFocus,
+    PreviousFocus,
+    ChangeCurrentRequest,
 }

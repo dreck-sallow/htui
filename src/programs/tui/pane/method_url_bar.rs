@@ -9,13 +9,16 @@ use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
     programs::tui::{
-        element_view::Painter,
+        common::{
+            action_history::{ActionHistory, History, TrackAction},
+            component::{Drawable, Interactive, WithHistory},
+        },
         elements::{dropdown::OverlayDropdown, utils::expand, Separator},
     },
     store::models::HttpMethod,
 };
 
-use super::store::{actions::Action, PaneStore};
+use super::state::ElementFocus;
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,
@@ -27,15 +30,16 @@ const METHODS: [HttpMethod; 7] = [
     HttpMethod::Options,
 ];
 
-pub struct MethodUrlBarView {
+pub struct MethodUrlBarComponent {
     render_area: Rect,
-    // method: HttpMethod,
+    method: HttpMethod,
     url_input: TextArea<'static>,
     dropdown: OverlayDropdown<HttpMethod>,
     show_dropdown: bool,
+    _history: ActionHistory<MethodUrlAction>,
 }
 
-impl MethodUrlBarView {
+impl MethodUrlBarComponent {
     pub fn new() -> Self {
         let mut url_input = TextArea::default();
         url_input.set_cursor_line_style(Style::default());
@@ -43,11 +47,13 @@ impl MethodUrlBarView {
 
         Self {
             render_area: Rect::default(),
+            method: HttpMethod::Get,
             url_input,
             dropdown: OverlayDropdown::with_items(HttpMethod::Get, METHODS)
                 .with_highlight_style(Style::default().on_light_blue())
                 .with_style(Style::default().on_light_red()),
             show_dropdown: false,
+            _history: ActionHistory::new(),
         }
     }
 
@@ -55,65 +61,78 @@ impl MethodUrlBarView {
         self.url_input.move_cursor(CursorMove::End);
         self.url_input.delete_line_by_head();
     }
+
+    pub fn set_data(&mut self, method: HttpMethod, url: &str) {
+        self.method = method;
+        self.clean_url();
+        self.url_input.insert_str(url);
+
+        self._history.clean();
+    }
 }
 
-impl MethodUrlBarView {
-    pub fn draw<'painter, 'this: 'painter, 'state: 'painter>(
-        &'this self,
-        painter: &mut Painter<'painter>,
-        state: &'state PaneStore,
+impl Drawable for MethodUrlBarComponent {
+    type Params = ElementFocus;
+
+    fn set_area(&mut self, _area: Rect) {
+        self.render_area = _area;
+    }
+
+    fn draw<'a: 'painter, 'painter>(
+        &'a self,
+        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
+        params: Self::Params,
     ) {
-        // painter.render(|frame| {
-        //     let req = state.current_request_idx().unwrap();
-        //     let is_focus = state.is_focus(super::state::ElementFocus::MethodUrlBar);
+        painter.render(move |frame| {
+            let is_focus = params == ElementFocus::MethodUrlBar;
 
-        //     let border_style = is_focus
-        //         .then_some(Style::default().blue())
-        //         .unwrap_or_default();
+            let border_style = is_focus
+                .then_some(Style::default().blue())
+                .unwrap_or_default();
 
-        //     let line_block = Block::bordered().border_style(border_style);
+            let line_block = Block::bordered().border_style(border_style);
 
-        //     let area = line_block.inner(self.render_area);
-        //     frame.render_widget(line_block, self.render_area);
+            let area = line_block.inner(self.render_area);
+            frame.render_widget(line_block, self.render_area);
 
-        //     let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
-        //         Layout::horizontal([
-        //             Constraint::Length(11),
-        //             Constraint::Length(1),
-        //             Constraint::Min(10),
-        //             Constraint::Length(1),
-        //             Constraint::Length(10),
-        //         ])
-        //         .areas(area);
+            let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
+                Layout::horizontal([
+                    Constraint::Length(11),
+                    Constraint::Length(1),
+                    Constraint::Min(10),
+                    Constraint::Length(1),
+                    Constraint::Length(10),
+                ])
+                .areas(area);
 
-        //     frame.render_widget(
-        //         Separator::default().style(border_style),
-        //         left_separator_area,
-        //     );
-        //     frame.render_widget(
-        //         Separator::default().style(border_style),
-        //         right_reparator_area,
-        //     );
+            frame.render_widget(
+                Separator::default().style(border_style),
+                left_separator_area,
+            );
+            frame.render_widget(
+                Separator::default().style(border_style),
+                right_reparator_area,
+            );
 
-        //     frame.render_widget(
-        //         Span::from(expand(req.method().as_ref(), " ", 10))
-        //             .style(Style::new().on_light_red())
-        //             .black(),
-        //         method_area,
-        //     );
+            frame.render_widget(
+                Span::from(expand(self.method.as_ref(), " ", 10))
+                    .style(Style::new().on_light_red())
+                    .black(),
+                method_area,
+            );
 
-        //     frame.render_widget(&self.url_input, url_area);
-        //     frame.render_widget(
-        //         Span::from(expand(
-        //             if self.show_dropdown { "--" } else { "Send" },
-        //             " ",
-        //             10,
-        //         ))
-        //         .on_light_green()
-        //         .black(),
-        //         indicator_area,
-        //     );
-        // });
+            frame.render_widget(&self.url_input, url_area);
+            frame.render_widget(
+                Span::from(expand(
+                    if self.show_dropdown { "--" } else { "Send" },
+                    " ",
+                    10,
+                ))
+                .on_light_green()
+                .black(),
+                indicator_area,
+            );
+        });
 
         if self.show_dropdown {
             painter.render_last(|frame| {
@@ -127,19 +146,21 @@ impl MethodUrlBarView {
             });
         }
     }
+}
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &PaneStore) -> Vec<Action> {
-        let mut actions = Vec::new();
+impl Interactive for MethodUrlBarComponent {
+    type Effect = MethodUrlEffect;
+
+    fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
         if key.kind == KeyEventKind::Press {
             if self.show_dropdown {
                 match key.code {
                     KeyCode::Enter => {
-                        // let request_idx = state.idx().child_idx();
-                        // collector.add(EditRequest::new(
-                        //     request_idx,
-                        //     RequestEditType::Method(self.dropdown.selected().clone()),
-                        // ));
                         self.show_dropdown = false;
+                        self._history.apply(
+                            MethodUrlAction::ChangeMethod(self.dropdown.selected().to_owned()),
+                            &mut self.method,
+                        );
                     }
                     KeyCode::Esc => {
                         self.show_dropdown = false;
@@ -149,32 +170,15 @@ impl MethodUrlBarView {
                     }
                 }
             } else {
-                let mut mutate_on_blur = |next: bool| {
-                    let request_idx = state.current_request_idx().unwrap();
-
-                    if next {
-                        actions.push(Action::NextFocus);
-                    } else {
-                        actions.push(Action::PreviousFocus);
-                    }
-
-                    actions.push(Action::EditRequestMethod {
-                        idx: state.current_request_idx().unwrap(),
-                        method: self.dropdown.selected().clone(),
-                    });
-
-                    actions.push(Action::EditRequestUrl {
-                        idx: state.current_request_idx().unwrap(),
-                        url: self.url_input.lines()[0].to_string(),
-                    });
-                };
-
                 match key.code {
                     KeyCode::Tab => {
-                        mutate_on_blur(true);
+                        // mutate_on_blur(true);
+
+                        return Some(MethodUrlEffect::NextFocus);
                     }
                     KeyCode::BackTab => {
-                        mutate_on_blur(false);
+                        // mutate_on_blur(false);
+                        return Some(MethodUrlEffect::PreviousFocus);
                     }
                     KeyCode::Enter => {
                         // Change to pending
@@ -191,10 +195,42 @@ impl MethodUrlBarView {
             }
         }
 
-        actions
+        None
+    }
+}
+
+impl WithHistory for MethodUrlBarComponent {
+    fn undo(&mut self) {
+        self._history.undo(&mut self.method);
     }
 
-    pub fn set_render_area(&mut self, area: Rect) {
-        self.render_area = area;
+    fn redo(&mut self) {
+        self._history.redo(&mut self.method);
     }
+}
+
+enum MethodUrlAction {
+    ChangeMethod(HttpMethod),
+}
+
+impl TrackAction for MethodUrlAction {
+    type State = HttpMethod;
+
+    fn apply(&self, state: &mut Self::State) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match self {
+            MethodUrlAction::ChangeMethod(http_method) => {
+                let previous_method = state.clone();
+                *state = http_method.clone();
+                Some(MethodUrlAction::ChangeMethod(previous_method))
+            }
+        }
+    }
+}
+
+pub enum MethodUrlEffect {
+    NextFocus,
+    PreviousFocus,
 }
