@@ -7,7 +7,10 @@ use ratatui::{
 
 use crate::programs::tui::common::component::{Drawable, Interactive};
 
-use super::{body_editor::BodyEditorView, state::ElementFocus, text_editor::TextEditor};
+use super::{
+    body_editor::BodyEditorView, params_table::TableParams, state::ElementFocus,
+    text_editor::TextEditor,
+};
 
 #[derive(Clone, Copy)]
 pub enum Tab {
@@ -40,6 +43,7 @@ pub struct RequestEditorComponent {
     tab: Tab,
     header_area: Rect,
     render_area: Rect,
+    params_table: TableParams,
     headers_editor: TextEditor,
     body_editor: BodyEditorView,
 }
@@ -47,9 +51,10 @@ pub struct RequestEditorComponent {
 impl RequestEditorComponent {
     pub fn new() -> Self {
         Self {
-            tab: Tab::Headers,
+            tab: Tab::Params,
             header_area: Rect::default(),
             render_area: Rect::default(),
+            params_table: TableParams::new(),
             headers_editor: TextEditor::new(true),
             body_editor: BodyEditorView::new(true),
         }
@@ -75,6 +80,7 @@ impl Drawable for RequestEditorComponent {
             frame.render_widget(block, self.render_area);
 
             let tabs = Tabs::new([
+                format!(" {} ", Tab::Params.as_ref()),
                 format!(" {} ", Tab::Headers.as_ref()),
                 format!(" {} ", Tab::Body.as_ref()),
             ])
@@ -94,7 +100,9 @@ impl Drawable for RequestEditorComponent {
             Tab::Body => {
                 // self.body_editor.draw(painter, state);
             }
-            Tab::Params => {}
+            Tab::Params => {
+                self.params_table.draw(painter, ());
+            }
         }
     }
 
@@ -104,6 +112,7 @@ impl Drawable for RequestEditorComponent {
 
         self.render_area = area;
         self.header_area = main_areas[0];
+        self.params_table.set_area(main_areas[1]);
         // self.content_area = main_areas[1];
         // self.body_editor.set_render_area(main_areas[1]);
     }
@@ -117,7 +126,7 @@ impl Interactive for RequestEditorComponent {
             let is_editing = match self.tab {
                 Tab::Headers => self.headers_editor.mode().is_write_mode(),
                 Tab::Body => self.body_editor.is_editing(),
-                Tab::Params => false,
+                Tab::Params => self.params_table.is_editing(),
             };
 
             // let mut mutate_on_blur = |focus_navigation: FocusNavigation| {
@@ -186,7 +195,9 @@ impl Interactive for RequestEditorComponent {
                     Tab::Body => {
                         // self.body_editor.on_key(key, mutator, state);
                     }
-                    Tab::Params => {}
+                    Tab::Params => {
+                        self.params_table.on_key(key);
+                    }
                 },
             }
         }

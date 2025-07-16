@@ -172,9 +172,7 @@ impl Pane {
                     }
                 }
                 state::ElementFocus::RequestBuilder => {
-                    todo!()
-                    // self.request_editor_view
-                    //     .handle_key(key, &mut mutation_collector, &self.state)
+                    self.request_builder_component.on_key(key);
                 }
                 state::ElementFocus::ResponseViewer => {
                     todo!()

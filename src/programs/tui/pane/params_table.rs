@@ -1,11 +1,11 @@
 use crossterm::event::KeyCode;
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     text::Span,
-    widgets::Widget,
+    widgets::{Block, Clear, Widget},
 };
-use tui_textarea::TextArea;
+use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
     programs::tui::common::{
@@ -28,6 +28,13 @@ impl TableParamState {
         }
     }
 
+    pub fn set_items(&mut self, list: Vec<KeyValueParam>) {
+        self.items = list;
+        if !self.items.is_empty() {
+            self.index_cell = Some((0, 0));
+        }
+    }
+
     pub fn next_item(&mut self) {
         match self.index_cell {
             Some(idx) => {
@@ -43,12 +50,40 @@ impl TableParamState {
         }
     }
 
+    pub fn next_cell(&mut self) {
+        if let Some((row, col)) = self.index_cell {
+            let next_col = match col {
+                0 => 1,
+                1 => 2,
+                _ => col,
+            };
+
+            self.index_cell = Some((row, next_col))
+        }
+    }
+
+    pub fn previous_cell(&mut self) {
+        if let Some((row, col)) = self.index_cell {
+            let next_col = match col {
+                1 => 0,
+                2 => 1,
+                _ => col,
+            };
+
+            self.index_cell = Some((row, next_col))
+        }
+    }
+
     pub fn previous_item(&mut self) {
         if let Some(idx) = self.index_cell {
             if idx.0 > 0 {
                 self.index_cell = Some((idx.0 - 1, idx.1));
             }
         }
+    }
+
+    pub fn get_item(&self, idx: usize) -> Option<&KeyValueParam> {
+        self.items.get(idx)
     }
 
     pub fn insert_param(&mut self, idx: usize, item: KeyValueParam) {
@@ -85,17 +120,43 @@ pub struct TableParams {
     render_area: Rect,
     state: TableParamState,
     input: TextArea<'static>,
+    /// For show the input for editing a field
+    show_popup: bool,
     _history: ActionHistory<TableParamsAction>,
 }
 
 impl TableParams {
     pub fn new() -> Self {
+        let mut input = TextArea::default();
+        input.set_block(
+            Block::bordered()
+                .title(" Edit ")
+                .border_style(Style::default().blue()),
+        );
+        input.set_cursor_line_style(Style::default());
+
         Self {
             render_area: Rect::default(),
             state: TableParamState::new(),
-            input: TextArea::new(Vec::new()),
+            input,
+            show_popup: false,
             _history: ActionHistory::new(),
         }
+    }
+
+    pub fn set_state(&mut self, params: Vec<KeyValueParam>) {
+        self.clean_lines();
+        self.state.set_items(params);
+        self._history.clean();
+    }
+
+    pub fn clean_lines(&mut self) {
+        self.input.move_cursor(CursorMove::End);
+        self.input.delete_line_by_head();
+    }
+
+    pub fn is_editing(&self) -> bool {
+        self.show_popup
     }
 }
 
@@ -116,28 +177,132 @@ impl Drawable for TableParams {
                 .state
                 .items
                 .iter()
-                .map(|itm| [Span::raw("*"), Span::from(&itm.key), Span::from(&itm.value)])
+                .map(|itm| {
+                    let apply_label = if itm.enable { "yes" } else { "no" };
+                    [
+                        Span::raw(apply_label),
+                        Span::from(&itm.key),
+                        Span::from(&itm.value),
+                    ]
+                })
                 .collect();
             let table = ParamsTable::new(items)
-                .title_style(Style::default().on_blue().white())
-                .index_style(Style::default().on_light_blue().white())
+                .title_style(Style::default().gray().blue())
+                .index_style(Style::default().on_light_blue().dark_gray())
                 .index_cell(self.state.index_cell.clone());
 
             frame.render_widget(table, self.render_area);
         });
+
+        if self.show_popup {
+            painter.render_last(|frame| {
+                let area = {
+                    let [area] = Layout::vertical([Constraint::Length(3)])
+                        .flex(ratatui::layout::Flex::Center)
+                        .areas(frame.area());
+
+                    let [area] = Layout::horizontal([Constraint::Percentage(40)])
+                        .flex(ratatui::layout::Flex::Center)
+                        .areas(area);
+
+                    area
+                };
+
+                frame.render_widget(Clear, area);
+                frame.render_widget(&self.input, area);
+            });
+        }
     }
 }
 
 impl Interactive for TableParams {
-    type Effect = TableParamsEffect;
+    type Effect = ();
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
-        match key.code {
-            KeyCode::Char('n') => self._history.apply(
-                TableParamsAction::AddItem(KeyValueParam::default()),
-                &mut self.state,
-            ),
-            _ => {}
+        if self.show_popup {
+            match key.code {
+                KeyCode::Esc => {
+                    self.show_popup = false;
+                    self.clean_lines();
+                }
+                KeyCode::Enter => {
+                    if let Some((row, col)) = self.state.index_cell {
+                        let txt = self.input.lines()[0].to_owned();
+                        match col {
+                            1 => {
+                                self._history
+                                    .apply(TableParamsAction::EditKey(row, txt), &mut self.state);
+                                self.clean_lines();
+                            }
+                            2 => {
+                                self._history
+                                    .apply(TableParamsAction::EditValue(row, txt), &mut self.state);
+                                self.clean_lines();
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    self.show_popup = false;
+                    self.clean_lines();
+                }
+                _ => {
+                    self.input.input(Input::from(key));
+                }
+            }
+        } else {
+            match key.code {
+                KeyCode::Char('n') => self._history.apply(
+                    TableParamsAction::AddItem(KeyValueParam::default()),
+                    &mut self.state,
+                ),
+                KeyCode::Char('h') | KeyCode::Left => {
+                    self.state.previous_cell();
+                }
+                KeyCode::Char('l') | KeyCode::Right => {
+                    self.state.next_cell();
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.state.next_item();
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.state.previous_item();
+                }
+
+                KeyCode::Char('d') | KeyCode::Delete => {
+                    if let Some((row, _)) = self.state.index_cell {
+                        self._history
+                            .apply(TableParamsAction::RemoveItem(row), &mut self.state);
+                    }
+                }
+                KeyCode::Char('e') | KeyCode::Enter => {
+                    if let Some((row, col)) = self.state.index_cell {
+                        match col {
+                            0 => {
+                                let key_value = self.state.get_item(row).unwrap();
+                                self._history.apply(
+                                    TableParamsAction::MarkApply(row, !key_value.enable),
+                                    &mut self.state,
+                                );
+                            }
+                            1 => {
+                                self.clean_lines();
+                                let key_value = self.state.get_item(row).unwrap();
+                                self.show_popup = true;
+                                self.input.insert_str(&key_value.key);
+                            }
+                            2 => {
+                                self.clean_lines();
+                                let key_value = self.state.get_item(row).unwrap();
+                                self.show_popup = true;
+                                self.input.insert_str(&key_value.value);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
         None
     }
@@ -148,6 +313,8 @@ enum TableParamsAction {
     InsertItem(usize, KeyValueParam),
     RemoveItem(usize),
     MarkApply(usize, bool),
+    EditKey(usize, String),
+    EditValue(usize, String),
 }
 
 impl TrackAction for TableParamsAction {
@@ -174,25 +341,35 @@ impl TrackAction for TableParamsAction {
             }
             TableParamsAction::MarkApply(idx, flag) => {
                 state.edit_item(*idx, |itm| {
-                    itm.apply = *flag;
+                    itm.enable = *flag;
                 });
 
                 Some(Self::MarkApply(*idx, !flag))
+            }
+            TableParamsAction::EditKey(idx, new_key) => {
+                let previous_key = state.get_item(*idx).unwrap().key.to_owned();
+                state.edit_item(*idx, |itm| itm.key = new_key.clone());
+                Some(Self::EditKey(*idx, previous_key))
+            }
+            TableParamsAction::EditValue(idx, new_value) => {
+                let previous_value = state.get_item(*idx).unwrap().value.to_owned();
+                state.edit_item(*idx, |itm| itm.value = new_value.clone());
+                Some(Self::EditKey(*idx, previous_value))
             }
         }
     }
 }
 
-pub enum TableParamsEffect {
-    NextFocus,
-    PreviousFocus,
-}
+// pub enum TableParamsEffect {
+//     NextFocus,
+//     PreviousFocus,
+// }
 
 pub struct ParamsTable<'text> {
     header: [&'static str; 3],
     key_values: Vec<[Span<'text>; 3]>,
     title_style: Style,
-    index_style: Option<Style>,
+    index_style: Style,
     index_cell: Option<(usize, usize)>,
 }
 
@@ -203,7 +380,7 @@ impl<'text> ParamsTable<'text> {
             header: ["Enable", "Key", "Value"],
             key_values: items,
             title_style: Style::default(),
-            index_style: None,
+            index_style: Style::default(),
             index_cell: if items_len > 0 { Some((0, 0)) } else { None },
         }
     }
@@ -214,7 +391,7 @@ impl<'text> ParamsTable<'text> {
     }
 
     pub fn index_style(mut self, style: Style) -> Self {
-        self.index_style = Some(style);
+        self.index_style = style;
         self
     }
 
@@ -240,22 +417,25 @@ impl<'a> Widget for ParamsTable<'a> {
         };
 
         let colum_widths = {
-            let missing_width = area.width - 6;
+            let missing_width = (area.width - 2) - 6;
             let key_width = ((missing_width as f32) * 0.4) as u16;
 
             [6, key_width, missing_width - key_width]
         };
         // Draw the header (titles)
 
+        let mut left = header_area.left();
         for (i, title) in self.header.iter().enumerate() {
             let width = colum_widths[i];
             buf.set_stringn(
-                header_area.left() + (i as u16 * width),
+                left,
                 header_area.top(),
                 title,
                 width as usize,
                 self.title_style,
             );
+
+            left += width + 1;
         }
 
         // If no items, render a placeholder
@@ -267,7 +447,7 @@ impl<'a> Widget for ParamsTable<'a> {
                 content_area.top(),
                 msg,
                 msg.len(),
-                Style::default().gray(),
+                Style::default().gray().italic(),
             );
         } else {
             // Draw the list table content
@@ -305,14 +485,44 @@ impl<'a> Widget for ParamsTable<'a> {
             };
 
             let mut top = content_area.top();
+            let mut left = content_area.left();
 
-            for key_value in &self.key_values[page_start..(page_end + 1)] {
-                for (i, text) in key_value.iter().enumerate() {
-                    let width = colum_widths[i];
-                    buf.set_span(i as u16 * width, top, text, width);
+            let check_idx = |n: (usize, usize)| {
+                if let Some(idx) = self.index_cell {
+                    let from_start_idx = idx.0 - page_start;
+                    n == (from_start_idx, idx.1)
+                } else {
+                    false
+                }
+            };
+
+            for (row, key_value) in self.key_values[page_start..page_end].iter().enumerate() {
+                for (col, text) in key_value.iter().enumerate() {
+                    let width = colum_widths[col];
+                    if text.width() == 0 {
+                        // render a placeholder!
+                        buf.set_string(left, top, "-", Style::default().italic().dark_gray());
+                    } else {
+                        buf.set_span(left, top, text, width);
+                    }
+
+                    if check_idx((row, col)) {
+                        buf.set_style(
+                            Rect {
+                                x: left,
+                                y: top,
+                                width,
+                                height: 1, // TODO: change for multiline
+                            },
+                            self.index_style,
+                        );
+                    }
+
+                    left += width + 1;
                 }
 
                 top += 1;
+                left = content_area.left();
             }
         }
     }

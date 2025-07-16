@@ -146,7 +146,7 @@ impl CollectionsModel {
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct KeyValueParam {
     /// Property for indicate if its value will applied to the request
-    pub apply: bool,
+    pub enable: bool,
     pub key: String,
     pub value: String,
 }
