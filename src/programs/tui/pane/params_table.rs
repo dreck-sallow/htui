@@ -1,6 +1,8 @@
+use std::{thread, time::Duration};
+
 use crossterm::event::KeyCode;
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
     text::Span,
     widgets::{Block, Clear, Widget},
@@ -10,7 +12,7 @@ use tui_textarea::{CursorMove, Input, TextArea};
 use crate::{
     programs::tui::common::{
         action_history::{ActionHistory, History, TrackAction},
-        component::{Drawable, Interactive},
+        component::{Drawable, Interactive, WithHistory},
     },
     store::models::KeyValueParam,
 };
@@ -100,7 +102,7 @@ impl TableParamState {
                 self.index_cell = None;
             } else if idx == self.items.len() - 1 {
                 let current_index = self.index_cell.unwrap();
-                self.index_cell = Some((current_index.0 - 1, current_index.1));
+                self.index_cell = Some((idx - 1, current_index.1));
             }
 
             Some(self.items.remove(idx))
@@ -164,7 +166,7 @@ impl Drawable for TableParams {
     type Params = ();
 
     fn set_area(&mut self, _area: Rect) {
-        self.render_area = _area;
+        self.render_area = _area.inner(Margin::new(1, 0));
     }
 
     fn draw<'a: 'painter, 'painter>(
@@ -186,7 +188,7 @@ impl Drawable for TableParams {
                     ]
                 })
                 .collect();
-            let table = ParamsTable::new(items)
+            let table = TableParamsUi::new(items)
                 .title_style(Style::default().gray().blue())
                 .index_style(Style::default().on_light_blue().dark_gray())
                 .index_cell(self.state.index_cell.clone());
@@ -354,18 +356,24 @@ impl TrackAction for TableParamsAction {
             TableParamsAction::EditValue(idx, new_value) => {
                 let previous_value = state.get_item(*idx).unwrap().value.to_owned();
                 state.edit_item(*idx, |itm| itm.value = new_value.clone());
-                Some(Self::EditKey(*idx, previous_value))
+                Some(Self::EditValue(*idx, previous_value))
             }
         }
     }
 }
 
-// pub enum TableParamsEffect {
-//     NextFocus,
-//     PreviousFocus,
-// }
+impl WithHistory for TableParams {
+    fn undo(&mut self) {
+        self._history.undo(&mut self.state);
+    }
 
-pub struct ParamsTable<'text> {
+    fn redo(&mut self) {
+        self._history.redo(&mut self.state);
+    }
+}
+
+/// Internal table for ui
+pub struct TableParamsUi<'text> {
     header: [&'static str; 3],
     key_values: Vec<[Span<'text>; 3]>,
     title_style: Style,
@@ -373,7 +381,7 @@ pub struct ParamsTable<'text> {
     index_cell: Option<(usize, usize)>,
 }
 
-impl<'text> ParamsTable<'text> {
+impl<'text> TableParamsUi<'text> {
     pub fn new(items: Vec<[Span<'text>; 3]>) -> Self {
         let items_len = items.len();
         Self {
@@ -401,7 +409,7 @@ impl<'text> ParamsTable<'text> {
     }
 }
 
-impl<'a> Widget for ParamsTable<'a> {
+impl<'a> Widget for TableParamsUi<'a> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,

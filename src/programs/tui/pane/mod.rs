@@ -126,7 +126,9 @@ impl Pane {
                     self.collections_component.undo();
                 }
                 state::ElementFocus::MethodUrlBar => self.method_url_component.undo(),
-                state::ElementFocus::RequestBuilder => {}
+                state::ElementFocus::RequestBuilder => {
+                    self.request_builder_component.undo();
+                }
                 state::ElementFocus::ResponseViewer => {}
             }
         } else if KeyCode::Char('y') == key.code && key.modifiers == KeyModifiers::ALT {
@@ -137,7 +139,9 @@ impl Pane {
                 state::ElementFocus::MethodUrlBar => {
                     self.method_url_component.redo();
                 }
-                state::ElementFocus::RequestBuilder => {}
+                state::ElementFocus::RequestBuilder => {
+                    self.request_builder_component.redo();
+                }
                 state::ElementFocus::ResponseViewer => {}
             }
         } else {
