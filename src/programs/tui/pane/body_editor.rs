@@ -73,6 +73,15 @@ impl BodyEditorComponent {
             _ => self.text_editor.mode().is_write_mode(),
         };
     }
+
+    pub fn set_state(&mut self, body_content: BodyContent) {
+        self._history.clean();
+        self.body_content = body_content;
+    }
+
+    pub fn get_data(&self) -> BodyContent {
+        self.body_content.clone()
+    }
 }
 
 impl Drawable for BodyEditorComponent {

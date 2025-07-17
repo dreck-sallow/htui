@@ -69,6 +69,10 @@ impl MethodUrlBarComponent {
 
         self._history.clean();
     }
+
+    pub fn get_data(&self) -> (HttpMethod, String) {
+        (self.method.clone(), self.url_input.lines()[0].to_string())
+    }
 }
 
 impl Drawable for MethodUrlBarComponent {

@@ -1,4 +1,4 @@
-use collections::{state::Idx, CollectionsComponent};
+use collections::CollectionsComponent;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use method_url_bar::MethodUrlBarComponent;
 use placeholder::PlaceholderView;
@@ -9,9 +9,8 @@ use ratatui::{
 use request_builder::RequestEditorComponent;
 // use response_viewer::ResponseViewerView;
 use state::{ElementFocus, PaneState};
-use store::PaneStore;
 
-use crate::store::models::ProjectModel;
+use crate::store::models::{KeyValueParam, ProjectModel};
 
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
@@ -36,7 +35,6 @@ pub struct Pane {
     // mutations_history: MutationsHistoryV2,
     project_id: String,
     project_name: String,
-    store: PaneStore,
     collections_component: CollectionsComponent,
     method_url_component: MethodUrlBarComponent,
     request_builder_component: RequestEditorComponent,
@@ -51,17 +49,10 @@ pub struct Pane {
 
 impl Pane {
     pub fn from_project(project: ProjectModel, sender: EventSender) -> Self {
-        let idx = if project.collections.is_empty() {
-            Idx::None
-        } else {
-            Idx::Parent(0)
-        };
-
         Self {
             // mutations_history: MutationsHistoryV2::new(),
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
-            store: PaneStore::new(),
             focus: ElementFocus::Collections,
             collections_component: CollectionsComponent::new(project.collections),
             method_url_component: MethodUrlBarComponent::new(),
@@ -158,6 +149,19 @@ impl Pane {
                             collections::CollectionEffect::ChangeCurrentRequest => {
                                 if let Some(req) = self.collections_component.current_request() {
                                     self.method_url_component.set_data(req.method(), req.url());
+                                    let headers = req
+                                        .headers()
+                                        .iter()
+                                        .map(|(k, v)| {
+                                            KeyValueParam::new(k.to_string(), v.to_string())
+                                        })
+                                        .collect();
+
+                                    self.request_builder_component.set_state(
+                                        req.params.clone(),
+                                        headers,
+                                        req.body().clone(),
+                                    );
                                 }
                             }
                         }
@@ -165,6 +169,7 @@ impl Pane {
                 }
                 state::ElementFocus::MethodUrlBar => {
                     if let Some(effect) = self.method_url_component.on_key(key) {
+                        // let data = self.method_url_component.get_data();
                         match effect {
                             method_url_bar::MethodUrlEffect::NextFocus => {
                                 self.focus = self.focus.next()
@@ -173,6 +178,10 @@ impl Pane {
                                 self.focus = self.focus.previous()
                             }
                         }
+
+                        let (method, url) = self.method_url_component.get_data();
+                        self.collections_component
+                            .set_data_from_method_url(method, url);
                     }
                 }
                 state::ElementFocus::RequestBuilder => {
@@ -185,6 +194,10 @@ impl Pane {
                                 self.focus = self.focus.previous()
                             }
                         }
+
+                        let (params, headers, body) = self.request_builder_component.get_data();
+                        self.collections_component
+                            .set_data_from_request_editor(params, headers, body);
                     }
                 }
                 state::ElementFocus::ResponseViewer => {

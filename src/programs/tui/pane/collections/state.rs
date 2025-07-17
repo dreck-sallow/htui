@@ -22,6 +22,7 @@ pub struct CollectionsState {
     collections: Vec<CollectionsModel>,
     idx: Idx,
     opened: HashSet<usize>,
+    selected_request_idx: Option<(usize, usize)>,
 }
 
 impl CollectionsState {
@@ -41,6 +42,7 @@ impl CollectionsState {
                 Idx::Parent(0)
             },
             collections: collections,
+            selected_request_idx: None,
             opened: HashSet::new(),
         }
     }
@@ -60,6 +62,14 @@ impl CollectionsState {
 
     pub fn idx(&self) -> Idx {
         self.idx.clone()
+    }
+
+    pub fn selected_request_idx(&self) -> Option<(usize, usize)> {
+        self.selected_request_idx
+    }
+
+    pub fn select_request_idx(&mut self, idx: Option<(usize, usize)>) {
+        self.selected_request_idx = idx;
     }
 
     pub fn add_collection(&mut self, collection: CollectionsModel) {
@@ -269,20 +279,40 @@ impl MutableList for CollectionsState {
         }
     }
 
-    fn remove_collection(&mut self, idx: usize) -> Option<CollectionsModel> {
-        // TODO: calculate the idx
-        if idx < self.collections.len() {
-            self.opened.remove(&idx);
-            Some(self.collections.remove(idx))
+    fn remove_collection(&mut self, collection_idx: usize) -> Option<CollectionsModel> {
+        if collection_idx < self.collections.len() {
+            // TODO: check for collections_idx != self.idx
+            self.opened.remove(&collection_idx);
+
+            if collection_idx == self.collections.len() - 1 {
+                if collection_idx == 0 {
+                    // We are removing the last remaining element in the list
+                    self.idx = Idx::None;
+                } else {
+                    // If removing last, we need go back one
+                    self.idx = Idx::Parent(collection_idx - 1);
+                }
+            }
+
+            Some(self.collections.remove(collection_idx))
         } else {
             None
         }
     }
 
     fn remove_request(&mut self, (i, sub_i): (usize, usize)) -> Option<RequestModel> {
-        // TODO: calculate the idx
         if let Some(coll) = self.collections.get_mut(i) {
             if sub_i < coll.requests.len() {
+                if sub_i == coll.requests.len() - 1 {
+                    if sub_i == 0 {
+                        // We are removing the last remaining element in the list
+                        self.idx = Idx::Parent(i);
+                    } else {
+                        // If removing last, we need go back one
+                        self.idx = Idx::Child(i, sub_i - 1);
+                    }
+                }
+
                 return Some(coll.requests.remove(sub_i));
             }
         }

@@ -151,6 +151,16 @@ pub struct KeyValueParam {
     pub value: String,
 }
 
+impl KeyValueParam {
+    pub fn new(key: String, value: String) -> Self {
+        Self {
+            enable: true,
+            key,
+            value,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct RequestModel {
     id: String,

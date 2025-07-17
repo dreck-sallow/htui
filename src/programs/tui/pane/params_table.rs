@@ -152,6 +152,10 @@ impl TableParams {
         self._history.clean();
     }
 
+    pub fn get_data(&self) -> Vec<KeyValueParam> {
+        self.state.items.clone()
+    }
+
     pub fn clean_lines(&mut self) {
         self.input.move_cursor(CursorMove::End);
         self.input.delete_line_by_head();

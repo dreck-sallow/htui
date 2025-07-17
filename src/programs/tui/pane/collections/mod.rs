@@ -16,7 +16,7 @@ use crate::{
         action_history::{ActionHistory, History, TrackAction},
         component::{Drawable, Interactive, WithHistory},
     },
-    store::models::{BodyContent, CollectionsModel, HttpMethod, RequestModel},
+    store::models::{BodyContent, CollectionsModel, HttpMethod, KeyValueParam, RequestModel},
 };
 
 use super::state::ElementFocus;
@@ -45,10 +45,60 @@ impl CollectionsComponent {
     }
 
     pub fn current_request(&self) -> Option<&RequestModel> {
-        match self.state.idx() {
-            state::Idx::None => None,
-            state::Idx::Parent(_) => None,
-            state::Idx::Child(i, sub_i) => self.state.get_request((i, sub_i)),
+        match self.state.selected_request_idx() {
+            Some(idx) => self.state.get_request(idx),
+            None => None,
+        }
+    }
+
+    pub fn set_data_from_method_url(&mut self, method: HttpMethod, url: String) {
+        if let Some(idx) = self.state.selected_request_idx() {
+            // TODO: make multiple actions as a single transactions for undo this operation
+            self._history.apply(
+                CollectionAction::EditRequestMethod {
+                    idx,
+                    method: method,
+                },
+                &mut self.state,
+            );
+            self._history.apply(
+                CollectionAction::EditRequestUrl { idx, url },
+                &mut self.state,
+            );
+        }
+    }
+
+    pub fn set_data_from_request_editor(
+        &mut self,
+        params: Vec<KeyValueParam>,
+        headers: Vec<KeyValueParam>,
+        body: BodyContent,
+    ) {
+        if let Some(idx) = self.state.selected_request_idx() {
+            // TODO: make multiple actions as a single transactions for undo this operation
+            self._history.apply(
+                CollectionAction::EditRequestParams { idx, params },
+                &mut self.state,
+            );
+            self._history.apply(
+                CollectionAction::EditRequestBody { idx, body },
+                &mut self.state,
+            );
+
+            let headers = {
+                let mut map = HashMap::new();
+
+                for key_value in headers {
+                    map.insert(key_value.key, key_value.value);
+                }
+
+                map
+            };
+
+            self._history.apply(
+                CollectionAction::EditRequestHeaders { idx, headers },
+                &mut self.state,
+            );
         }
     }
 }
@@ -184,10 +234,16 @@ impl Interactive for CollectionsComponent {
                     KeyCode::Tab => {
                         return Some(CollectionEffect::NextFocus);
                     }
-                    // KeyCode::Enter => match state.idx() {
-                    //     Idx::Child(i, sub_i) => mutator.add(SetRquestIdx::new(Some((i, sub_i)))),
-                    //     _ => {}
-                    // },
+                    KeyCode::Enter => match self.state.idx() {
+                        state::Idx::Child(i, sub_i) => {
+                            self._history.apply(
+                                CollectionAction::SelectRequestIdx(Some((i, sub_i))),
+                                &mut self.state,
+                            );
+                            return Some(CollectionEffect::ChangeCurrentRequest);
+                        }
+                        _ => {}
+                    },
                     KeyCode::BackTab => {
                         return Some(CollectionEffect::PreviousFocus);
                     }
@@ -261,6 +317,7 @@ impl Interactive for CollectionsComponent {
 }
 
 enum CollectionAction {
+    SelectRequestIdx(Option<(usize, usize)>),
     // Collection actions
     CreateCollection(String),
     InsertCollection {
@@ -301,6 +358,10 @@ enum CollectionAction {
         idx: (usize, usize),
         headers: HashMap<String, String>,
     },
+    EditRequestParams {
+        idx: (usize, usize),
+        params: Vec<KeyValueParam>,
+    },
     EditRequestBody {
         idx: (usize, usize),
         body: BodyContent,
@@ -315,6 +376,13 @@ impl TrackAction for CollectionAction {
         Self: Sized,
     {
         match self {
+            CollectionAction::SelectRequestIdx(idx) => {
+                let previous_selection = state.selected_request_idx();
+
+                state.select_request_idx(*idx);
+
+                Some(CollectionAction::SelectRequestIdx(previous_selection))
+            }
             CollectionAction::CreateCollection(name) => {
                 let collection = CollectionsModel::new(name.to_string());
 
@@ -435,6 +503,20 @@ impl TrackAction for CollectionAction {
                 Some(CollectionAction::EditRequestBody {
                     idx,
                     body: previous_body,
+                })
+            }
+            CollectionAction::EditRequestParams { idx, params } => {
+                let idx = idx.to_owned();
+                let request = state.get_request_mut(idx).unwrap();
+                let previous_params = request.params.clone();
+
+                state.edit_request(idx, |req| {
+                    req.params = params.clone();
+                });
+
+                Some(CollectionAction::EditRequestParams {
+                    idx,
+                    params: previous_params,
                 })
             }
         }

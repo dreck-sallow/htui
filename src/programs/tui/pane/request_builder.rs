@@ -5,7 +5,10 @@ use ratatui::{
     widgets::{Block, Borders, Tabs},
 };
 
-use crate::programs::tui::common::component::{Drawable, Interactive, WithHistory};
+use crate::{
+    programs::tui::common::component::{Drawable, Interactive, WithHistory},
+    store::models::{BodyContent, KeyValueParam},
+};
 
 use super::{body_editor::BodyEditorComponent, params_table::TableParams, state::ElementFocus};
 
@@ -57,6 +60,25 @@ impl RequestEditorComponent {
             // headers_editor: TextEditor::new(true),
             body_editor_component: BodyEditorComponent::new(),
         }
+    }
+
+    pub fn set_state(
+        &mut self,
+        params: Vec<KeyValueParam>,
+        headers: Vec<KeyValueParam>,
+        body: BodyContent,
+    ) {
+        self.params_table.set_state(params);
+        self.headers_table.set_state(headers);
+        self.body_editor_component.set_state(body);
+    }
+
+    pub fn get_data(&mut self) -> (Vec<KeyValueParam>, Vec<KeyValueParam>, BodyContent) {
+        (
+            self.params_table.get_data(),
+            self.headers_table.get_data(),
+            self.body_editor_component.get_data(),
+        )
     }
 
     /// on corners tab, return bool for indicate set focus
