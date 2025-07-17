@@ -7,7 +7,7 @@ use ratatui::{
 
 use crate::programs::tui::common::component::{Drawable, Interactive, WithHistory};
 
-use super::{body_editor::BodyEditorView, params_table::TableParams, state::ElementFocus};
+use super::{body_editor::BodyEditorComponent, params_table::TableParams, state::ElementFocus};
 
 #[derive(Clone, Copy)]
 pub enum Tab {
@@ -43,7 +43,7 @@ pub struct RequestEditorComponent {
     params_table: TableParams,
     headers_table: TableParams,
     // headers_editor: TextEditor,
-    body_editor: BodyEditorView,
+    body_editor_component: BodyEditorComponent,
 }
 
 impl RequestEditorComponent {
@@ -55,7 +55,7 @@ impl RequestEditorComponent {
             params_table: TableParams::new(),
             headers_table: TableParams::new(),
             // headers_editor: TextEditor::new(true),
-            body_editor: BodyEditorView::new(true),
+            body_editor_component: BodyEditorComponent::new(),
         }
     }
 
@@ -72,7 +72,7 @@ impl RequestEditorComponent {
                 }
             }
             Tab::Body => {
-                if !self.body_editor.is_editing() {
+                if !self.body_editor_component.is_editing() {
                     if is_next {
                         // outof
                         // self.tab = Tab::Params;
@@ -133,7 +133,7 @@ impl Drawable for RequestEditorComponent {
                 self.headers_table.draw(painter, ());
             }
             Tab::Body => {
-                // self.body_editor.draw(painter, state);
+                self.body_editor_component.draw(painter, ());
             }
             Tab::Params => {
                 self.params_table.draw(painter, ());
@@ -149,7 +149,7 @@ impl Drawable for RequestEditorComponent {
         self.header_area = main_areas[0];
         self.params_table.set_area(main_areas[1]);
         self.headers_table.set_area(main_areas[1]);
-        // self.body_editor.set(main_areas[1]);
+        self.body_editor_component.set_area(main_areas[1]);
     }
 }
 
@@ -176,7 +176,7 @@ impl Interactive for RequestEditorComponent {
                         self.headers_table.on_key(key);
                     }
                     Tab::Body => {
-                        // self.body_editor.on_key(key, mutator, state);
+                        self.body_editor_component.on_key(key);
                     }
                     Tab::Params => {
                         self.params_table.on_key(key);
@@ -197,7 +197,7 @@ impl WithHistory for RequestEditorComponent {
     fn undo(&mut self) {
         match self.tab {
             Tab::Headers => self.headers_table.undo(),
-            Tab::Body => {}
+            Tab::Body => self.body_editor_component.undo(),
             Tab::Params => self.params_table.undo(),
         }
     }
@@ -205,7 +205,7 @@ impl WithHistory for RequestEditorComponent {
     fn redo(&mut self) {
         match self.tab {
             Tab::Headers => self.headers_table.redo(),
-            Tab::Body => {}
+            Tab::Body => self.body_editor_component.redo(),
             Tab::Params => self.params_table.redo(),
         }
     }

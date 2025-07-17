@@ -176,7 +176,16 @@ impl Pane {
                     }
                 }
                 state::ElementFocus::RequestBuilder => {
-                    self.request_builder_component.on_key(key);
+                    if let Some(effect) = self.request_builder_component.on_key(key) {
+                        match effect {
+                            request_builder::RequestEditorEffect::NextFocus => {
+                                self.focus = self.focus.next()
+                            }
+                            request_builder::RequestEditorEffect::PreviousFocus => {
+                                self.focus = self.focus.previous()
+                            }
+                        }
+                    }
                 }
                 state::ElementFocus::ResponseViewer => {
                     todo!()

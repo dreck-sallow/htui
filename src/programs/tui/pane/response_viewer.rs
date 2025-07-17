@@ -6,7 +6,7 @@ use ratatui::{
 
 use crate::programs::tui::element_view::Painter;
 
-use super::{body_editor::BodyEditorView, state::PaneState, text_editor::TextEditor};
+use super::{state::PaneState, text_editor::TextEditor};
 
 #[derive(Clone, Copy)]
 pub enum Tab {
@@ -38,7 +38,7 @@ pub struct ResponseViewerView {
     content_area: Rect,
     tab: Tab,
     headers_editor: TextEditor,
-    body_editor: BodyEditorView,
+    // body_editor: BodyEditorView,
 }
 
 impl ResponseViewerView {
@@ -49,7 +49,7 @@ impl ResponseViewerView {
             content_area: Rect::default(),
             tab: Tab::Response,
             headers_editor: TextEditor::new(false),
-            body_editor: BodyEditorView::new(false),
+            // body_editor: BodyEditorView::new(false),
         }
     }
 
