@@ -7,10 +7,11 @@ use ratatui::{
     Frame,
 };
 use request_builder::RequestEditorComponent;
+use request_response::ResponseViewerComponent;
 // use response_viewer::ResponseViewerView;
 use state::{ElementFocus, PaneState};
 
-use crate::store::models::{KeyValueParam, ProjectModel};
+use crate::store::models::{KeyValueParam, ProjectModel, SendRequestId};
 
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
@@ -25,6 +26,7 @@ mod mutations;
 mod params_table;
 mod placeholder;
 mod request_builder;
+mod request_response;
 mod response_viewer;
 mod responses;
 mod state;
@@ -32,35 +34,27 @@ mod store;
 mod text_editor;
 
 pub struct Pane {
-    // mutations_history: MutationsHistoryV2,
     project_id: String,
     project_name: String,
     collections_component: CollectionsComponent,
     method_url_component: MethodUrlBarComponent,
     request_builder_component: RequestEditorComponent,
-    // collections_view: CollectionsView,
+    response_viewer_component: ResponseViewerComponent,
     placeholder_view: PlaceholderView,
     focus: ElementFocus,
-    // method_url_view: MethodUrlBarView,
-    // request_editor_view: RequestEditorView,
-    // response_viewer: ResponseViewerView,
     _sender: EventSender,
 }
 
 impl Pane {
     pub fn from_project(project: ProjectModel, sender: EventSender) -> Self {
         Self {
-            // mutations_history: MutationsHistoryV2::new(),
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
             focus: ElementFocus::Collections,
             collections_component: CollectionsComponent::new(project.collections),
             method_url_component: MethodUrlBarComponent::new(),
             request_builder_component: RequestEditorComponent::new(),
-            // collections_view: CollectionsView::new(idx),
-            // method_url_view: MethodUrlBarView::new(),
-            // request_editor_view: RequestEditorView::new(),
-            // response_viewer: ResponseViewerView::new(),
+            response_viewer_component: ResponseViewerComponent::new(),
             placeholder_view: PlaceholderView::new(),
             _sender: sender,
         }
@@ -89,20 +83,20 @@ impl Pane {
         self.collections_component.set_area(collections_area);
         self.method_url_component.set_area(content_areas[0]);
         self.request_builder_component.set_area(content_areas[1]);
+        self.response_viewer_component.set_area(content_areas[2]);
         self.placeholder_view.set_render_area(placeholder_area);
-        // self.response_viewer.set_render_area(content_areas[2]);
     }
 
     pub fn draw(&self, frame: &mut Frame) {
         let mut painter = Painter::new();
         self.collections_component.draw(&mut painter, self.focus);
-        // self.collections_view.draw(&mut painter, &self.store);
 
         if self.collections_component.current_request().is_some() {
             self.method_url_component.draw(&mut painter, self.focus);
             self.request_builder_component
                 .draw(&mut painter, self.focus);
-            // self.response_viewer.draw(&mut painter, &self.state);
+            self.response_viewer_component
+                .draw(&mut painter, self.focus);
         } else {
             self.placeholder_view.draw(frame);
         }
@@ -134,6 +128,16 @@ impl Pane {
                     self.request_builder_component.redo();
                 }
                 state::ElementFocus::ResponseViewer => {}
+            }
+        } else if KeyCode::Char('x') == key.code && key.modifiers == KeyModifiers::ALT {
+            // Send request
+            if let Some(req) = self.collections_component.current_request() {
+                let idx = self.collections_component.current_request_idx().unwrap();
+                self.response_viewer_component.execute_req(
+                    SendRequestId(idx.0, idx.1),
+                    req,
+                    self._sender.clone(),
+                );
             }
         } else {
             match self.focus {
@@ -201,7 +205,16 @@ impl Pane {
                     }
                 }
                 state::ElementFocus::ResponseViewer => {
-                    todo!()
+                    if let Some(effect) = self.response_viewer_component.on_key(key) {
+                        match effect {
+                            request_response::ResponseViewerEffect::NextFocus => {
+                                self.focus = self.focus.next()
+                            }
+                            request_response::ResponseViewerEffect::PreviousFocus => {
+                                self.focus = self.focus.previous()
+                            }
+                        }
+                    }
                 }
             }
         }
