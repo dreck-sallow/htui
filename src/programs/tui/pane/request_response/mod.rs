@@ -4,6 +4,7 @@ use std::{
 };
 
 use crossterm::event::{KeyCode, KeyEventKind};
+use headers_table::HeadersTable;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
@@ -22,10 +23,7 @@ use crate::{
     store::models::{RequestModel, ResponseModel, SendRequest, SendRequestId},
 };
 
-use super::{
-    params_table::{TableParams, TableParamsUi},
-    state::ElementFocus,
-};
+use super::state::ElementFocus;
 
 mod body_viewer;
 mod headers_table;
@@ -58,7 +56,8 @@ impl AsRef<str> for Tab {
 pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
-    headers_editor: Arc<Mutex<TableParams>>,
+    headers_editor: Arc<Mutex<HeadersTable>>,
+    // ui_state: Arc<Mutex<(TableParamState, usize)>>,
     render_area: Rect,
     header_area: Rect,
     content_area: Rect,
@@ -69,7 +68,7 @@ impl ResponseViewerComponent {
         Self {
             state: RequestResponseState::new(),
             tab: Tab::Response,
-            headers_editor: Arc::new(Mutex::new(TableParams::new())),
+            headers_editor: Arc::new(Mutex::new(HeadersTable::new(vec![]))),
             render_area: Rect::default(),
             header_area: Rect::default(),
             content_area: Rect::default(),
@@ -85,13 +84,16 @@ impl ResponseViewerComponent {
             None => Arc::new(RwLock::new(SendRequest::Pending)),
         };
 
-        let send_req_task = send_request(req, Arc::clone(&send_req), sender);
+        let send_req_task = send_request(
+            req,
+            Arc::clone(&send_req),
+            (Arc::clone(&self.headers_editor), 1),
+            sender,
+        );
 
         self.state.add(id.clone(), send_req, send_req_task);
         self.state.set_current_response(Some(id));
     }
-
-    // pub fn delete_response() {}
 }
 
 impl Drawable for ResponseViewerComponent {
@@ -181,13 +183,11 @@ impl Drawable for ResponseViewerComponent {
 
                         match self.tab {
                             Tab::Headers => {
-                                // painter.render(|frame| {
-                                //     self.headers_editor.lock().unwrap().draw(&mut painter, ());
-                                // });
-                                // painter.render(|frame| {
-                                //     let table = TableParamsUi::new(Vec::new());
-                                //     frame.render_widget(table, self.content_area);
-                                // });
+                                painter.render(|frame| {
+                                    let headers_table = self.headers_editor.lock().unwrap();
+                                    let table_ui = headers_table.table_ui();
+                                    frame.render_widget(table_ui, self.content_area);
+                                });
                             }
                             Tab::Response => {
                                 // self.body_editor.draw(painter, state);
@@ -216,8 +216,18 @@ impl Interactive for ResponseViewerComponent {
                 },
                 _ => match self.tab {
                     Tab::Headers => {
-                        let headers_editor = &mut *self.headers_editor.lock().unwrap();
-                        headers_editor.on_key(key);
+                        let mut headers_editor = self.headers_editor.lock().unwrap();
+                        match key.code {
+                            KeyCode::Left | KeyCode::Char('h') => {
+                                headers_editor.move_col_idx(false)
+                            }
+                            KeyCode::Right | KeyCode::Char('l') => {
+                                headers_editor.move_col_idx(true)
+                            }
+                            KeyCode::Up | KeyCode::Char('k') => headers_editor.move_row_idx(false),
+                            KeyCode::Down | KeyCode::Char('j') => headers_editor.move_row_idx(true),
+                            _ => {}
+                        }
                     }
                     Tab::Response => {
                         // self.body_editor.on_key(key, mutator, state);
@@ -238,6 +248,7 @@ pub enum ResponseViewerEffect {
 fn send_request(
     req: &RequestModel,
     state: SendRequestResponse,
+    (table_headers, _i): (Arc<Mutex<HeadersTable>>, usize),
     sender: EventSender,
 ) -> RequestTask {
     let (tx, tr) = tokio::sync::oneshot::channel();
@@ -272,6 +283,11 @@ fn send_request(
                     Ok(res) => {
                         let response = ResponseModel { duration:timer.elapsed(), status:res.status().as_u16(), body: "BODY", headers: HashMap::new() };
                         *state.write().unwrap() = SendRequest::Finish(response);
+
+                        let key_value_headers: Vec<(String, String)> = res.headers().iter().map(|(k,v)| (k.to_string(), v.to_str().unwrap().into())).collect();
+
+                        let mut headers_state = table_headers.lock().unwrap();
+                        headers_state.replace(key_value_headers);
                     },
                     Err(_e) => {},
                 }

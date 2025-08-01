@@ -31,17 +31,8 @@ impl HexDumpLine {
             hex_values.push_str(value);
         }
 
-        let mut missing_values = self.bytes_per_line - self.values.len();
-
-        while missing_values > 0 {
-            hex_values.push_str(" ");
-            hex_values.push_str("  ");
-
-            missing_values -= 1;
-            // // if missing_values > 0 {
-            // hex_values.push_str(" ");
-            // // }
-        }
+        let missing_values = self.bytes_per_line - self.values.len();
+        hex_values.push_str(&"   ".repeat(missing_values));
 
         format!("{}: {} | {}", offset_hex, hex_values, self.ascii)
     }

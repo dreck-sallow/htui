@@ -51,6 +51,10 @@ impl CollectionsComponent {
         }
     }
 
+    pub fn current_request_idx(&self) -> Option<(usize, usize)> {
+        self.state.selected_request_idx()
+    }
+
     pub fn set_data_from_method_url(&mut self, method: HttpMethod, url: String) {
         if let Some(idx) = self.state.selected_request_idx() {
             // TODO: make multiple actions as a single transactions for undo this operation

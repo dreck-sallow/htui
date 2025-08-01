@@ -1,11 +1,13 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use tokio::{sync::oneshot, task::JoinHandle};
 
-use crate::{
-    programs::tui::pane::responses::SendRequestResponse,
-    store::models::{SendRequest, SendRequestId},
-};
+use crate::store::models::{SendRequest, SendRequestId};
+
+pub type SendRequestResponse = Arc<RwLock<SendRequest>>;
 
 pub struct Responses {
     inner: HashMap<SendRequestId, SendRequestResponse>,

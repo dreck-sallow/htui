@@ -1,5 +1,3 @@
-use std::{thread, time::Duration};
-
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
