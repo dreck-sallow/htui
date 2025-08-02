@@ -1,8 +1,9 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex, RwLock},
 };
 
+use body_viewer::{BodyContentView, HexDumpViewer};
 use crossterm::event::{KeyCode, KeyEventKind};
 use headers_table::HeadersTable;
 use ratatui::{
@@ -11,7 +12,7 @@ use ratatui::{
     text::Span,
     widgets::{Block, Borders, Tabs},
 };
-use reqwest::{ClientBuilder, Url};
+use reqwest::{header::CONTENT_TYPE, ClientBuilder, Url};
 use state::{RequestResponseState, RequestTask, SendRequestResponse};
 use tokio::time::Instant;
 
@@ -19,6 +20,7 @@ use crate::{
     programs::tui::{
         common::component::{Drawable, Interactive},
         events::EventSender,
+        pane::text_editor::TextEditor,
     },
     store::models::{RequestModel, ResponseModel, SendRequest, SendRequestId},
 };
@@ -56,8 +58,8 @@ impl AsRef<str> for Tab {
 pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
-    headers_editor: Arc<Mutex<HeadersTable>>,
-    // ui_state: Arc<Mutex<(TableParamState, usize)>>,
+    headers_viewer: Arc<Mutex<HeadersTable>>,
+    body_viewer: Arc<Mutex<BodyContentView>>,
     render_area: Rect,
     header_area: Rect,
     content_area: Rect,
@@ -68,7 +70,8 @@ impl ResponseViewerComponent {
         Self {
             state: RequestResponseState::new(),
             tab: Tab::Response,
-            headers_editor: Arc::new(Mutex::new(HeadersTable::new(vec![]))),
+            headers_viewer: Arc::new(Mutex::new(HeadersTable::new(vec![]))),
+            body_viewer: Arc::new(Mutex::new(BodyContentView::Empty)),
             render_area: Rect::default(),
             header_area: Rect::default(),
             content_area: Rect::default(),
@@ -87,7 +90,10 @@ impl ResponseViewerComponent {
         let send_req_task = send_request(
             req,
             Arc::clone(&send_req),
-            (Arc::clone(&self.headers_editor), 1),
+            (
+                Arc::clone(&self.headers_viewer),
+                Arc::clone(&self.body_viewer),
+            ),
             sender,
         );
 
@@ -137,65 +143,66 @@ impl Drawable for ResponseViewerComponent {
                     frame.render_widget(placeholder_text, center_area);
                 });
             }
-            Some(response) => {
-                match &*response.read().unwrap() {
-                    crate::store::models::SendRequest::Pending => {
-                        painter.render(|frame| {
-                            let placeholder_text = Span::from("Sending...");
-                            let center_area = {
-                                let [area] = Layout::vertical([Constraint::Length(1)])
-                                    .flex(ratatui::layout::Flex::Center)
-                                    .areas(self.render_area);
-
-                                let [area] = Layout::horizontal([Constraint::Length(
-                                    placeholder_text.width() as u16,
-                                )])
+            Some(response) => match &*response.read().unwrap() {
+                crate::store::models::SendRequest::Pending => {
+                    painter.render(|frame| {
+                        let placeholder_text = Span::from("Sending...");
+                        let center_area = {
+                            let [area] = Layout::vertical([Constraint::Length(1)])
                                 .flex(ratatui::layout::Flex::Center)
-                                .areas(area);
+                                .areas(self.render_area);
 
-                                area
-                            };
+                            let [area] = Layout::horizontal([Constraint::Length(
+                                placeholder_text.width() as u16,
+                            )])
+                            .flex(ratatui::layout::Flex::Center)
+                            .areas(area);
 
-                            frame.render_widget(placeholder_text, center_area);
-                        });
-                    }
-                    crate::store::models::SendRequest::Finish(_) => {
-                        painter.render(move |frame| {
-                            let style = if params == super::state::ElementFocus::ResponseViewer {
-                                Style::default().blue()
-                            } else {
-                                Style::default()
-                            };
+                            area
+                        };
 
-                            let block = Block::bordered().border_style(style);
-                            frame.render_widget(block, self.render_area);
+                        frame.render_widget(placeholder_text, center_area);
+                    });
+                }
+                crate::store::models::SendRequest::Finish(_) => {
+                    painter.render(move |frame| {
+                        let style = if params == super::state::ElementFocus::ResponseViewer {
+                            Style::default().blue()
+                        } else {
+                            Style::default()
+                        };
 
-                            let tabs = Tabs::new([
-                                format!(" {} ", Tab::Response.as_ref()),
-                                format!(" {} ", Tab::Headers.as_ref()),
-                            ])
-                            .select(self.tab.as_idx())
-                            .block(Block::new().borders(Borders::BOTTOM).border_style(style))
-                            .highlight_style(Style::default().blue());
+                        let block = Block::bordered().border_style(style);
+                        frame.render_widget(block, self.render_area);
 
-                            frame.render_widget(tabs, self.header_area);
-                        });
+                        let tabs = Tabs::new([
+                            format!(" {} ", Tab::Response.as_ref()),
+                            format!(" {} ", Tab::Headers.as_ref()),
+                        ])
+                        .select(self.tab.as_idx())
+                        .block(Block::new().borders(Borders::BOTTOM).border_style(style))
+                        .highlight_style(Style::default().blue());
 
-                        match self.tab {
-                            Tab::Headers => {
-                                painter.render(|frame| {
-                                    let headers_table = self.headers_editor.lock().unwrap();
-                                    let table_ui = headers_table.table_ui();
-                                    frame.render_widget(table_ui, self.content_area);
-                                });
-                            }
-                            Tab::Response => {
-                                // self.body_editor.draw(painter, state);
-                            }
+                        frame.render_widget(tabs, self.header_area);
+                    });
+
+                    match self.tab {
+                        Tab::Headers => {
+                            painter.render(|frame| {
+                                let headers_table = self.headers_viewer.lock().unwrap();
+                                let table_ui = headers_table.table_ui();
+                                frame.render_widget(table_ui, self.content_area);
+                            });
+                        }
+                        Tab::Response => {
+                            painter.render(|frame| {
+                                let body_viewer = self.body_viewer.lock().unwrap();
+                                frame.render_widget(&*body_viewer, self.content_area);
+                            });
                         }
                     }
                 }
-            }
+            },
         }
     }
 }
@@ -216,7 +223,7 @@ impl Interactive for ResponseViewerComponent {
                 },
                 _ => match self.tab {
                     Tab::Headers => {
-                        let mut headers_editor = self.headers_editor.lock().unwrap();
+                        let mut headers_editor = self.headers_viewer.lock().unwrap();
                         match key.code {
                             KeyCode::Left | KeyCode::Char('h') => {
                                 headers_editor.move_col_idx(false)
@@ -230,7 +237,14 @@ impl Interactive for ResponseViewerComponent {
                         }
                     }
                     Tab::Response => {
-                        // self.body_editor.on_key(key, mutator, state);
+                        let mut body_viewer = self.body_viewer.lock().unwrap();
+                        match &mut *body_viewer {
+                            BodyContentView::Text(text_editor) => {
+                                text_editor.handle_key(key);
+                            }
+                            BodyContentView::Binary(_hex_dump_viewer) => {}
+                            BodyContentView::Empty => {}
+                        }
                     }
                 },
             }
@@ -248,7 +262,7 @@ pub enum ResponseViewerEffect {
 fn send_request(
     req: &RequestModel,
     state: SendRequestResponse,
-    (table_headers, _i): (Arc<Mutex<HeadersTable>>, usize),
+    (table_headers, body_viewer): (Arc<Mutex<HeadersTable>>, Arc<Mutex<BodyContentView>>),
     sender: EventSender,
 ) -> RequestTask {
     let (tx, tr) = tokio::sync::oneshot::channel();
@@ -284,10 +298,49 @@ fn send_request(
                         let response = ResponseModel { duration:timer.elapsed(), status:res.status().as_u16(), body: "BODY", headers: HashMap::new() };
                         *state.write().unwrap() = SendRequest::Finish(response);
 
-                        let key_value_headers: Vec<(String, String)> = res.headers().iter().map(|(k,v)| (k.to_string(), v.to_str().unwrap().into())).collect();
+                        {
+                            // Mutate the headers state
+                            let key_value_headers: Vec<(String, String)> = res.headers().iter().map(|(k,v)| (k.to_string(), v.to_str().unwrap().into())).collect();
+                            let mut headers_state = table_headers.lock().unwrap();
+                            headers_state.replace(key_value_headers);
+                        };
 
-                        let mut headers_state = table_headers.lock().unwrap();
-                        headers_state.replace(key_value_headers);
+                        // Mutate the response body content state
+                        let content_type = res.headers().get(CONTENT_TYPE).and_then(|val| val.to_str().ok());
+                        match content_type {
+                            Some(_content_type) => {
+                                if _content_type.starts_with("text/") {
+                                    let text = res.text().await.unwrap();
+                                    let mut _body_viewer = body_viewer.lock().unwrap();
+                                    let mut text_editor = TextEditor::new(false);
+                                    text_editor.insert_str(&text);
+                                    *_body_viewer = BodyContentView::Text(text_editor);
+                                } else {
+                                    let valid_text = HashSet::from(["application/json", "application/xml", "application/javascript", "application/x-www-form-urlencoded", "application/xhtml+xml"]);
+
+                                    if valid_text.iter().any(|txt| valid_text.contains(txt)) {
+                                        let text = res.text().await.unwrap();
+                                        let mut _body_viewer = body_viewer.lock().unwrap();
+                                        let mut text_editor = TextEditor::new(false);
+                                        text_editor.insert_str(&text);
+                                        *_body_viewer = BodyContentView::Text(text_editor);
+                                    } else {
+                                        let bytes_vec = res.bytes().await.unwrap().to_vec();
+                                        let dump_viewer = HexDumpViewer::new(&bytes_vec);
+                                        let mut _body_viewer = body_viewer.lock().unwrap();
+                                        *_body_viewer = BodyContentView::Binary(dump_viewer);
+                                    }
+
+
+                                }
+                            },
+                            None => {
+                                let bytes_vec = res.bytes().await.unwrap().to_vec();
+                                let dump_viewer = HexDumpViewer::new(&bytes_vec);
+                                let mut _body_viewer = body_viewer.lock().unwrap();
+                                *_body_viewer = BodyContentView::Binary(dump_viewer);
+                            }
+                        };
                     },
                     Err(_e) => {},
                 }

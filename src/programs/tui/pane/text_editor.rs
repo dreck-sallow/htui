@@ -81,6 +81,7 @@ impl TextEditor {
 
     pub fn insert_str(&mut self, txt: &str) {
         self.textarea.insert_str(txt);
+        self.textarea.move_cursor(CursorMove::Head);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {

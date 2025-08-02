@@ -1,13 +1,72 @@
 use crate::programs::tui::pane::text_editor::TextEditor;
+use ratatui::{layout::Rect, style::Stylize, text::Span, widgets::Widget};
 
 pub enum BodyContentView {
     Text(TextEditor),
+    Binary(HexDumpViewer),
     Empty,
 }
 
-pub struct BodyViewer {}
+impl Widget for &BodyContentView {
+    fn render(self, area: Rect, buf: &mut ratatui::prelude::Buffer)
+    where
+        Self: Sized,
+    {
+        match self {
+            BodyContentView::Text(text_editor) => text_editor.render(area, buf),
+            BodyContentView::Binary(hex_dump_viewer) => hex_dump_viewer.render(area, buf),
+            BodyContentView::Empty => {
+                if area.is_empty() {
+                    return;
+                }
 
-struct HexDumpLine {
+                buf.set_span(
+                    area.left(),
+                    area.top(),
+                    &Span::from("No body content").italic(),
+                    area.width,
+                );
+            }
+        }
+    }
+}
+
+pub struct HexDumpViewer {
+    lines: Vec<HexDumpLine>,
+}
+
+impl HexDumpViewer {
+    pub fn new(bytes: &[u8]) -> Self {
+        let lines = binary_to_hexdump(bytes, 15, 16);
+
+        Self { lines }
+    }
+}
+
+impl Widget for &HexDumpViewer {
+    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+    where
+        Self: Sized,
+    {
+        if area.is_empty() {
+            return;
+        }
+
+        let mut top = area.top();
+
+        for line in &self.lines {
+            if top >= area.bottom() {
+                break;
+            }
+
+            let line_txt = ratatui::text::Line::from(line.as_line_text());
+            line_txt.render(Rect { y: top, ..area }, buf);
+            top += 1;
+        }
+    }
+}
+
+pub struct HexDumpLine {
     bytes_per_line: usize,
     offset: usize,
     values: Vec<String>,
@@ -64,37 +123,6 @@ fn byte_to_ascci(byte: u8) -> char {
 
     '.'
 }
-
-// fn fill_hex(mut hex: String, len: usize) -> String {
-//     while hex.len() < len {
-//         hex.insert_str(0, "0");
-//     }
-
-//     hex
-// }
-
-// fn byte_to_hexadecimal(byte: u8) -> String {
-//     let mut hex = String::new();
-//     let mut byte_part = byte;
-
-//     while byte_part != 0 {
-//         let hexadecimal = match byte_part % 16 {
-//             n @ 0..=9 => n.to_string(),
-//             10 => "A".to_string(),
-//             11 => "B".to_string(),
-//             12 => "C".to_string(),
-//             13 => "D".to_string(),
-//             14 => "E".to_string(),
-//             15 => "F".to_string(),
-//             _ => unreachable!(),
-//         };
-
-//         hex.insert_str(0, &hexadecimal);
-//         byte_part = byte_part / 16;
-//     }
-
-//     fill_hex(hex, 2)
-// }
 
 #[cfg(test)]
 mod test {
