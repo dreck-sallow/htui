@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::store::models::{CollectionsModel, RequestModel, SendRequestId};
+use crate::store::models::{CollectionsModel, RequestModel, SendRequestKey};
 
 use super::{
     collections::state::{CollectionsState, Idx},
@@ -83,7 +83,7 @@ impl PaneState {
         self.collections.idx()
     }
 
-    pub fn is_sending_request(&self, id: SendRequestId) -> bool {
+    pub fn is_sending_request(&self, id: SendRequestKey) -> bool {
         match self.responses.get(&id) {
             Some(send_req) => match &*send_req.read().unwrap() {
                 crate::store::models::SendRequest::Pending => true,

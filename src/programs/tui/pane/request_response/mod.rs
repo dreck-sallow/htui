@@ -1,6 +1,6 @@
 use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex, RwLock},
+    collections::HashSet,
+    sync::{Arc, RwLock},
 };
 
 use body_viewer::{BodyContentView, HexDumpViewer};
@@ -22,7 +22,7 @@ use crate::{
         events::EventSender,
         pane::text_editor::TextEditor,
     },
-    store::models::{RequestModel, ResponseModel, SendRequest, SendRequestId},
+    store::models::{RequestModel, ResponseModel, SendRequest, SendRequestKey},
 };
 
 use super::state::ElementFocus;
@@ -55,11 +55,16 @@ impl AsRef<str> for Tab {
     }
 }
 
+pub struct ResponseContent {
+    headers_table: HeadersTable,
+    body_viewer: BodyContentView,
+    request_key: Option<SendRequestKey>,
+}
+
 pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
-    headers_viewer: Arc<Mutex<HeadersTable>>,
-    body_viewer: Arc<Mutex<BodyContentView>>,
+    response_content: Arc<RwLock<ResponseContent>>,
     render_area: Rect,
     header_area: Rect,
     content_area: Rect,
@@ -70,15 +75,29 @@ impl ResponseViewerComponent {
         Self {
             state: RequestResponseState::new(),
             tab: Tab::Response,
-            headers_viewer: Arc::new(Mutex::new(HeadersTable::new(vec![]))),
-            body_viewer: Arc::new(Mutex::new(BodyContentView::Empty)),
+            response_content: Arc::new(RwLock::new(ResponseContent {
+                headers_table: HeadersTable::new(vec![]),
+                body_viewer: BodyContentView::Empty,
+                request_key: None,
+            })),
             render_area: Rect::default(),
             header_area: Rect::default(),
             content_area: Rect::default(),
         }
     }
 
-    pub fn execute_req(&mut self, id: SendRequestId, req: &RequestModel, sender: EventSender) {
+    pub fn change_req(&mut self, id: SendRequestKey) {
+        let mut locked = self.response_content.write().unwrap();
+        locked.request_key = Some(id.clone());
+
+        if let Some(req) = self.state.get(&id) {
+            if let SendRequest::Finish(response) = &*req.read().unwrap() {
+                locked.headers_table.replace(response.headers.as_slice());
+            }
+        }
+    }
+
+    pub fn execute_req(&mut self, id: SendRequestKey, req: &RequestModel, sender: EventSender) {
         let send_req = match self.state.get(&id) {
             Some(req) => {
                 *req.write().unwrap() = SendRequest::Pending;
@@ -89,16 +108,12 @@ impl ResponseViewerComponent {
 
         let send_req_task = send_request(
             req,
-            Arc::clone(&send_req),
-            (
-                Arc::clone(&self.headers_viewer),
-                Arc::clone(&self.body_viewer),
-            ),
+            (Arc::clone(&send_req), id.clone()),
+            Arc::clone(&self.response_content),
             sender,
         );
 
-        self.state.add(id.clone(), send_req, send_req_task);
-        self.state.set_current_response(Some(id));
+        self.state.add_response(id.clone(), send_req, send_req_task);
     }
 }
 
@@ -120,8 +135,11 @@ impl Drawable for ResponseViewerComponent {
         params: Self::Params,
     ) {
         match self
-            .state
-            .current_response()
+            .response_content
+            .read()
+            .unwrap()
+            .request_key
+            .as_ref()
             .and_then(|id| self.state.get(id))
         {
             None => {
@@ -186,18 +204,20 @@ impl Drawable for ResponseViewerComponent {
                         frame.render_widget(tabs, self.header_area);
                     });
 
+                    let response_content = Arc::clone(&self.response_content);
+
                     match self.tab {
                         Tab::Headers => {
-                            painter.render(|frame| {
-                                let headers_table = self.headers_viewer.lock().unwrap();
-                                let table_ui = headers_table.table_ui();
+                            painter.render(move |frame| {
+                                let locked = response_content.read().unwrap();
+                                let table_ui = locked.headers_table.table_ui();
                                 frame.render_widget(table_ui, self.content_area);
                             });
                         }
                         Tab::Response => {
-                            painter.render(|frame| {
-                                let body_viewer = self.body_viewer.lock().unwrap();
-                                frame.render_widget(&*body_viewer, self.content_area);
+                            painter.render(move |frame| {
+                                let locked = response_content.read().unwrap();
+                                frame.render_widget(&locked.body_viewer, self.content_area);
                             });
                         }
                     }
@@ -223,7 +243,8 @@ impl Interactive for ResponseViewerComponent {
                 },
                 _ => match self.tab {
                     Tab::Headers => {
-                        let mut headers_editor = self.headers_viewer.lock().unwrap();
+                        let mut response_content = self.response_content.write().unwrap();
+                        let headers_editor = &mut response_content.headers_table;
                         match key.code {
                             KeyCode::Left | KeyCode::Char('h') => {
                                 headers_editor.move_col_idx(false)
@@ -237,8 +258,9 @@ impl Interactive for ResponseViewerComponent {
                         }
                     }
                     Tab::Response => {
-                        let mut body_viewer = self.body_viewer.lock().unwrap();
-                        match &mut *body_viewer {
+                        let mut response_content = self.response_content.write().unwrap();
+                        let body_viewer = &mut response_content.body_viewer;
+                        match body_viewer {
                             BodyContentView::Text(text_editor) => {
                                 text_editor.handle_key(key);
                             }
@@ -261,8 +283,8 @@ pub enum ResponseViewerEffect {
 
 fn send_request(
     req: &RequestModel,
-    state: SendRequestResponse,
-    (table_headers, body_viewer): (Arc<Mutex<HeadersTable>>, Arc<Mutex<BodyContentView>>),
+    (state, request_key): (SendRequestResponse, SendRequestKey),
+    response_content: Arc<RwLock<ResponseContent>>,
     sender: EventSender,
 ) -> RequestTask {
     let (tx, tr) = tokio::sync::oneshot::channel();
@@ -295,14 +317,20 @@ fn send_request(
             result = client_builder.send() => {
                 match result {
                     Ok(res) => {
-                        let response = ResponseModel { duration:timer.elapsed(), status:res.status().as_u16(), body: "BODY", headers: HashMap::new() };
+                        let key_value_headers: Vec<(String, String)> = res.headers().iter().map(|(k,v)| (k.to_string(), v.to_str().unwrap().into())).collect();
+
+                        let response = ResponseModel { duration:timer.elapsed(), status:res.status().as_u16(), body: "BODY", headers: key_value_headers.clone() };
                         *state.write().unwrap() = SendRequest::Finish(response);
+
+                        if response_content.read().unwrap().request_key.as_ref().map(|key| *key != request_key).unwrap_or(false) {
+                            // So the current visual UI request is diferent from the local request executing
+                            return;
+                        }
 
                         {
                             // Mutate the headers state
-                            let key_value_headers: Vec<(String, String)> = res.headers().iter().map(|(k,v)| (k.to_string(), v.to_str().unwrap().into())).collect();
-                            let mut headers_state = table_headers.lock().unwrap();
-                            headers_state.replace(key_value_headers);
+                            let mut locked = response_content.write().unwrap();
+                            locked.headers_table.replace(key_value_headers);
                         };
 
                         // Mutate the response body content state
@@ -311,34 +339,39 @@ fn send_request(
                             Some(_content_type) => {
                                 if _content_type.starts_with("text/") {
                                     let text = res.text().await.unwrap();
-                                    let mut _body_viewer = body_viewer.lock().unwrap();
+                                    let mut locked = response_content.write().unwrap();
+
                                     let mut text_editor = TextEditor::new(false);
                                     text_editor.insert_str(&text);
-                                    *_body_viewer = BodyContentView::Text(text_editor);
+                                    locked.body_viewer = BodyContentView::Text(text_editor);
                                 } else {
                                     let valid_text = HashSet::from(["application/json", "application/xml", "application/javascript", "application/x-www-form-urlencoded", "application/xhtml+xml"]);
 
                                     if valid_text.iter().any(|txt| valid_text.contains(txt)) {
                                         let text = res.text().await.unwrap();
-                                        let mut _body_viewer = body_viewer.lock().unwrap();
+                                        let mut locked = response_content.write().unwrap();
+
                                         let mut text_editor = TextEditor::new(false);
                                         text_editor.insert_str(&text);
-                                        *_body_viewer = BodyContentView::Text(text_editor);
+                                        locked.body_viewer = BodyContentView::Text(text_editor);
                                     } else {
                                         let bytes_vec = res.bytes().await.unwrap().to_vec();
                                         let dump_viewer = HexDumpViewer::new(&bytes_vec);
-                                        let mut _body_viewer = body_viewer.lock().unwrap();
-                                        *_body_viewer = BodyContentView::Binary(dump_viewer);
+                                        let mut locked = response_content.write().unwrap();
+
+                                        locked.body_viewer = BodyContentView::Binary(dump_viewer);
                                     }
 
 
                                 }
                             },
                             None => {
+
                                 let bytes_vec = res.bytes().await.unwrap().to_vec();
                                 let dump_viewer = HexDumpViewer::new(&bytes_vec);
-                                let mut _body_viewer = body_viewer.lock().unwrap();
-                                *_body_viewer = BodyContentView::Binary(dump_viewer);
+                                let mut locked = response_content.write().unwrap();
+
+                                locked.body_viewer = BodyContentView::Binary(dump_viewer);
                             }
                         };
                     },

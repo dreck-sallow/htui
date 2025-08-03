@@ -11,7 +11,7 @@ use request_response::ResponseViewerComponent;
 // use response_viewer::ResponseViewerView;
 use state::{ElementFocus, PaneState};
 
-use crate::store::models::{KeyValueParam, ProjectModel, SendRequestId};
+use crate::store::models::{KeyValueParam, ProjectModel};
 
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
@@ -132,9 +132,8 @@ impl Pane {
         } else if KeyCode::Char('x') == key.code && key.modifiers == KeyModifiers::ALT {
             // Send request
             if let Some(req) = self.collections_component.current_request() {
-                let idx = self.collections_component.current_request_idx().unwrap();
                 self.response_viewer_component.execute_req(
-                    SendRequestId(idx.0, idx.1),
+                    self.collections_component.current_request_key().unwrap(),
                     req,
                     self._sender.clone(),
                 );
@@ -166,6 +165,10 @@ impl Pane {
                                         headers,
                                         req.body().clone(),
                                     );
+
+                                    self.response_viewer_component.change_req(
+                                        self.collections_component.current_request_key().unwrap(),
+                                    );
                                 }
                             }
                         }
@@ -173,7 +176,6 @@ impl Pane {
                 }
                 state::ElementFocus::MethodUrlBar => {
                     if let Some(effect) = self.method_url_component.on_key(key) {
-                        // let data = self.method_url_component.get_data();
                         match effect {
                             method_url_bar::MethodUrlEffect::NextFocus => {
                                 self.focus = self.focus.next()

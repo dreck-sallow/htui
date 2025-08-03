@@ -5,14 +5,13 @@ use std::{
 
 use tokio::{sync::oneshot, task::JoinHandle};
 
-use crate::store::models::{SendRequest, SendRequestId};
+use crate::store::models::{SendRequest, SendRequestKey};
 
 pub type SendRequestResponse = Arc<RwLock<SendRequest>>;
 
 pub struct RequestResponseState {
-    inner: HashMap<SendRequestId, SendRequestResponse>,
-    tasks: HashMap<SendRequestId, RequestTask>,
-    current_response: Option<SendRequestId>,
+    inner: HashMap<SendRequestKey, SendRequestResponse>,
+    tasks: HashMap<SendRequestKey, RequestTask>,
 }
 
 impl RequestResponseState {
@@ -20,13 +19,12 @@ impl RequestResponseState {
         Self {
             inner: HashMap::new(),
             tasks: HashMap::new(),
-            current_response: None,
         }
     }
 
-    pub fn add(
+    pub fn add_response(
         &mut self,
-        id: SendRequestId,
+        id: SendRequestKey,
         send_request: SendRequestResponse,
         request_task: RequestTask,
     ) {
@@ -34,19 +32,11 @@ impl RequestResponseState {
         self.tasks.insert(id, request_task);
     }
 
-    pub fn get(&self, id: &SendRequestId) -> Option<SendRequestResponse> {
+    pub fn get(&self, id: &SendRequestKey) -> Option<SendRequestResponse> {
         self.inner.get(id).cloned()
     }
 
-    pub fn current_response(&self) -> Option<&SendRequestId> {
-        self.current_response.as_ref()
-    }
-
-    pub fn set_current_response(&mut self, request_id: Option<SendRequestId>) {
-        self.current_response = request_id;
-    }
-
-    pub fn stop(&mut self, id: &SendRequestId) -> Option<SendRequestResponse> {
+    pub fn stop(&mut self, id: &SendRequestKey) -> Option<SendRequestResponse> {
         match self.inner.remove(id) {
             Some(req) => {
                 if let SendRequest::Pending = &*req.read().unwrap() {

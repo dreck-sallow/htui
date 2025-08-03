@@ -5,13 +5,13 @@ use std::{
 
 use tokio::{sync::oneshot, task::JoinHandle};
 
-use crate::store::models::{SendRequest, SendRequestId};
+use crate::store::models::{SendRequest, SendRequestKey};
 
 pub type SendRequestResponse = Arc<RwLock<SendRequest>>;
 
 pub struct Responses {
-    inner: HashMap<SendRequestId, SendRequestResponse>,
-    tasks: HashMap<SendRequestId, RequestTask>,
+    inner: HashMap<SendRequestKey, SendRequestResponse>,
+    tasks: HashMap<SendRequestKey, RequestTask>,
 }
 
 impl Responses {
@@ -24,7 +24,7 @@ impl Responses {
 
     pub fn add(
         &mut self,
-        id: SendRequestId,
+        id: SendRequestKey,
         send_request: SendRequestResponse,
         request_task: RequestTask,
     ) {
@@ -32,15 +32,15 @@ impl Responses {
         self.tasks.insert(id, request_task);
     }
 
-    pub fn contains(&self, id: SendRequestId) -> bool {
+    pub fn contains(&self, id: SendRequestKey) -> bool {
         self.inner.contains_key(&id)
     }
 
-    pub fn get(&self, id: &SendRequestId) -> Option<SendRequestResponse> {
+    pub fn get(&self, id: &SendRequestKey) -> Option<SendRequestResponse> {
         self.inner.get(id).cloned()
     }
 
-    pub fn stop(&mut self, id: &SendRequestId) -> Option<SendRequestResponse> {
+    pub fn stop(&mut self, id: &SendRequestKey) -> Option<SendRequestResponse> {
         match self.inner.remove(id) {
             Some(req) => {
                 if let SendRequest::Pending = &*req.read().unwrap() {

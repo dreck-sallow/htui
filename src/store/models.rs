@@ -435,17 +435,23 @@ pub struct ResponseModel {
     pub duration: Duration,
     pub status: u16,
     pub body: &'static str, //FIXME: temporal value
-    pub headers: HashMap<String, String>,
+    pub headers: Vec<(String, String)>,
 }
 
 /// Used for track the request that is currently tracked on async tasks
 /// Is using the index for collection & request
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub struct SendRequestId(pub usize, pub usize);
+pub struct SendRequestKey {
+    pub collection_id: String,
+    pub request_id: String,
+}
 
-impl From<(usize, usize)> for SendRequestId {
-    fn from(value: (usize, usize)) -> Self {
-        SendRequestId(value.0, value.1)
+impl From<(String, String)> for SendRequestKey {
+    fn from(value: (String, String)) -> Self {
+        Self {
+            collection_id: value.0,
+            request_id: value.1,
+        }
     }
 }
 

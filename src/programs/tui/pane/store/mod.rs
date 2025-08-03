@@ -1,7 +1,7 @@
 use collections_store::{CollectionsStore, MutableList};
 use responses_store::Responses;
 
-use crate::store::models::{CollectionsModel, RequestModel, SendRequestId};
+use crate::store::models::{CollectionsModel, RequestModel, SendRequestKey};
 
 use super::{responses::SendRequestResponse, state::ElementFocus};
 
@@ -48,7 +48,7 @@ impl PaneStore {
     //         .and_then(|idx| self.collections.get_request(idx))
     // }
 
-    pub fn is_sending_request(&self, id: SendRequestId) -> bool {
+    pub fn is_sending_request(&self, id: SendRequestKey) -> bool {
         match self.responses.get(&id) {
             Some(req) => match &*req.read().unwrap() {
                 crate::store::models::SendRequest::Pending => true,
@@ -58,7 +58,7 @@ impl PaneStore {
         }
     }
 
-    pub fn current_send_request(&self, id: SendRequestId) -> Option<SendRequestResponse> {
+    pub fn current_send_request(&self, id: SendRequestKey) -> Option<SendRequestResponse> {
         self.responses.get(&id)
     }
 }

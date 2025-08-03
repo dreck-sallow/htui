@@ -16,7 +16,9 @@ use crate::{
         action_history::{ActionHistory, History, TrackAction},
         component::{Drawable, Interactive, WithHistory},
     },
-    store::models::{BodyContent, CollectionsModel, HttpMethod, KeyValueParam, RequestModel},
+    store::models::{
+        BodyContent, CollectionsModel, HttpMethod, KeyValueParam, RequestModel, SendRequestKey,
+    },
 };
 
 use super::state::ElementFocus;
@@ -49,6 +51,20 @@ impl CollectionsComponent {
             Some(idx) => self.state.get_request(idx),
             None => None,
         }
+    }
+
+    /// Returns the key (collection & request ids) for get the request
+    pub fn current_request_key(&self) -> Option<SendRequestKey> {
+        if let Some((idx, sub_idx)) = self.state.selected_request_idx() {
+            let collection = self.state.get_collection(idx).unwrap();
+            let request_id = collection.requests[sub_idx].id().to_string();
+
+            return Some(SendRequestKey::from((
+                collection.id().to_string(),
+                request_id,
+            )));
+        }
+        None
     }
 
     pub fn current_request_idx(&self) -> Option<(usize, usize)> {
