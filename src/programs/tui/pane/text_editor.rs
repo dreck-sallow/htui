@@ -124,8 +124,7 @@ impl TextEditor {
                             KeyCode::Char('h') | KeyCode::Left => {
                                 self.textarea.move_cursor(CursorMove::Back)
                             }
-
-                            KeyCode::Char('u') => {
+                            KeyCode::Char('u') if self.mode.is_read_mode() => {
                                 if key.modifiers == KeyModifiers::SHIFT {
                                     self.textarea.redo();
                                 } else {
@@ -136,10 +135,10 @@ impl TextEditor {
                                 self.textarea.move_cursor(CursorMove::WordForward)
                             }
                             KeyCode::Char('b') => self.textarea.move_cursor(CursorMove::WordBack),
-                            KeyCode::Char('d') => {
+                            KeyCode::Char('d') if self.mode.is_read_mode() => {
                                 self.textarea.delete_char();
                             }
-                            KeyCode::Char('x') => {
+                            KeyCode::Char('x') if self.mode.is_read_mode() => {
                                 self.textarea.delete_line_by_end();
                                 self.textarea.delete_line_by_head();
                             }
