@@ -8,7 +8,9 @@ async-trait = "0.1.88"
 clap = { version = "4.5.13", features = ["derive"] }
 crossterm = { version = "0.28.0", features = ["event-stream"] }
 directories = "6.0.0"
+encoding_rs = "0.8.35"
 futures = "0.3.31"
+mime = "0.3.17"
 ratatui = "0.29.0"
 reqwest = "0.12.18"
 serde = { version = "1.0.219", features = ["derive"] }

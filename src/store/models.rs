@@ -434,7 +434,8 @@ impl<'de> Deserialize<'de> for BodyContent {
 pub struct ResponseModel {
     pub duration: Duration,
     pub status: u16,
-    pub body: &'static str, //FIXME: temporal value
+    /// Body types, storing bytes from (Bytes struct)
+    pub body: Vec<u8>,
     pub headers: Vec<(String, String)>,
 }
 

@@ -1,11 +1,10 @@
-use std::{
-    collections::HashSet,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 use body_viewer::{BodyContentView, HexDumpViewer};
 use crossterm::event::{KeyCode, KeyEventKind};
+use encoding_rs::{Encoding, UTF_8};
 use headers_table::HeadersTable;
+use mime::Mime;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
@@ -93,6 +92,12 @@ impl ResponseViewerComponent {
         if let Some(req) = self.state.get(&id) {
             if let SendRequest::Finish(response) = &*req.read().unwrap() {
                 locked.headers_table.replace(response.headers.as_slice());
+                let mime_type = response
+                    .headers
+                    .iter()
+                    .find(|(k, _v)| k == CONTENT_TYPE.as_str())
+                    .and_then(|(_k, v)| v.parse::<mime::Mime>().ok());
+                locked.body_viewer = response_into_body_content(&response.body, &mime_type);
             }
         }
     }
@@ -318,8 +323,12 @@ fn send_request(
                 match result {
                     Ok(res) => {
                         let key_value_headers: Vec<(String, String)> = res.headers().iter().map(|(k,v)| (k.to_string(), v.to_str().unwrap().into())).collect();
+                        let content_type = res.headers().get(CONTENT_TYPE).and_then(|val| val.to_str().ok()).and_then(|val| val.parse::<Mime>().ok());
+                        let response_status = res.status().as_u16();
+                        let response_body = res.bytes().await.unwrap();
 
-                        let response = ResponseModel { duration:timer.elapsed(), status:res.status().as_u16(), body: "BODY", headers: key_value_headers.clone() };
+
+                        let response = ResponseModel { duration:timer.elapsed(), status: response_status, body: response_body.to_vec(), headers: key_value_headers.clone() };
                         *state.write().unwrap() = SendRequest::Finish(response);
 
                         if response_content.read().unwrap().request_key.as_ref().map(|key| *key != request_key).unwrap_or(false) {
@@ -333,47 +342,9 @@ fn send_request(
                             locked.headers_table.replace(key_value_headers);
                         };
 
-                        // Mutate the response body content state
-                        let content_type = res.headers().get(CONTENT_TYPE).and_then(|val| val.to_str().ok());
-                        match content_type {
-                            Some(_content_type) => {
-                                if _content_type.starts_with("text/") {
-                                    let text = res.text().await.unwrap();
-                                    let mut locked = response_content.write().unwrap();
-
-                                    let mut text_editor = TextEditor::new(false);
-                                    text_editor.insert_str(&text);
-                                    locked.body_viewer = BodyContentView::Text(text_editor);
-                                } else {
-                                    let valid_text = HashSet::from(["application/json", "application/xml", "application/javascript", "application/x-www-form-urlencoded", "application/xhtml+xml"]);
-
-                                    if valid_text.iter().any(|txt| valid_text.contains(txt)) {
-                                        let text = res.text().await.unwrap();
-                                        let mut locked = response_content.write().unwrap();
-
-                                        let mut text_editor = TextEditor::new(false);
-                                        text_editor.insert_str(&text);
-                                        locked.body_viewer = BodyContentView::Text(text_editor);
-                                    } else {
-                                        let bytes_vec = res.bytes().await.unwrap().to_vec();
-                                        let dump_viewer = HexDumpViewer::new(&bytes_vec);
-                                        let mut locked = response_content.write().unwrap();
-
-                                        locked.body_viewer = BodyContentView::Binary(dump_viewer);
-                                    }
-
-
-                                }
-                            },
-                            None => {
-
-                                let bytes_vec = res.bytes().await.unwrap().to_vec();
-                                let dump_viewer = HexDumpViewer::new(&bytes_vec);
-                                let mut locked = response_content.write().unwrap();
-
-                                locked.body_viewer = BodyContentView::Binary(dump_viewer);
-                            }
-                        };
+                        // set body content
+                        let mut locked = response_content.write().unwrap();
+                        locked.body_viewer = response_into_body_content(&response_body, &content_type);
                     },
                     Err(_e) => {},
                 }
@@ -387,4 +358,40 @@ fn send_request(
     });
 
     RequestTask::new(tx, jh)
+}
+
+fn response_into_body_content(bytes: &[u8], content_type: &Option<Mime>) -> BodyContentView {
+    if let Some(mime_type) = content_type {
+        let is_text_based = match (mime_type.type_(), mime_type.subtype()) {
+            (mime::TEXT, _) => true,
+            (mime::APPLICATION, sub) => {
+                matches!(
+                    sub.as_str(),
+                    "json" | "xml" | "xhtml+xml" | "x-www-form-urlencoded"
+                )
+            }
+            _ => false,
+        };
+
+        if is_text_based {
+            let encoding_name = mime_type
+                .get_param("charset")
+                .map(|charset| charset.as_str())
+                .unwrap_or("utf-8");
+
+            let encoding = Encoding::for_label(encoding_name.as_bytes()).unwrap_or(UTF_8);
+
+            let (text, _, _) = encoding.decode(bytes);
+
+            let mut text_editor = TextEditor::new(false);
+
+            text_editor.insert_str(text.as_ref());
+
+            return BodyContentView::Text(text_editor);
+        }
+    }
+
+    // Fallback: show the content as hexdump
+    let dump_viewer = HexDumpViewer::new(bytes);
+    BodyContentView::Binary(dump_viewer)
 }
