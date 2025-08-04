@@ -41,54 +41,6 @@ impl ProjectModel {
     pub fn name(&self) -> &str {
         &self.name
     }
-
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
-    }
-
-    pub fn collections(&self) -> &[CollectionsModel] {
-        &self.collections
-    }
-
-    pub fn add_collection(&mut self, collection: CollectionsModel) {
-        self.collections.push(collection);
-    }
-
-    pub fn add_request_by_i(&mut self, i: usize, request: RequestModel) {
-        if let Some(coll) = self.collections.get_mut(i) {
-            coll.requests.push(request);
-        }
-    }
-
-    pub fn remove_collection(&mut self, i: usize) -> CollectionsModel {
-        self.collections.remove(i)
-    }
-
-    pub fn remove_request(&mut self, (i, sub_i): (usize, usize)) -> Option<RequestModel> {
-        if let Some(coll) = self.collections.get_mut(i) {
-            Some(coll.requests.remove(sub_i))
-        } else {
-            None
-        }
-    }
-
-    pub fn collection_by_idx(&self, i: usize) -> Option<&CollectionsModel> {
-        self.collections.get(i)
-    }
-
-    pub fn collection_by_idx_mut(&mut self, i: usize) -> Option<&mut CollectionsModel> {
-        self.collections.get_mut(i)
-    }
-
-    pub fn request_by_idx(&self, (i, sub_i): (usize, usize)) -> Option<&RequestModel> {
-        self.collections.get(i).and_then(|c| c.requests.get(sub_i))
-    }
-
-    pub fn request_mut_by_idx(&mut self, (i, sub_i): (usize, usize)) -> Option<&mut RequestModel> {
-        self.collections
-            .get_mut(i)
-            .and_then(|c| c.requests.get_mut(sub_i))
-    }
 }
 
 impl Default for ProjectModel {
@@ -126,20 +78,8 @@ impl CollectionsModel {
         &self.name
     }
 
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
-    }
-
     pub fn requests(&self) -> &[RequestModel] {
         &self.requests
-    }
-
-    pub fn get_request_mut(&mut self, i: usize) -> Option<&mut RequestModel> {
-        self.requests.get_mut(i)
-    }
-
-    pub fn remove_request(&mut self, idx: usize) -> RequestModel {
-        self.requests.remove(idx)
     }
 }
 
@@ -279,7 +219,7 @@ impl Serialize for HttpMethod {
 
 struct HttpMethodVisitor;
 
-impl<'de> Visitor<'de> for HttpMethodVisitor {
+impl Visitor<'_> for HttpMethodVisitor {
     type Value = HttpMethod;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -413,7 +353,7 @@ impl<'de> Visitor<'de> for BodyVisitor {
                     .map_err(de::Error::custom)?;
                 Ok(BodyContent::Form(form))
             }
-            "empty" => return Ok(BodyContent::Empty),
+            "empty" => Ok(BodyContent::Empty),
             other => Err(de::Error::unknown_field(
                 other,
                 &["text", "file", "form", "empty"],

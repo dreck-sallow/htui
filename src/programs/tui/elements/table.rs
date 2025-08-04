@@ -17,7 +17,7 @@ pub struct TableGrid<'text, 'placeholder, const N: usize> {
 impl<'text, 'placeholder, const N: usize> TableGrid<'text, 'placeholder, N> {
     pub fn new(titles: [Span<'static>; N], widths: [f32; N]) -> Self {
         Self {
-            titles: titles,
+            titles,
             rows: Vec::new(),
             index_style: Style::default(),
             index_cell: None,
@@ -44,7 +44,7 @@ impl<'text, 'placeholder, const N: usize> TableGrid<'text, 'placeholder, N> {
     }
 }
 
-impl<'text, 'placeholder, const N: usize> Widget for TableGrid<'text, 'placeholder, N> {
+impl<const N: usize> Widget for TableGrid<'_, '_, N> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,

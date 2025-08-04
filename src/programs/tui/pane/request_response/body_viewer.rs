@@ -80,9 +80,9 @@ impl HexDumpLine {
 
         for (i, value) in self.values[0..self.values.len() - 1].iter().enumerate() {
             hex_values.push_str(value);
-            hex_values.push_str(" ");
+            hex_values.push(' ');
             if i == 7 {
-                hex_values.push_str(" ");
+                hex_values.push(' ');
             }
         }
 
@@ -115,10 +115,8 @@ fn binary_to_hexdump(bytes: &[u8], max_lines: usize, line_bytes: usize) -> Vec<H
 }
 
 fn byte_to_ascci(byte: u8) -> char {
-    if byte.is_ascii() {
-        if 0x20 <= byte && byte <= 0x7e {
-            return byte as char;
-        }
+    if byte.is_ascii() && 0x20 <= byte && byte <= 0x7e {
+        return byte as char;
     }
 
     '.'

@@ -156,7 +156,7 @@ impl Widget for &TextEditor {
     where
         Self: Sized,
     {
-        let mut editor_area = area.clone();
+        let mut editor_area = area;
         editor_area.height = editor_area.height.saturating_sub(1);
 
         self.textarea.render(editor_area, buf);

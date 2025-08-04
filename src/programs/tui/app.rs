@@ -33,7 +33,7 @@ impl App {
 
     fn add_project(&mut self, project: ProjectModel, sender: EventSender) {
         self.panes.push(Pane::from_project(project, sender));
-        if self.selected == None {
+        if self.selected.is_none() {
             self.selected = Some(0);
         }
     }

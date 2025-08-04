@@ -10,7 +10,7 @@ use crate::{
     store::models::{BodyContent, KeyValueParam},
 };
 
-use super::{body_editor::BodyEditorComponent, params_table::TableParams, state::ElementFocus};
+use super::{body_editor::BodyEditorComponent, params_table::TableParams, ElementFocus};
 
 #[derive(Clone, Copy)]
 pub enum Tab {
@@ -129,7 +129,7 @@ impl Drawable for RequestEditorComponent {
         params: Self::Params,
     ) {
         painter.render(move |frame| {
-            let style = if params == super::state::ElementFocus::RequestBuilder {
+            let style = if params == ElementFocus::RequestBuilder {
                 Style::default().blue()
             } else {
                 Style::default()

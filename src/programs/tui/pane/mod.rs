@@ -1,3 +1,4 @@
+use crate::store::models::{KeyValueParam, ProjectModel};
 use collections::CollectionsComponent;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use method_url_bar::MethodUrlBarComponent;
@@ -8,10 +9,6 @@ use ratatui::{
 };
 use request_builder::RequestEditorComponent;
 use request_response::ResponseViewerComponent;
-// use response_viewer::ResponseViewerView;
-use state::{ElementFocus, PaneState};
-
-use crate::store::models::{KeyValueParam, ProjectModel};
 
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
@@ -21,17 +18,39 @@ use super::{
 mod body_editor;
 mod collections;
 mod method_url_bar;
-mod mutation_history;
-mod mutations;
 mod params_table;
 mod placeholder;
 mod request_builder;
 mod request_response;
-mod response_viewer;
-mod responses;
-mod state;
-mod store;
 mod text_editor;
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum ElementFocus {
+    Collections,
+    MethodUrlBar,
+    RequestBuilder,
+    ResponseViewer,
+}
+
+impl ElementFocus {
+    pub fn next(&self) -> Self {
+        match self {
+            ElementFocus::Collections => ElementFocus::MethodUrlBar,
+            ElementFocus::MethodUrlBar => ElementFocus::RequestBuilder,
+            ElementFocus::RequestBuilder => ElementFocus::ResponseViewer,
+            ElementFocus::ResponseViewer => ElementFocus::Collections,
+        }
+    }
+
+    pub fn previous(&self) -> Self {
+        match self {
+            ElementFocus::Collections => ElementFocus::ResponseViewer,
+            ElementFocus::MethodUrlBar => ElementFocus::Collections,
+            ElementFocus::RequestBuilder => ElementFocus::MethodUrlBar,
+            ElementFocus::ResponseViewer => ElementFocus::RequestBuilder,
+        }
+    }
+}
 
 pub struct Pane {
     project_id: String,
@@ -107,27 +126,27 @@ impl Pane {
     pub fn handle_key(&mut self, key: KeyEvent) {
         if KeyCode::Char('u') == key.code && key.modifiers == KeyModifiers::ALT {
             match self.focus {
-                state::ElementFocus::Collections => {
+                ElementFocus::Collections => {
                     self.collections_component.undo();
                 }
-                state::ElementFocus::MethodUrlBar => self.method_url_component.undo(),
-                state::ElementFocus::RequestBuilder => {
+                ElementFocus::MethodUrlBar => self.method_url_component.undo(),
+                ElementFocus::RequestBuilder => {
                     self.request_builder_component.undo();
                 }
-                state::ElementFocus::ResponseViewer => {}
+                ElementFocus::ResponseViewer => {}
             }
         } else if KeyCode::Char('y') == key.code && key.modifiers == KeyModifiers::ALT {
             match self.focus {
-                state::ElementFocus::Collections => {
+                ElementFocus::Collections => {
                     self.collections_component.redo();
                 }
-                state::ElementFocus::MethodUrlBar => {
+                ElementFocus::MethodUrlBar => {
                     self.method_url_component.redo();
                 }
-                state::ElementFocus::RequestBuilder => {
+                ElementFocus::RequestBuilder => {
                     self.request_builder_component.redo();
                 }
-                state::ElementFocus::ResponseViewer => {}
+                ElementFocus::ResponseViewer => {}
             }
         } else if KeyCode::Char('x') == key.code && key.modifiers == KeyModifiers::ALT {
             // Send request
@@ -140,7 +159,7 @@ impl Pane {
             }
         } else {
             match self.focus {
-                state::ElementFocus::Collections => {
+                ElementFocus::Collections => {
                     if let Some(effect) = self.collections_component.on_key(key) {
                         match effect {
                             collections::CollectionEffect::NextFocus => {
@@ -174,7 +193,7 @@ impl Pane {
                         }
                     }
                 }
-                state::ElementFocus::MethodUrlBar => {
+                ElementFocus::MethodUrlBar => {
                     if let Some(effect) = self.method_url_component.on_key(key) {
                         match effect {
                             method_url_bar::MethodUrlEffect::NextFocus => {
@@ -190,7 +209,7 @@ impl Pane {
                             .set_data_from_method_url(method, url);
                     }
                 }
-                state::ElementFocus::RequestBuilder => {
+                ElementFocus::RequestBuilder => {
                     if let Some(effect) = self.request_builder_component.on_key(key) {
                         match effect {
                             request_builder::RequestEditorEffect::NextFocus => {
@@ -206,7 +225,7 @@ impl Pane {
                             .set_data_from_request_editor(params, headers, body);
                     }
                 }
-                state::ElementFocus::ResponseViewer => {
+                ElementFocus::ResponseViewer => {
                     if let Some(effect) = self.response_viewer_component.on_key(key) {
                         match effect {
                             request_response::ResponseViewerEffect::NextFocus => {

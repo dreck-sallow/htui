@@ -13,12 +13,10 @@ use crate::{
 
 mod app;
 mod common;
-mod element_view;
 mod elements;
 mod events;
 mod pane;
 mod sources;
-// mod views;
 
 pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     let project = load_project(project_name).await.unwrap();

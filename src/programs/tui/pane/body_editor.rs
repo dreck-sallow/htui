@@ -67,11 +67,11 @@ impl BodyEditorComponent {
     }
 
     pub fn is_editing(&self) -> bool {
-        return match self.body_content {
+        match self.body_content {
             BodyContent::Empty => false,
             BodyContent::File(_) => false,
             _ => self.text_editor.mode().is_write_mode(),
-        };
+        }
     }
 
     pub fn set_state(&mut self, body_content: BodyContent) {

@@ -89,7 +89,7 @@ impl TableParamState {
     pub fn insert_param(&mut self, idx: usize, item: KeyValueParam) {
         self.items.insert(idx, item);
 
-        if let None = self.index_cell {
+        if self.index_cell.is_none() {
             self.index_cell = Some((0, 0));
         }
     }
@@ -193,7 +193,7 @@ impl Drawable for TableParams {
             let table = TableParamsUi::new(items)
                 .title_style(Style::default().gray().blue())
                 .index_style(Style::default().on_light_blue().dark_gray())
-                .index_cell(self.state.index_cell.clone());
+                .index_cell(self.state.index_cell);
 
             frame.render_widget(table, self.render_area);
         });
@@ -411,7 +411,7 @@ impl<'text> TableParamsUi<'text> {
     }
 }
 
-impl<'a> Widget for TableParamsUi<'a> {
+impl Widget for TableParamsUi<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,

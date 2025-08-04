@@ -35,14 +35,11 @@ impl<A: TrackAction<State = State>, State> History<State> for ActionHistory<A> {
         let back_action = action.apply(state);
 
         if let Some(back_action) = back_action {
-            match self.cursor {
-                Some(cursor) => {
-                    let start_i = cursor + 1;
-                    for _ in start_i..self.sequence.len() {
-                        self.sequence.remove(start_i);
-                    }
+            if let Some(cursor) = self.cursor {
+                let start_i = cursor + 1;
+                for _ in start_i..self.sequence.len() {
+                    self.sequence.remove(start_i);
                 }
-                None => {}
             }
 
             self.sequence.push(back_action);

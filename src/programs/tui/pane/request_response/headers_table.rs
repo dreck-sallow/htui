@@ -10,10 +10,7 @@ pub struct HeadersTable {
 impl HeadersTable {
     pub fn new(items: Vec<(String, String)>) -> Self {
         let idx = TableGridIndex::new(items.len());
-        Self {
-            items: items,
-            index: idx,
-        }
+        Self { items, index: idx }
     }
 
     pub fn move_col_idx(&mut self, is_next: bool) {

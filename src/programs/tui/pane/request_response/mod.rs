@@ -24,7 +24,7 @@ use crate::{
     store::models::{RequestModel, ResponseModel, SendRequest, SendRequestKey},
 };
 
-use super::state::ElementFocus;
+use super::ElementFocus;
 
 mod body_viewer;
 mod headers_table;
@@ -189,7 +189,7 @@ impl Drawable for ResponseViewerComponent {
                 }
                 crate::store::models::SendRequest::Finish(_) => {
                     painter.render(move |frame| {
-                        let style = if params == super::state::ElementFocus::ResponseViewer {
+                        let style = if params == ElementFocus::ResponseViewer {
                             Style::default().blue()
                         } else {
                             Style::default()

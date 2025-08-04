@@ -38,7 +38,7 @@ pub struct CollectionList<'a, 'b> {
     idx: Idx,
 }
 
-impl<'a, 'b> Default for CollectionList<'a, 'b> {
+impl Default for CollectionList<'_, '_> {
     fn default() -> Self {
         Self {
             items: Vec::new(),
@@ -87,7 +87,7 @@ impl<'a, 'b> CollectionList<'a, 'b> {
         }
 
         let mut start = Idx::Parent(0);
-        let mut end = start.clone();
+        let mut end = start;
 
         let mut count_height = 0;
 
@@ -100,7 +100,7 @@ impl<'a, 'b> CollectionList<'a, 'b> {
                 if self.idx >= start && self.idx <= end {
                     break;
                 } else {
-                    start = end.clone();
+                    start = end;
                 }
                 count_height = 0;
             }
@@ -116,7 +116,7 @@ impl<'a, 'b> CollectionList<'a, 'b> {
                         if self.idx >= start && self.idx <= end {
                             break;
                         } else {
-                            start = end.clone();
+                            start = end;
                         }
                     }
                 }
@@ -133,7 +133,7 @@ impl<'a, 'b> CollectionList<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Widget for CollectionList<'a, 'b> {
+impl Widget for CollectionList<'_, '_> {
     fn render(self, mut area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
         Self: Sized,
@@ -181,7 +181,7 @@ impl<'a, 'b> Widget for CollectionList<'a, 'b> {
                 symbol.len(),
                 self.items[start.0].label.style,
             );
-            let mut render_area = acc_area.clone();
+            let mut render_area = acc_area;
             render_area.x = x;
 
             (&self.items[start.0].label).render(render_area, buf);
@@ -202,7 +202,7 @@ impl<'a, 'b> Widget for CollectionList<'a, 'b> {
                         blank_symbol.len(),
                         itm.label.style,
                     );
-                    let mut render_area = acc_area.clone();
+                    let mut render_area = acc_area;
                     render_area.x = x;
 
                     (&itm.label).render(render_area, buf);
@@ -228,7 +228,7 @@ impl<'a, 'b> Widget for CollectionList<'a, 'b> {
                     symbol.len(),
                     self.items[i].label.style,
                 );
-                let mut render_area = acc_area.clone();
+                let mut render_area = acc_area;
                 render_area.x = x;
 
                 (&self.items[i].label).render(render_area, buf);
@@ -252,7 +252,7 @@ impl<'a, 'b> Widget for CollectionList<'a, 'b> {
                             blank_symbol.len(),
                             itm.label.style,
                         );
-                        let mut render_area = acc_area.clone();
+                        let mut render_area = acc_area;
                         render_area.x = x;
 
                         (&itm.label).render(render_area, buf);

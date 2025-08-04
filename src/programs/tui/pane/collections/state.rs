@@ -41,7 +41,7 @@ impl CollectionsState {
             } else {
                 Idx::Parent(0)
             },
-            collections: collections,
+            collections,
             selected_request_idx: None,
             opened: HashSet::new(),
         }
@@ -52,16 +52,12 @@ impl CollectionsState {
         &self.collections
     }
 
-    pub fn collections_mut(&mut self) -> &mut [CollectionsModel] {
-        &mut self.collections
-    }
-
     pub fn openeds(&self) -> HashSet<usize> {
         self.opened.clone()
     }
 
     pub fn idx(&self) -> Idx {
-        self.idx.clone()
+        self.idx
     }
 
     pub fn selected_request_idx(&self) -> Option<(usize, usize)> {
@@ -70,23 +66,6 @@ impl CollectionsState {
 
     pub fn select_request_idx(&mut self, idx: Option<(usize, usize)>) {
         self.selected_request_idx = idx;
-    }
-
-    pub fn add_collection(&mut self, collection: CollectionsModel) {
-        self.collections.push(collection);
-
-        if self.idx.is_none() {
-            self.idx = Idx::Parent(0);
-        }
-    }
-
-    pub fn add_request(&mut self, request: RequestModel) {
-        match self.idx {
-            Idx::None => {}
-            Idx::Parent(i) | Idx::Child(i, _) => {
-                self.collections[i].requests.push(request);
-            }
-        }
     }
 
     pub fn next_collection(&mut self) {
@@ -129,7 +108,7 @@ impl CollectionsState {
         match self.idx {
             Idx::None => self.next_collection(),
             _ => {
-                let previous_idx = self.idx.clone();
+                let previous_idx = self.idx;
                 self.next_request();
 
                 if self.idx == previous_idx {
@@ -173,7 +152,7 @@ impl CollectionsState {
         match self.idx {
             Idx::None => {}
             _ => {
-                let previous_idx = self.idx.clone();
+                let previous_idx = self.idx;
                 self.prev_request();
 
                 if self.idx == previous_idx {
@@ -210,50 +189,6 @@ impl CollectionsState {
             _ => {}
         }
     }
-
-    // pub fn delete_collection(&mut self) -> Option<CollectionsModel> {
-    //     match self.idx {
-    //         Idx::Parent(i) => self.remove_collection_by_idx(i),
-    //         _ => None,
-    //     }
-    // }
-
-    // pub fn remove_collection_by_idx(&mut self, idx: usize) -> Option<CollectionsModel> {
-    //     // TODO: Move the idx
-    //     if idx < self.collections.len() {
-    //         self.opened.remove(&idx);
-    //         Some(self.collections.remove(idx))
-    //     } else {
-    //         None
-    //     }
-    // }
-
-    // pub fn remove_request(&mut self) -> Option<RequestModel> {
-    //     // TODO: move the idx on deletion
-    //     match self.idx {
-    //         Idx::Child(i, sub_i) => self.remove_request_by_idx((i, sub_i)),
-    //         _ => None,
-    //     }
-    // }
-
-    pub fn remove_request_by_idx(&mut self, (i, sub_i): (usize, usize)) -> Option<RequestModel> {
-        // TODO: Move the idx
-        if i < self.collections.len() {
-            if let Some(coll) = self.collections.get_mut(i) {
-                return Some(coll.remove_request(sub_i));
-            }
-        }
-
-        None
-    }
-
-    // pub fn delete(&mut self) {
-    //     if self.idx.is_parent() {
-    //         self.delete_collection();
-    //     } else if self.idx.is_child() {
-    //         self.remove_request();
-    //     }
-    // }
 
     pub fn current_request(&self) -> Option<&RequestModel> {
         match self.idx {
@@ -359,39 +294,39 @@ pub enum Idx {
 
 impl PartialOrd for Idx {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let ord = match (self, other) {
-            (Idx::None, Idx::None) => std::cmp::Ordering::Equal,
-            (Idx::None, Idx::Parent(_)) => std::cmp::Ordering::Less,
-            (Idx::None, Idx::Child(_, _)) => std::cmp::Ordering::Less,
+        // let ord = match (self, other) {
+        //     (Idx::None, Idx::None) => std::cmp::Ordering::Equal,
+        //     (Idx::None, Idx::Parent(_)) => std::cmp::Ordering::Less,
+        //     (Idx::None, Idx::Child(_, _)) => std::cmp::Ordering::Less,
 
-            (Idx::Parent(_), Idx::None) => std::cmp::Ordering::Greater,
-            (Idx::Parent(i), Idx::Parent(other_i)) => i.cmp(other_i),
-            (Idx::Parent(i), Idx::Child(other_i, _other_sub_i)) => {
-                if i == other_i {
-                    std::cmp::Ordering::Less
-                } else {
-                    i.cmp(other_i)
-                }
-            }
+        //     (Idx::Parent(_), Idx::None) => std::cmp::Ordering::Greater,
+        //     (Idx::Parent(i), Idx::Parent(other_i)) => i.cmp(other_i),
+        //     (Idx::Parent(i), Idx::Child(other_i, _other_sub_i)) => {
+        //         if i == other_i {
+        //             std::cmp::Ordering::Less
+        //         } else {
+        //             i.cmp(other_i)
+        //         }
+        //     }
 
-            (Idx::Child(_, _), Idx::None) => std::cmp::Ordering::Greater,
-            (Idx::Child(i, _), Idx::Parent(other_i)) => {
-                if i == other_i {
-                    std::cmp::Ordering::Greater
-                } else {
-                    i.cmp(other_i)
-                }
-            }
-            (Idx::Child(i, sub_i), Idx::Child(other_i, other_sub_i)) => {
-                if i == other_i {
-                    sub_i.cmp(other_sub_i)
-                } else {
-                    i.cmp(other_i)
-                }
-            }
-        };
+        //     (Idx::Child(_, _), Idx::None) => std::cmp::Ordering::Greater,
+        //     (Idx::Child(i, _), Idx::Parent(other_i)) => {
+        //         if i == other_i {
+        //             std::cmp::Ordering::Greater
+        //         } else {
+        //             i.cmp(other_i)
+        //         }
+        //     }
+        //     (Idx::Child(i, sub_i), Idx::Child(other_i, other_sub_i)) => {
+        //         if i == other_i {
+        //             sub_i.cmp(other_sub_i)
+        //         } else {
+        //             i.cmp(other_i)
+        //         }
+        //     }
+        // };
 
-        Some(ord)
+        Some(self.cmp(other))
     }
 }
 
@@ -406,13 +341,13 @@ impl Idx {
         matches!(self, Idx::None)
     }
 
-    pub fn is_parent(&self) -> bool {
-        matches!(self, Idx::Parent(_))
-    }
+    // pub fn is_parent(&self) -> bool {
+    //     matches!(self, Idx::Parent(_))
+    // }
 
-    pub fn is_child(&self) -> bool {
-        matches!(self, Idx::Child(_, _))
-    }
+    // pub fn is_child(&self) -> bool {
+    //     matches!(self, Idx::Child(_, _))
+    // }
 
     pub fn parent_idx(&self) -> usize {
         match self {

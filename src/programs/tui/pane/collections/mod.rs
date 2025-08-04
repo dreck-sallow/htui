@@ -21,7 +21,7 @@ use crate::{
     },
 };
 
-use super::state::ElementFocus;
+use super::ElementFocus;
 
 mod list;
 pub mod state;
@@ -67,18 +67,11 @@ impl CollectionsComponent {
         None
     }
 
-    pub fn current_request_idx(&self) -> Option<(usize, usize)> {
-        self.state.selected_request_idx()
-    }
-
     pub fn set_data_from_method_url(&mut self, method: HttpMethod, url: String) {
         if let Some(idx) = self.state.selected_request_idx() {
             // TODO: make multiple actions as a single transactions for undo this operation
             self._history.apply(
-                CollectionAction::EditRequestMethod {
-                    idx,
-                    method: method,
-                },
+                CollectionAction::EditRequestMethod { idx, method },
                 &mut self.state,
             );
             self._history.apply(
@@ -132,7 +125,7 @@ impl Drawable for CollectionsComponent {
         focus: Self::Params,
     ) {
         painter.render(move |frame| {
-            let is_focus = focus == super::state::ElementFocus::Collections;
+            let is_focus = focus == ElementFocus::Collections;
             let items: Vec<Item<'_>> = self
                 .state
                 .collections()
@@ -254,16 +247,15 @@ impl Interactive for CollectionsComponent {
                     KeyCode::Tab => {
                         return Some(CollectionEffect::NextFocus);
                     }
-                    KeyCode::Enter => match self.state.idx() {
-                        state::Idx::Child(i, sub_i) => {
+                    KeyCode::Enter => {
+                        if let state::Idx::Child(i, sub_i) = self.state.idx() {
                             self._history.apply(
                                 CollectionAction::SelectRequestIdx(Some((i, sub_i))),
                                 &mut self.state,
                             );
                             return Some(CollectionEffect::ChangeCurrentRequest);
                         }
-                        _ => {}
-                    },
+                    }
                     KeyCode::BackTab => {
                         return Some(CollectionEffect::PreviousFocus);
                     }
@@ -472,10 +464,10 @@ impl TrackAction for CollectionAction {
             CollectionAction::EditRequestMethod { idx, method } => {
                 let idx = idx.to_owned();
                 let request = state.get_request_mut(idx).unwrap();
-                let previous_method = request.method().clone();
+                let previous_method = request.method();
 
                 state.edit_request(idx, |req| {
-                    req.set_method(method.clone());
+                    req.set_method(*method);
                 });
 
                 Some(CollectionAction::EditRequestMethod {

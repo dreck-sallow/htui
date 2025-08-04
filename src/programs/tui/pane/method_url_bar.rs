@@ -18,7 +18,7 @@ use crate::{
     store::models::HttpMethod,
 };
 
-use super::state::ElementFocus;
+use super::ElementFocus;
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,
@@ -71,7 +71,7 @@ impl MethodUrlBarComponent {
     }
 
     pub fn get_data(&self) -> (HttpMethod, String) {
-        (self.method.clone(), self.url_input.lines()[0].to_string())
+        (self.method, self.url_input.lines()[0].to_string())
     }
 }
 
@@ -227,7 +227,7 @@ impl TrackAction for MethodUrlAction {
         match self {
             MethodUrlAction::ChangeMethod(http_method) => {
                 let previous_method = state.clone();
-                *state = http_method.clone();
+                *state = *http_method;
                 Some(MethodUrlAction::ChangeMethod(previous_method))
             }
         }

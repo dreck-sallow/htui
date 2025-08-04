@@ -58,7 +58,7 @@ impl RequestTask {
     pub fn new(cancel_sender: oneshot::Sender<()>, task: JoinHandle<()>) -> Self {
         Self {
             cancel_sender,
-            task: task,
+            task,
         }
     }
 

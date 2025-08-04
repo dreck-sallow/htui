@@ -48,7 +48,7 @@ pub trait Store {
     async fn save_project(&self, project: ProjectModel) -> StoreResult<()>;
 }
 
-const MAPPING_FILE: &'static str = "mapping.json";
+const MAPPING_FILE: &str = "mapping.json";
 
 pub struct LocalStore {
     paths: Paths,
@@ -93,7 +93,7 @@ impl Store for LocalStore {
     async fn save_project(&self, project: ProjectModel) -> StoreResult<()> {
         let mut projects = self.project_list().await?;
 
-        let exists_project = projects.iter().find(|p| &p.id == project.id()).is_some();
+        let exists_project = projects.iter().any(|p| project.id() == p.id);
 
         let project_file_path = self
             .paths
