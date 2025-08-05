@@ -11,7 +11,7 @@ use ratatui::{
     text::Span,
     widgets::{Block, Borders, Tabs},
 };
-use reqwest::{header::CONTENT_TYPE, ClientBuilder, Url};
+use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Url};
 use state::{RequestResponseState, RequestTask, SendRequestResponse};
 use tokio::time::Instant;
 
@@ -294,26 +294,7 @@ fn send_request(
 ) -> RequestTask {
     let (tx, tr) = tokio::sync::oneshot::channel();
 
-    let url = Url::parse(req.url()).unwrap();
-    let method = match req.method() {
-        crate::store::models::HttpMethod::Options => reqwest::Method::OPTIONS,
-        crate::store::models::HttpMethod::Get => reqwest::Method::GET,
-        crate::store::models::HttpMethod::Post => reqwest::Method::POST,
-        crate::store::models::HttpMethod::Put => reqwest::Method::PUT,
-        crate::store::models::HttpMethod::Delete => reqwest::Method::DELETE,
-        crate::store::models::HttpMethod::Head => reqwest::Method::HEAD,
-        crate::store::models::HttpMethod::Patch => reqwest::Method::PATCH,
-    };
-
-    let mut client_builder = ClientBuilder::new()
-        .referer(false)
-        .build()
-        .unwrap()
-        .request(method, url);
-
-    for (key, value) in req.headers_map() {
-        client_builder = client_builder.header(key, value);
-    }
+    let client_builder = request_into_builder(req);
 
     let jh = tokio::spawn(async move {
         let timer = Instant::now();
@@ -358,6 +339,31 @@ fn send_request(
     });
 
     RequestTask::new(tx, jh)
+}
+
+fn request_into_builder(req: &RequestModel) -> RequestBuilder {
+    let url = Url::parse(req.url()).unwrap();
+    let method = match req.method() {
+        crate::store::models::HttpMethod::Options => reqwest::Method::OPTIONS,
+        crate::store::models::HttpMethod::Get => reqwest::Method::GET,
+        crate::store::models::HttpMethod::Post => reqwest::Method::POST,
+        crate::store::models::HttpMethod::Put => reqwest::Method::PUT,
+        crate::store::models::HttpMethod::Delete => reqwest::Method::DELETE,
+        crate::store::models::HttpMethod::Head => reqwest::Method::HEAD,
+        crate::store::models::HttpMethod::Patch => reqwest::Method::PATCH,
+    };
+
+    let mut client_builder = ClientBuilder::new()
+        .referer(false)
+        .build()
+        .unwrap()
+        .request(method, url);
+
+    for (key, value) in req.headers_map() {
+        client_builder = client_builder.header(key, value);
+    }
+
+    client_builder
 }
 
 fn response_into_body_content(bytes: &[u8], content_type: &Option<Mime>) -> BodyContentView {
