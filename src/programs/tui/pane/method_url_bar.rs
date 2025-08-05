@@ -18,7 +18,7 @@ use crate::{
     store::models::HttpMethod,
 };
 
-use super::ElementFocus;
+use super::{action::PaneAction, ElementFocus};
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,
@@ -153,7 +153,8 @@ impl Drawable for MethodUrlBarComponent {
 }
 
 impl Interactive for MethodUrlBarComponent {
-    type Effect = MethodUrlEffect;
+    // type Effect = MethodUrlEffect;
+    type Effect = PaneAction;
 
     fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
         if key.kind == KeyEventKind::Press {
@@ -176,13 +177,10 @@ impl Interactive for MethodUrlBarComponent {
             } else {
                 match key.code {
                     KeyCode::Tab => {
-                        // mutate_on_blur(true);
-
-                        return Some(MethodUrlEffect::NextFocus);
+                        return Some(PaneAction::NextFocus);
                     }
                     KeyCode::BackTab => {
-                        // mutate_on_blur(false);
-                        return Some(MethodUrlEffect::PreviousFocus);
+                        return Some(PaneAction::PreviousFocus);
                     }
                     KeyCode::Enter => {
                         // Change to pending
@@ -232,9 +230,4 @@ impl TrackAction for MethodUrlAction {
             }
         }
     }
-}
-
-pub enum MethodUrlEffect {
-    NextFocus,
-    PreviousFocus,
 }

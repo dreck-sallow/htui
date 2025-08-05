@@ -24,7 +24,7 @@ use crate::{
     store::models::{RequestModel, ResponseModel, SendRequest, SendRequestKey},
 };
 
-use super::ElementFocus;
+use super::{action::PaneAction, ElementFocus};
 
 mod body_viewer;
 mod headers_table;
@@ -233,18 +233,18 @@ impl Drawable for ResponseViewerComponent {
 }
 
 impl Interactive for ResponseViewerComponent {
-    type Effect = ResponseViewerEffect;
+    type Effect = PaneAction;
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Tab => match self.tab {
-                    Tab::Headers => return Some(ResponseViewerEffect::NextFocus),
+                    Tab::Headers => return Some(PaneAction::NextFocus),
                     Tab::Response => self.tab = Tab::Headers,
                 },
                 KeyCode::BackTab => match self.tab {
                     Tab::Headers => self.tab = Tab::Response,
-                    Tab::Response => return Some(ResponseViewerEffect::PreviousFocus),
+                    Tab::Response => return Some(PaneAction::PreviousFocus),
                 },
                 _ => match self.tab {
                     Tab::Headers => {

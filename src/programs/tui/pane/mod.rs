@@ -1,4 +1,5 @@
 use crate::store::models::{KeyValueParam, ProjectModel};
+use action::PaneAction;
 use collections::CollectionsComponent;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use method_url_bar::MethodUrlBarComponent;
@@ -15,6 +16,7 @@ use super::{
     events::EventSender,
 };
 
+mod action;
 mod body_editor;
 mod collections;
 mod method_url_bar;
@@ -123,118 +125,103 @@ impl Pane {
         painter.draw(frame);
     }
 
+    pub fn get_with_history_component(&mut self) -> Option<Box<&mut dyn WithHistory>> {
+        match self.focus {
+            ElementFocus::Collections => Some(Box::new(&mut self.collections_component)),
+            ElementFocus::MethodUrlBar => Some(Box::new(&mut self.method_url_component)),
+            ElementFocus::RequestBuilder => Some(Box::new(&mut self.request_builder_component)),
+            ElementFocus::ResponseViewer => None,
+        }
+    }
+
+    pub fn handle_action(&mut self, action: PaneAction) {
+        match action {
+            PaneAction::NextFocus => {
+                self.focus = self.focus.next();
+            }
+            PaneAction::PreviousFocus => {
+                self.focus = self.focus.previous();
+            }
+            PaneAction::ChangeRequest => {
+                if let Some(req) = self.collections_component.current_request() {
+                    self.method_url_component.set_data(req.method(), req.url());
+                    let headers = req
+                        .headers()
+                        .iter()
+                        .map(|(k, v)| KeyValueParam::new(k.to_string(), v.to_string()))
+                        .collect();
+
+                    self.request_builder_component.set_state(
+                        req.params.clone(),
+                        headers,
+                        req.body().clone(),
+                    );
+
+                    self.response_viewer_component
+                        .change_req(self.collections_component.current_request_key().unwrap());
+                }
+            }
+            PaneAction::DeleteRequest => {
+                // TODO: cancel the background http request
+            }
+            PaneAction::ExecuteRequest => {
+                if let Some(req) = self.collections_component.current_request() {
+                    self.response_viewer_component.execute_req(
+                        self.collections_component.current_request_key().unwrap(),
+                        req,
+                        self._sender.clone(),
+                    );
+                }
+            }
+            PaneAction::SetUrlAndMethod => {
+                let (method, url) = self.method_url_component.get_data();
+                self.collections_component
+                    .set_data_from_method_url(method, url);
+            }
+            PaneAction::SetHeadersAndBody => {
+                let (params, headers, body) = self.request_builder_component.get_data();
+                self.collections_component
+                    .set_data_from_request_editor(params, headers, body);
+            }
+        }
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent) {
+        // TODO: handle the undo of creation
+        // Context: when I create a request and exeute it, and after, make an undo
+        // the system delete the request, but the background task is still running
         if KeyCode::Char('u') == key.code && key.modifiers == KeyModifiers::ALT {
-            match self.focus {
-                ElementFocus::Collections => {
-                    self.collections_component.undo();
-                }
-                ElementFocus::MethodUrlBar => self.method_url_component.undo(),
-                ElementFocus::RequestBuilder => {
-                    self.request_builder_component.undo();
-                }
-                ElementFocus::ResponseViewer => {}
+            if let Some(component) = self.get_with_history_component() {
+                component.undo();
             }
         } else if KeyCode::Char('y') == key.code && key.modifiers == KeyModifiers::ALT {
-            match self.focus {
-                ElementFocus::Collections => {
-                    self.collections_component.redo();
-                }
-                ElementFocus::MethodUrlBar => {
-                    self.method_url_component.redo();
-                }
-                ElementFocus::RequestBuilder => {
-                    self.request_builder_component.redo();
-                }
-                ElementFocus::ResponseViewer => {}
+            if let Some(component) = self.get_with_history_component() {
+                component.redo();
             }
         } else if KeyCode::Char('x') == key.code && key.modifiers == KeyModifiers::ALT {
-            // Send request
-            if let Some(req) = self.collections_component.current_request() {
-                self.response_viewer_component.execute_req(
-                    self.collections_component.current_request_key().unwrap(),
-                    req,
-                    self._sender.clone(),
-                );
-            }
+            self.handle_action(PaneAction::ExecuteRequest);
         } else {
             match self.focus {
                 ElementFocus::Collections => {
                     if let Some(effect) = self.collections_component.on_key(key) {
-                        match effect {
-                            collections::CollectionEffect::NextFocus => {
-                                self.focus = self.focus.next();
-                            }
-                            collections::CollectionEffect::PreviousFocus => {
-                                self.focus = self.focus.previous();
-                            }
-                            collections::CollectionEffect::ChangeCurrentRequest => {
-                                if let Some(req) = self.collections_component.current_request() {
-                                    self.method_url_component.set_data(req.method(), req.url());
-                                    let headers = req
-                                        .headers()
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            KeyValueParam::new(k.to_string(), v.to_string())
-                                        })
-                                        .collect();
-
-                                    self.request_builder_component.set_state(
-                                        req.params.clone(),
-                                        headers,
-                                        req.body().clone(),
-                                    );
-
-                                    self.response_viewer_component.change_req(
-                                        self.collections_component.current_request_key().unwrap(),
-                                    );
-                                }
-                            }
-                        }
+                        self.handle_action(effect);
                     }
                 }
                 ElementFocus::MethodUrlBar => {
                     if let Some(effect) = self.method_url_component.on_key(key) {
-                        match effect {
-                            method_url_bar::MethodUrlEffect::NextFocus => {
-                                self.focus = self.focus.next()
-                            }
-                            method_url_bar::MethodUrlEffect::PreviousFocus => {
-                                self.focus = self.focus.previous()
-                            }
-                        }
-
-                        let (method, url) = self.method_url_component.get_data();
-                        self.collections_component
-                            .set_data_from_method_url(method, url);
+                        self.handle_action(effect);
+                        self.handle_action(PaneAction::SetUrlAndMethod);
                     }
                 }
                 ElementFocus::RequestBuilder => {
                     if let Some(effect) = self.request_builder_component.on_key(key) {
-                        match effect {
-                            request_builder::RequestEditorEffect::NextFocus => {
-                                self.focus = self.focus.next()
-                            }
-                            request_builder::RequestEditorEffect::PreviousFocus => {
-                                self.focus = self.focus.previous()
-                            }
-                        }
-
-                        let (params, headers, body) = self.request_builder_component.get_data();
-                        self.collections_component
-                            .set_data_from_request_editor(params, headers, body);
+                        self.handle_action(effect);
+                        self.handle_action(PaneAction::SetHeadersAndBody);
                     }
                 }
                 ElementFocus::ResponseViewer => {
                     if let Some(effect) = self.response_viewer_component.on_key(key) {
-                        match effect {
-                            request_response::ResponseViewerEffect::NextFocus => {
-                                self.focus = self.focus.next()
-                            }
-                            request_response::ResponseViewerEffect::PreviousFocus => {
-                                self.focus = self.focus.previous()
-                            }
-                        }
+                        self.handle_action(effect);
                     }
                 }
             }

@@ -21,7 +21,7 @@ use crate::{
     },
 };
 
-use super::ElementFocus;
+use super::{action::PaneAction, ElementFocus};
 
 mod list;
 pub mod state;
@@ -188,7 +188,8 @@ impl Drawable for CollectionsComponent {
 }
 
 impl Interactive for CollectionsComponent {
-    type Effect = CollectionEffect;
+    // type Effect = CollectionEffect;
+    type Effect = PaneAction;
 
     fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
         if key.kind == KeyEventKind::Press {
@@ -245,7 +246,8 @@ impl Interactive for CollectionsComponent {
             } else {
                 match key.code {
                     KeyCode::Tab => {
-                        return Some(CollectionEffect::NextFocus);
+                        // return Some(CollectionEffect::NextFocus);
+                        return Some(PaneAction::NextFocus);
                     }
                     KeyCode::Enter => {
                         if let state::Idx::Child(i, sub_i) = self.state.idx() {
@@ -253,11 +255,13 @@ impl Interactive for CollectionsComponent {
                                 CollectionAction::SelectRequestIdx(Some((i, sub_i))),
                                 &mut self.state,
                             );
-                            return Some(CollectionEffect::ChangeCurrentRequest);
+                            // return Some(CollectionEffect::ChangeCurrentRequest);
+                            return Some(PaneAction::ChangeRequest);
                         }
                     }
                     KeyCode::BackTab => {
-                        return Some(CollectionEffect::PreviousFocus);
+                        // return Some(CollectionEffect::PreviousFocus);
+                        return Some(PaneAction::PreviousFocus);
                     }
                     KeyCode::Left | KeyCode::Char('h') => {
                         self.state.close_collection(true);
@@ -545,8 +549,8 @@ impl WithHistory for CollectionsComponent {
     }
 }
 
-pub enum CollectionEffect {
-    NextFocus,
-    PreviousFocus,
-    ChangeCurrentRequest,
-}
+// pub enum CollectionEffect {
+//     NextFocus,
+//     PreviousFocus,
+//     ChangeCurrentRequest,
+// }

@@ -10,7 +10,9 @@ use crate::{
     store::models::{BodyContent, KeyValueParam},
 };
 
-use super::{body_editor::BodyEditorComponent, params_table::TableParams, ElementFocus};
+use super::{
+    action::PaneAction, body_editor::BodyEditorComponent, params_table::TableParams, ElementFocus,
+};
 
 #[derive(Clone, Copy)]
 pub enum Tab {
@@ -176,7 +178,7 @@ impl Drawable for RequestEditorComponent {
 }
 
 impl Interactive for RequestEditorComponent {
-    type Effect = RequestEditorEffect;
+    type Effect = PaneAction;
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
         if key.kind == KeyEventKind::Press {
@@ -184,13 +186,15 @@ impl Interactive for RequestEditorComponent {
                 KeyCode::Tab => {
                     if self.change_tab(true) {
                         // next focus
-                        return Some(RequestEditorEffect::NextFocus);
+                        // return Some(RequestEditorEffect::NextFocus);
+                        return Some(PaneAction::NextFocus);
                     }
                 }
                 KeyCode::BackTab => {
                     if self.change_tab(false) {
                         // previous focus
-                        return Some(RequestEditorEffect::PreviousFocus);
+                        // return Some(RequestEditorEffect::PreviousFocus);
+                        return Some(PaneAction::PreviousFocus);
                     }
                 }
                 _ => match self.tab {
@@ -208,11 +212,6 @@ impl Interactive for RequestEditorComponent {
         }
         None
     }
-}
-
-pub enum RequestEditorEffect {
-    NextFocus,
-    PreviousFocus,
 }
 
 impl WithHistory for RequestEditorComponent {
