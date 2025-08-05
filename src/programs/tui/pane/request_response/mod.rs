@@ -8,7 +8,8 @@ use mime::Mime;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
-    text::Span,
+    symbols::line,
+    text::{Line, Span},
     widgets::{Block, Borders, Tabs},
 };
 use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Url};
@@ -18,6 +19,7 @@ use tokio::time::Instant;
 use crate::{
     programs::tui::{
         common::component::{Drawable, Interactive},
+        elements::Separator,
         events::EventSender,
         pane::text_editor::TextEditor,
     },
@@ -64,6 +66,8 @@ pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
     response_content: Arc<RwLock<ResponseContent>>,
+
+    status_bar_area: Rect,
     render_area: Rect,
     header_area: Rect,
     content_area: Rect,
@@ -79,6 +83,7 @@ impl ResponseViewerComponent {
                 body_viewer: BodyContentView::Empty,
                 request_key: None,
             })),
+            status_bar_area: Rect::default(),
             render_area: Rect::default(),
             header_area: Rect::default(),
             content_area: Rect::default(),
@@ -120,18 +125,76 @@ impl ResponseViewerComponent {
 
         self.state.add_response(id.clone(), send_req, send_req_task);
     }
+
+    fn status_line_ui(&self, res: &ResponseModel) -> Line {
+        let status = if res.status >= 400 && res.status < 600 {
+            res.status.to_string().red()
+        } else if res.status >= 300 {
+            res.status.to_string().yellow()
+        } else if res.status >= 200 {
+            res.status.to_string().green()
+        } else {
+            res.status.to_string().gray()
+        };
+
+        let time_display = {
+            let millis = res.duration.as_millis();
+            if millis < 1000 {
+                format!("Time: {}ms", millis)
+            } else {
+                format!("Time: {:.2}s", res.duration.as_secs_f32())
+            }
+        };
+
+        let size_display = {
+            let size = res.body.len();
+            const KB: usize = 1024;
+            const MB: usize = KB * 1024;
+
+            if size < KB {
+                format!("Size: {} B", size)
+            } else if size < MB {
+                format!("Size: {} KB", size as f64 / KB as f64)
+            } else {
+                format!("Size: {:.2} MB", size as f64 / MB as f64)
+            }
+        };
+
+        let content_type = res
+            .headers
+            .iter()
+            .find(|(k, _v)| k == CONTENT_TYPE.as_str())
+            .map(|(_k, v)| v.to_string())
+            .unwrap_or("Unknown".into());
+
+        Line::default().spans([
+            Span::from("Status: "),
+            status,
+            "  ".into(),
+            Span::from(time_display),
+            "  ".into(),
+            Span::from(size_display),
+            "  ".into(),
+            Span::from(format!("Content-Type: {}", content_type)),
+        ])
+    }
 }
 
 impl Drawable for ResponseViewerComponent {
     type Params = ElementFocus;
 
     fn set_area(&mut self, area: Rect) {
-        let main_areas = Layout::vertical([Constraint::Length(2), Constraint::Fill(50)])
-            .split(area.inner(Margin::new(1, 1)));
+        let main_areas = Layout::vertical([
+            Constraint::Length(2),
+            Constraint::Length(2),
+            Constraint::Fill(50),
+        ])
+        .split(area.inner(Margin::new(1, 1)));
 
         self.render_area = area;
-        self.header_area = main_areas[0];
-        self.content_area = main_areas[1];
+        self.status_bar_area = main_areas[0];
+        self.header_area = main_areas[1];
+        self.content_area = main_areas[2];
     }
 
     fn draw<'a: 'painter, 'painter>(
@@ -166,7 +229,7 @@ impl Drawable for ResponseViewerComponent {
                     frame.render_widget(placeholder_text, center_area);
                 });
             }
-            Some(response) => match &*response.read().unwrap() {
+            Some(send_request_response) => match &*send_request_response.read().unwrap() {
                 crate::store::models::SendRequest::Pending => {
                     painter.render(|frame| {
                         let placeholder_text = Span::from("Sending...");
@@ -187,7 +250,10 @@ impl Drawable for ResponseViewerComponent {
                         frame.render_widget(placeholder_text, center_area);
                     });
                 }
-                crate::store::models::SendRequest::Finish(_) => {
+                crate::store::models::SendRequest::Finish(response) => {
+                    // Draw the status line
+                    let status_line = self.status_line_ui(response);
+
                     painter.render(move |frame| {
                         let style = if params == ElementFocus::ResponseViewer {
                             Style::default().blue()
@@ -197,6 +263,23 @@ impl Drawable for ResponseViewerComponent {
 
                         let block = Block::bordered().border_style(style);
                         frame.render_widget(block, self.render_area);
+
+                        // Draw the status line bar
+                        frame.render_widget(
+                            &status_line,
+                            Rect {
+                                height: 1,
+                                ..self.status_bar_area
+                            },
+                        );
+                        frame.render_widget(
+                            Separator::default().symbol(line::HORIZONTAL).style(style),
+                            Rect {
+                                height: 1,
+                                y: self.status_bar_area.top() + 1,
+                                ..self.status_bar_area
+                            },
+                        );
 
                         let tabs = Tabs::new([
                             format!(" {} ", Tab::Response.as_ref()),
@@ -281,10 +364,10 @@ impl Interactive for ResponseViewerComponent {
     }
 }
 
-pub enum ResponseViewerEffect {
-    NextFocus,
-    PreviousFocus,
-}
+// pub enum ResponseViewerEffect {
+//     NextFocus,
+//     PreviousFocus,
+// }
 
 fn send_request(
     req: &RequestModel,

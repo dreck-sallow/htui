@@ -1,4 +1,10 @@
-use crate::store::models::{KeyValueParam, ProjectModel};
+use crate::{
+    paths::Paths,
+    store::{
+        models::{KeyValueParam, ProjectModel},
+        LocalStore, Store,
+    },
+};
 use action::PaneAction;
 use collections::CollectionsComponent;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -183,6 +189,22 @@ impl Pane {
                 self.collections_component
                     .set_data_from_request_editor(params, headers, body);
             }
+            PaneAction::SaveLocal => {
+                let model = ProjectModel::from_parts(
+                    self.project_id.clone(),
+                    self.project_name.clone(),
+                    self.collections_component.as_collections(),
+                );
+
+                // QUESTION: We need the store async?
+                let _ = tokio::task::spawn_blocking(move || {
+                    let rt = tokio::runtime::Handle::current();
+                    let store = LocalStore::new(Paths::new("store"));
+                    rt.block_on(async move {
+                        let _ = store.save_project(model).await;
+                    })
+                });
+            }
         }
     }
 
@@ -190,6 +212,7 @@ impl Pane {
         // TODO: handle the undo of creation
         // Context: when I create a request and exeute it, and after, make an undo
         // the system delete the request, but the background task is still running
+
         if KeyCode::Char('u') == key.code && key.modifiers == KeyModifiers::ALT {
             if let Some(component) = self.get_with_history_component() {
                 component.undo();
@@ -200,6 +223,8 @@ impl Pane {
             }
         } else if KeyCode::Char('x') == key.code && key.modifiers == KeyModifiers::ALT {
             self.handle_action(PaneAction::ExecuteRequest);
+        } else if KeyCode::Char('s') == key.code && key.modifiers == KeyModifiers::ALT {
+            self.handle_action(PaneAction::SaveLocal);
         } else {
             match self.focus {
                 ElementFocus::Collections => {

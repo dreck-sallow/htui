@@ -8,4 +8,7 @@ pub enum PaneAction {
     ExecuteRequest,
     SetUrlAndMethod,
     SetHeadersAndBody,
+
+    /// Action used for save the project to local
+    SaveLocal,
 }

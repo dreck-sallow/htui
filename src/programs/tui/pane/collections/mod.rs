@@ -53,6 +53,23 @@ impl CollectionsComponent {
         }
     }
 
+    pub fn as_collections(&self) -> Vec<CollectionsModel> {
+        let collections = self.state.collections();
+
+        let mut model_collections = Vec::with_capacity(collections.len());
+
+        for collection in collections {
+            // QUESTION:  We need clone?
+            model_collections.push(CollectionsModel::from_parts(
+                collection.id().to_string(),
+                collection.name.clone(),
+                collection.requests.clone(),
+            ));
+        }
+
+        model_collections
+    }
+
     /// Returns the key (collection & request ids) for get the request
     pub fn current_request_key(&self) -> Option<SendRequestKey> {
         if let Some((idx, sub_idx)) = self.state.selected_request_idx() {

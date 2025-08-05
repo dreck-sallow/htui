@@ -100,7 +100,7 @@ impl Store for LocalStore {
             .store_folder()
             .join(format!("{}.json", project.id()));
 
-        let contents = serde_json::to_string(&project)?;
+        let contents = serde_json::to_string_pretty(&project)?;
 
         if exists_project {
             fs::write(project_file_path, contents).await?;

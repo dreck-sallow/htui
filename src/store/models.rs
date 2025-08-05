@@ -34,6 +34,14 @@ impl ProjectModel {
         }
     }
 
+    pub fn from_parts(id: String, name: String, collections: Vec<CollectionsModel>) -> Self {
+        Self {
+            id,
+            name,
+            collections,
+        }
+    }
+
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -68,6 +76,10 @@ impl CollectionsModel {
             name,
             requests: Vec::new(),
         }
+    }
+
+    pub fn from_parts(id: String, name: String, requests: Vec<RequestModel>) -> Self {
+        Self { id, name, requests }
     }
 
     pub fn id(&self) -> &str {
