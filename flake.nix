@@ -14,7 +14,7 @@
       packages = with pkgs; [ rustc cargo gcc rustfmt clippy rust-analyzer pkg-config openssl];
 
       shellHook = ''
-        exec fish
+        exec fish -c zellij a htui
       '';
 
       env = {
