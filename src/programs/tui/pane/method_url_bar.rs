@@ -1,9 +1,11 @@
+use std::rc::Rc;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     text::Span,
-    widgets::Block,
+    widgets::{Block, BorderType},
 };
 use tui_textarea::{CursorMove, Input, TextArea};
 
@@ -13,6 +15,7 @@ use crate::{
             action_history::{ActionHistory, History, TrackAction},
             component::{Drawable, Interactive, WithHistory},
         },
+        config::Config,
         elements::{dropdown::OverlayDropdown, utils::expand, Separator},
     },
     store::models::HttpMethod,
@@ -36,11 +39,12 @@ pub struct MethodUrlBarComponent {
     url_input: TextArea<'static>,
     dropdown: OverlayDropdown<HttpMethod>,
     show_dropdown: bool,
+    config: Rc<Config>,
     _history: ActionHistory<MethodUrlAction>,
 }
 
 impl MethodUrlBarComponent {
-    pub fn new() -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         let mut url_input = TextArea::default();
         url_input.set_cursor_line_style(Style::default());
         url_input.set_placeholder_text("https://");
@@ -50,8 +54,17 @@ impl MethodUrlBarComponent {
             method: HttpMethod::Get,
             url_input,
             dropdown: OverlayDropdown::with_items(HttpMethod::Get, METHODS)
-                .with_highlight_style(Style::default().on_light_blue())
-                .with_style(Style::default().on_light_red()),
+                .with_highlight_style(
+                    Style::default()
+                        .fg(config.theme.dropdown_highlight.fg)
+                        .bg(config.theme.dropdown_highlight.bg),
+                )
+                .with_style(
+                    Style::default()
+                        .fg(config.theme.dropdown.fg)
+                        .bg(config.theme.dropdown.bg),
+                ),
+            config,
             show_dropdown: false,
             _history: ActionHistory::new(),
         }
@@ -90,11 +103,17 @@ impl Drawable for MethodUrlBarComponent {
         painter.render(move |frame| {
             let is_focus = params == ElementFocus::MethodUrlBar;
 
-            let border_style = is_focus
-                .then_some(Style::default().blue())
-                .unwrap_or_default();
+            let border_style = Style::default().fg(is_focus
+                .then_some(self.config.theme.border_focus)
+                .unwrap_or(self.config.theme.border));
 
-            let line_block = Block::bordered().border_style(border_style);
+            let line_block = Block::bordered()
+                .border_type(if is_focus {
+                    BorderType::Thick
+                } else {
+                    BorderType::Plain
+                })
+                .border_style(border_style);
 
             let area = line_block.inner(self.render_area);
             frame.render_widget(line_block, self.render_area);
@@ -120,8 +139,8 @@ impl Drawable for MethodUrlBarComponent {
 
             frame.render_widget(
                 Span::from(expand(self.method.as_ref(), " ", 10))
-                    .style(Style::new().on_light_red())
-                    .black(),
+                    .fg(self.config.theme.dropdown.fg)
+                    .bg(self.config.theme.dropdown.bg),
                 method_area,
             );
 

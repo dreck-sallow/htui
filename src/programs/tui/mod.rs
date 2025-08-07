@@ -1,10 +1,10 @@
-use std::io;
+use std::{io, rc::Rc};
 
 use app::App;
+use config::load_config;
 use events::Events;
 use ratatui::layout::Rect;
 use sources::TerminalSource;
-// use views::dashboard::DashboardView;
 
 use crate::{
     paths::Paths,
@@ -13,6 +13,7 @@ use crate::{
 
 mod app;
 mod common;
+mod config;
 mod elements;
 mod events;
 mod pane;
@@ -20,6 +21,7 @@ mod sources;
 
 pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
     let project = load_project(project_name).await.unwrap();
+    let config = load_config(&Paths::new("store"));
 
     let mut terminal = ratatui::init();
 
@@ -28,7 +30,7 @@ pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
 
     events.listen();
 
-    let mut app = App::new_from_project(project, events.sender());
+    let mut app = App::new_from_project(project, Rc::new(config), events.sender());
     app.viewport_area(Rect {
         x: 0,
         y: 0,

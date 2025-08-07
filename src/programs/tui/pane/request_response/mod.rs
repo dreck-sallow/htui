@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
 
 use body_viewer::{BodyContentView, HexDumpViewer};
 use crossterm::event::{KeyCode, KeyEventKind};
@@ -10,7 +13,7 @@ use ratatui::{
     style::{Style, Stylize},
     symbols::line,
     text::{Line, Span},
-    widgets::{Block, Borders, Tabs},
+    widgets::{Block, BorderType, Borders, Tabs},
 };
 use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Url};
 use state::{RequestResponseState, RequestTask, SendRequestResponse};
@@ -19,6 +22,7 @@ use tokio::time::Instant;
 use crate::{
     programs::tui::{
         common::component::{Drawable, Interactive},
+        config::Config,
         elements::Separator,
         events::EventSender,
         pane::text_editor::TextEditor,
@@ -66,6 +70,7 @@ pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
     response_content: Arc<RwLock<ResponseContent>>,
+    config: Rc<Config>,
 
     status_bar_area: Rect,
     render_area: Rect,
@@ -74,7 +79,7 @@ pub struct ResponseViewerComponent {
 }
 
 impl ResponseViewerComponent {
-    pub fn new() -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         Self {
             state: RequestResponseState::new(),
             tab: Tab::Response,
@@ -83,6 +88,7 @@ impl ResponseViewerComponent {
                 body_viewer: BodyContentView::Empty,
                 request_key: None,
             })),
+            config,
             status_bar_area: Rect::default(),
             render_area: Rect::default(),
             header_area: Rect::default(),
@@ -255,13 +261,22 @@ impl Drawable for ResponseViewerComponent {
                     let status_line = self.status_line_ui(response);
 
                     painter.render(move |frame| {
-                        let style = if params == ElementFocus::ResponseViewer {
-                            Style::default().blue()
+                        let is_focus = params == ElementFocus::ResponseViewer;
+                        let border_style = Style::default().fg(if is_focus {
+                            self.config.theme.border_focus
                         } else {
-                            Style::default()
+                            self.config.theme.border
+                        });
+
+                        let border_type = if is_focus {
+                            BorderType::Thick
+                        } else {
+                            BorderType::Plain
                         };
 
-                        let block = Block::bordered().border_style(style);
+                        let block = Block::bordered()
+                            .border_type(border_type)
+                            .border_style(border_style);
                         frame.render_widget(block, self.render_area);
 
                         // Draw the status line bar
@@ -273,7 +288,9 @@ impl Drawable for ResponseViewerComponent {
                             },
                         );
                         frame.render_widget(
-                            Separator::default().symbol(line::HORIZONTAL).style(style),
+                            Separator::default()
+                                .symbol(line::HORIZONTAL)
+                                .style(border_style),
                             Rect {
                                 height: 1,
                                 y: self.status_bar_area.top() + 1,
@@ -286,8 +303,13 @@ impl Drawable for ResponseViewerComponent {
                             format!(" {} ", Tab::Headers.as_ref()),
                         ])
                         .select(self.tab.as_idx())
-                        .block(Block::new().borders(Borders::BOTTOM).border_style(style))
-                        .highlight_style(Style::default().blue());
+                        .block(
+                            Block::new()
+                                .borders(Borders::BOTTOM)
+                                .border_type(border_type)
+                                .border_style(border_style),
+                        )
+                        .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
 
                         frame.render_widget(tabs, self.header_area);
                     });
@@ -298,7 +320,7 @@ impl Drawable for ResponseViewerComponent {
                         Tab::Headers => {
                             painter.render(move |frame| {
                                 let locked = response_content.read().unwrap();
-                                let table_ui = locked.headers_table.table_ui();
+                                let table_ui = locked.headers_table.table_ui(&self.config.theme);
                                 frame.render_widget(table_ui, self.content_area);
                             });
                         }

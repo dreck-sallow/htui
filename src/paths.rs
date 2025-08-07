@@ -8,6 +8,7 @@ use directories::ProjectDirs;
 pub struct Paths {
     dirs: ProjectDirs,
     store_folder: &'static str,
+    config_file: &'static str,
 }
 
 impl Paths {
@@ -15,11 +16,16 @@ impl Paths {
         Self {
             dirs: ProjectDirs::from("com", "dreck", "htui").unwrap(),
             store_folder,
+            config_file: "config.json",
         }
     }
 
     pub fn store_folder(&self) -> PathBuf {
         ensure_path(self.dirs.data_local_dir().join(self.store_folder)).unwrap()
+    }
+
+    pub fn config_folder(&self) -> PathBuf {
+        ensure_path(self.dirs.config_local_dir()).unwrap()
     }
 }
 

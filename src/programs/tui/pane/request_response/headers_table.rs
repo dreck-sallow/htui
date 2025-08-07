@@ -1,6 +1,9 @@
 use ratatui::style::{Style, Stylize};
 
-use crate::programs::tui::elements::table::{TableGrid, TableGridIndex};
+use crate::programs::tui::{
+    config::Theme,
+    elements::table::{TableGrid, TableGridIndex},
+};
 
 pub struct HeadersTable {
     items: Vec<(String, String)>,
@@ -35,7 +38,7 @@ impl HeadersTable {
         self.items = items;
     }
 
-    pub fn table_ui(&self) -> TableGrid<'_, '_, 2> {
+    pub fn table_ui(&self, theme: &Theme) -> TableGrid<'_, '_, 2> {
         let rows = self
             .items
             .iter()
@@ -45,7 +48,9 @@ impl HeadersTable {
         TableGrid::new(["Header name".blue(), "Header value".blue()], [0.4, 0.5])
             .with_index(
                 self.index.index(),
-                Style::default().on_light_red().dark_gray(),
+                Style::default()
+                    .fg(theme.selection.fg)
+                    .bg(theme.selection.bg),
             )
             .with_placeholder("No items".italic().dark_gray())
             .with_rows(rows)

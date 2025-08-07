@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::Arc};
+
 use crate::{
     paths::Paths,
     store::{
@@ -19,6 +21,7 @@ use request_response::ResponseViewerComponent;
 
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
+    config::Config,
     events::EventSender,
 };
 
@@ -73,15 +76,18 @@ pub struct Pane {
 }
 
 impl Pane {
-    pub fn from_project(project: ProjectModel, sender: EventSender) -> Self {
+    pub fn from_project(project: ProjectModel, config: Rc<Config>, sender: EventSender) -> Self {
         Self {
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
             focus: ElementFocus::Collections,
-            collections_component: CollectionsComponent::new(project.collections),
-            method_url_component: MethodUrlBarComponent::new(),
-            request_builder_component: RequestEditorComponent::new(),
-            response_viewer_component: ResponseViewerComponent::new(),
+            collections_component: CollectionsComponent::new(
+                project.collections,
+                Rc::clone(&config),
+            ),
+            method_url_component: MethodUrlBarComponent::new(Rc::clone(&config)),
+            request_builder_component: RequestEditorComponent::new(Rc::clone(&config)),
+            response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config)),
             placeholder_view: PlaceholderView::new(),
             _sender: sender,
         }

@@ -1,12 +1,17 @@
+use std::rc::Rc;
+
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
-    widgets::{Block, Borders, Tabs},
+    widgets::{Block, BorderType, Borders, Tabs},
 };
 
 use crate::{
-    programs::tui::common::component::{Drawable, Interactive, WithHistory},
+    programs::tui::{
+        common::component::{Drawable, Interactive, WithHistory},
+        config::Config,
+    },
     store::models::{BodyContent, KeyValueParam},
 };
 
@@ -49,10 +54,11 @@ pub struct RequestEditorComponent {
     headers_table: TableParams,
     // headers_editor: TextEditor,
     body_editor_component: BodyEditorComponent,
+    config: Rc<Config>,
 }
 
 impl RequestEditorComponent {
-    pub fn new() -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         Self {
             tab: Tab::Params,
             header_area: Rect::default(),
@@ -60,7 +66,8 @@ impl RequestEditorComponent {
             params_table: TableParams::new(),
             headers_table: TableParams::new(),
             // headers_editor: TextEditor::new(true),
-            body_editor_component: BodyEditorComponent::new(),
+            body_editor_component: BodyEditorComponent::new(Rc::clone(&config)),
+            config,
         }
     }
 
@@ -131,23 +138,36 @@ impl Drawable for RequestEditorComponent {
         params: Self::Params,
     ) {
         painter.render(move |frame| {
-            let style = if params == ElementFocus::RequestBuilder {
-                Style::default().blue()
+            let border_style = if params == ElementFocus::RequestBuilder {
+                Style::default().fg(self.config.theme.border_focus)
             } else {
-                Style::default()
+                Style::default().fg(self.config.theme.border)
             };
 
-            let block = Block::bordered().border_style(style);
+            let border_type = if params == ElementFocus::RequestBuilder {
+                BorderType::Thick
+            } else {
+                BorderType::Plain
+            };
+
+            let block = Block::bordered()
+                .border_style(border_style)
+                .border_type(border_type);
             frame.render_widget(block, self.render_area);
 
             let tabs = Tabs::new([
-                format!(" {} ", Tab::Params.as_ref()),
-                format!(" {} ", Tab::Headers.as_ref()),
-                format!(" {} ", Tab::Body.as_ref()),
+                format!(" {} ", Tab::Params.as_ref().fg(self.config.theme.tab)),
+                format!(" {} ", Tab::Headers.as_ref().fg(self.config.theme.tab)),
+                format!(" {} ", Tab::Body.as_ref().fg(self.config.theme.tab)),
             ])
             .select(self.tab.as_idx())
-            .block(Block::new().borders(Borders::BOTTOM).border_style(style))
-            .highlight_style(Style::default().blue());
+            .block(
+                Block::new()
+                    .borders(Borders::BOTTOM)
+                    .border_style(border_style)
+                    .border_type(border_type),
+            )
+            .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
 
             frame.render_widget(tabs, self.header_area);
         });

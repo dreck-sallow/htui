@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
@@ -13,6 +13,7 @@ use crate::{
             action_history::{ActionHistory, History, TrackAction},
             component::{Drawable, Interactive, WithHistory},
         },
+        config::Config,
         elements::dropdown::OverlayDropdown,
     },
     store::models::BodyContent,
@@ -43,11 +44,12 @@ pub struct BodyEditorComponent {
     text_editor: TextEditor,
     dropdown: OverlayDropdown<BodyTypeV2>,
     show_dropdown: bool,
+    config: Rc<Config>,
     _history: ActionHistory<BodyEditorAction>,
 }
 
 impl BodyEditorComponent {
-    pub fn new() -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         Self {
             body_content: BodyContent::Empty,
             render_area: Rect::default(),
@@ -60,8 +62,18 @@ impl BodyEditorComponent {
                     BodyTypeV2::Text,
                 ],
             )
-            .with_highlight_style(Style::default().blue()),
+            .with_style(
+                Style::default()
+                    .fg(config.theme.dropdown.fg)
+                    .bg(config.theme.dropdown.bg),
+            )
+            .with_highlight_style(
+                Style::default()
+                    .fg(config.theme.dropdown_highlight.fg)
+                    .bg(config.theme.dropdown_highlight.bg),
+            ),
             show_dropdown: false,
+            config,
             _history: ActionHistory::new(),
         }
     }
@@ -101,7 +113,10 @@ impl Drawable for BodyEditorComponent {
                 Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
                     .areas(self.render_area);
 
-            let title = Span::from(format!(" Type: {} ", self.body_content.as_tag())).italic();
+            let title = Span::from(format!(" Type: {} ", self.body_content.as_tag()))
+                .italic()
+                .fg(self.config.theme.dropdown.fg)
+                .bg(self.config.theme.dropdown.bg);
             let body_type = Span::from("\u{25bc} ");
 
             let [title_area, body_type_area] = Layout::horizontal([
@@ -143,7 +158,6 @@ impl Drawable for BodyEditorComponent {
                     frame.render_widget(text, inner_area);
                 }
                 BodyContent::Form(_hash_map) => {
-                    // frame.render_widget(Span::from("Form values!"), content_area);
                     frame.render_widget(&self.text_editor, content_area);
                 }
                 BodyContent::Text(_) => {

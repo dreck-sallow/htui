@@ -1,20 +1,23 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use list::{CollectionList, Item};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Style, Stylize},
-    widgets::{Block, Clear},
+    style::Style,
+    widgets::{Block, BorderType, Clear},
 };
 use state::{CollectionsState, MutableList};
 use tui_textarea::Input;
 use upsert_item::{UpsertItemPopup, UpsertMethod};
 
 use crate::{
-    programs::tui::common::{
-        action_history::{ActionHistory, History, TrackAction},
-        component::{Drawable, Interactive, WithHistory},
+    programs::tui::{
+        common::{
+            action_history::{ActionHistory, History, TrackAction},
+            component::{Drawable, Interactive, WithHistory},
+        },
+        config::Config,
     },
     store::models::{
         BodyContent, CollectionsModel, HttpMethod, KeyValueParam, RequestModel, SendRequestKey,
@@ -31,17 +34,19 @@ pub struct CollectionsComponent {
     render_area: Rect,
     state: CollectionsState,
     menu: UpsertItemPopup,
+    config: Rc<Config>,
     show_popup: bool,
     _history: ActionHistory<CollectionAction>,
 }
 
 impl CollectionsComponent {
-    pub fn new(collections: Vec<CollectionsModel>) -> Self {
+    pub fn new(collections: Vec<CollectionsModel>, config: Rc<Config>) -> Self {
         Self {
             state: CollectionsState::from_list(collections),
             render_area: Rect::default(),
             menu: UpsertItemPopup::new(),
             show_popup: false,
+            config,
             _history: ActionHistory::new(),
         }
     }
@@ -166,15 +171,28 @@ impl Drawable for CollectionsComponent {
             let collections = CollectionList::default()
                 .set_items(items)
                 .set_block(
-                    Block::bordered().title(" Collections ").border_style(
-                        is_focus
-                            .then_some(Style::default().blue())
-                            .unwrap_or_default(),
-                    ),
+                    Block::bordered()
+                        .title(" Collections ")
+                        .border_type(if is_focus {
+                            BorderType::Thick
+                        } else {
+                            BorderType::Plain
+                        })
+                        .border_style(
+                            Style::default().fg(is_focus
+                                .then_some(self.config.theme.border_focus)
+                                .unwrap_or(self.config.theme.border)),
+                        ),
                 )
                 .set_openeds(self.state.openeds().clone())
                 .set_idx(self.state.idx())
-                .set_highlight_style(Style::default().green());
+                .set_highlight_style(
+                    Style::default().fg(self.config.theme.selection.fg).bg(self
+                        .config
+                        .theme
+                        .selection
+                        .bg),
+                );
 
             frame.render_widget(collections, self.render_area);
         });

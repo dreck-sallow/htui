@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -8,31 +10,38 @@ use ratatui::{
 
 use crate::store::models::ProjectModel;
 
-use super::{events::EventSender, pane::Pane};
+use super::{config::Config, events::EventSender, pane::Pane};
 
 pub struct App {
     panes: Vec<Pane>,
     selected: Option<usize>,
     tabs_area: Rect,
+    config: Rc<Config>,
 }
 
 impl App {
-    pub fn new_from_project(project: ProjectModel, sender: EventSender) -> Self {
-        let mut this = Self::new();
+    pub fn new_from_project(
+        project: ProjectModel,
+        config: Rc<Config>,
+        sender: EventSender,
+    ) -> Self {
+        let mut this = Self::new(Rc::clone(&config));
         this.add_project(project, sender);
         this
     }
 
-    fn new() -> Self {
+    fn new(config: Rc<Config>) -> Self {
         Self {
             panes: Vec::new(),
             selected: None,
             tabs_area: Rect::default(),
+            config,
         }
     }
 
     fn add_project(&mut self, project: ProjectModel, sender: EventSender) {
-        self.panes.push(Pane::from_project(project, sender));
+        self.panes
+            .push(Pane::from_project(project, Rc::clone(&self.config), sender));
         if self.selected.is_none() {
             self.selected = Some(0);
         }
