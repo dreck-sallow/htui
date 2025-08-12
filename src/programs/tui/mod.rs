@@ -19,9 +19,29 @@ mod events;
 mod pane;
 mod sources;
 
-pub async fn run_tui(project_name: Option<String>) -> io::Result<()> {
+#[derive(Debug)]
+pub enum TuiError {
+    Io(io::Error),
+    Config(toml::de::Error),
+}
+
+impl From<io::Error> for TuiError {
+    fn from(value: io::Error) -> Self {
+        TuiError::Io(value)
+    }
+}
+
+impl From<toml::de::Error> for TuiError {
+    fn from(value: toml::de::Error) -> Self {
+        TuiError::Config(value)
+    }
+}
+
+pub type TuiResult<T> = Result<T, TuiError>;
+
+pub async fn run_tui(project_name: Option<String>) -> TuiResult<()> {
     let project = load_project(project_name).await.unwrap();
-    let config = load_config(&Paths::new("store"));
+    let config = load_config(&Paths::new("store"))?;
 
     let mut terminal = ratatui::init();
 

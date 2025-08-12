@@ -60,21 +60,27 @@ impl Theme {
     };
 }
 
-const CONFIG_FILE: &str = "config.json";
+const CONFIG_FILE: &str = "config.toml";
 
-pub fn load_config(paths: &Paths) -> Config {
+pub fn load_config(paths: &Paths) -> Result<Config, toml::de::Error> {
     let config_folder = paths.config_folder();
     let config_file = config_folder.join(CONFIG_FILE);
-    // serde_json::
 
-    // This only return an error when the sematic or marlformed data is on the file (In this case I should show the error to user!)
-    // TODO: show the error to user
-    return serde_json::from_slice(&fs::read(config_file).unwrap()).unwrap();
+    match fs::read(config_file) {
+        Ok(content) => {
+            // This only return an error when the sematic or marlformed data is on the file (In this case I should show the error to user!)
+            // TODO: show the error to user
+            toml::from_slice(&content)
+        }
+        Err(_e) => Ok(Config::default()),
+    }
 }
 
 // The keybinding deserialization
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct Config {
+    #[serde(default)]
     pub theme: Theme,
+    #[serde(default)]
     pub keymap: KeyMap,
 }

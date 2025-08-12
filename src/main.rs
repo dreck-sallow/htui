@@ -29,6 +29,12 @@ async fn main() {
             println!("{} - {}", project.id, project.name);
         }
     } else {
-        tui::run_tui(cli.project).await.unwrap();
+        if let Err(err) = tui::run_tui(cli.project).await {
+            match err {
+                tui::TuiError::Io(error) => eprintln!("IO_ERROR: {:?}", error),
+                tui::TuiError::Config(error) => eprintln!("CONFIG_ERROR: {:?}", error),
+            }
+            std::process::exit(1)
+        }
     }
 }

@@ -89,8 +89,8 @@ where
         {
             let mut key_bindings: Vec<KeyBinding<T>> = KeyBinding::default_list();
 
-            while let Some((action, _key)) = map.next_entry::<T, &str>()? {
-                match key_event::str_to_key_event(_key) {
+            while let Some((action, _key)) = map.next_entry::<T, String>()? {
+                match key_event::str_to_key_event(&_key) {
                     // I should find the event, because the seed for the vec would have the all action default
                     Some(key_event) => {
                         let i = key_bindings
@@ -114,57 +114,14 @@ where
     deserializer.deserialize_map(KeyBindingVisitor(PhantomData))
 }
 
-// struct KeyBindingVec<'a, T>(&'a mut Vec<KeyBinding<T>>);
-
-// impl<'de, 'a, T> DeserializeSeed<'de> for KeyBindingVec<'a, T>
-// where
-//     T: KeyAction + Deserialize<'de>,
-// {
-//     type Value = ();
-
-//     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         struct KeyBindingVecVisitor<'a, T: 'a>(&'a mut Vec<KeyBinding<T>>);
-
-//         impl<'de, 'a, T> Visitor<'de> for KeyBindingVecVisitor<'a, T>
-//         where
-//             T: KeyAction + Deserialize<'de>,
-//         {
-//             type Value = ();
-
-//             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-//                 formatter.write_str("A valid map for keybinding")
-//             }
-
-//             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-//             where
-//                 A: serde::de::MapAccess<'de>,
-//             {
-//                 while let Some((action, _key)) = map.next_entry::<T, &str>()? {
-//                     println!("next_entry!");
-//                     match key_event::str_to_key_event(_key) {
-//                         // I should find the event, because the seed for the vec would have the all action default
-//                         Some(key_event) => {
-//                             let i = self
-//                                 .0
-//                                 .iter()
-//                                 .enumerate()
-//                                 .find(|(_i, key_binding)| *key_binding.raw().0 == key_event)
-//                                 .map(|(i, _)| i)
-//                                 .expect("The action should exist on the vec for, ");
-
-//                             self.0.swap_remove(i);
-//                             self.0.push(KeyBinding::new(action, key_event));
-//                         }
-//                         None => return Err(serde::de::Error::custom("")),
-//                     }
-//                 }
-//                 Ok(())
-//             }
-//         }
-
-//         deserializer.deserialize_map(KeyBindingVecVisitor(self.0))
-//     }
-// }
+impl Default for KeyMap {
+    fn default() -> Self {
+        Self {
+            global: KeyBinding::default_list(),
+            table: KeyBinding::default_list(),
+            method_url: KeyBinding::default_list(),
+            request_builder: KeyBinding::default_list(),
+            collections: KeyBinding::default_list(),
+        }
+    }
+}
