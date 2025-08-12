@@ -1,22 +1,21 @@
 use std::fs;
 
+use keymap::KeyMap;
 use ratatui::style::Color;
 use serde::Deserialize;
 
 use crate::paths::Paths;
+pub mod keybinding;
+// pub mod keybindings;
+pub mod keymap;
+// mod toml;
 
-#[derive(Deserialize)]
-pub struct Config {
-    pub theme: Theme,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            theme: Theme::DEFAULT,
-        }
-    }
-}
+// #[derive(Deserialize)]
+// pub struct Config {
+//     #[serde(default)]
+//     pub theme: Theme,
+//     pub keymap: KeyMapV2,
+// }
 
 #[derive(Deserialize)]
 pub struct ColorPair {
@@ -42,6 +41,11 @@ pub struct Theme {
     pub border: Color,
     pub border_focus: Color,
 }
+impl Default for Theme {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 impl Theme {
     pub const DEFAULT: Self = Self {
@@ -61,10 +65,16 @@ const CONFIG_FILE: &str = "config.json";
 pub fn load_config(paths: &Paths) -> Config {
     let config_folder = paths.config_folder();
     let config_file = config_folder.join(CONFIG_FILE);
+    // serde_json::
 
-    if config_file.exists() {
-        return serde_json::from_slice(&fs::read(config_file).unwrap()).unwrap();
-    } else {
-        Config::default()
-    }
+    // This only return an error when the sematic or marlformed data is on the file (In this case I should show the error to user!)
+    // TODO: show the error to user
+    return serde_json::from_slice(&fs::read(config_file).unwrap()).unwrap();
+}
+
+// The keybinding deserialization
+#[derive(Deserialize)]
+pub struct Config {
+    pub theme: Theme,
+    pub keymap: KeyMap,
 }
