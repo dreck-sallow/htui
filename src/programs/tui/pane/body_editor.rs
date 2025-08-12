@@ -170,7 +170,7 @@ impl Drawable for BodyEditorComponent {
             painter.render_last(|frame| {
                 let area = Rect {
                     y: self.render_area.top() + 1,
-                    height: 5,
+                    height: 3,
                     ..self.render_area
                 };
 

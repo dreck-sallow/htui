@@ -92,7 +92,7 @@ impl<const N: usize> Widget for TableGrid<'_, '_, N> {
 
             let (mut top, mut left) = (area.top() + 1, area.left());
 
-            for (row_i, row_values) in self.rows[index_start..(index_end + 1)].iter().enumerate() {
+            for (row_i, row_values) in self.rows[index_start..index_end].iter().enumerate() {
                 for (col_i, text) in row_values.iter().enumerate() {
                     let width = column_widths[col_i];
 

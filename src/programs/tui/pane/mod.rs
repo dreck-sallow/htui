@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::rc::Rc;
 
 use crate::{
     paths::Paths,
@@ -9,7 +9,7 @@ use crate::{
 };
 use action::PaneAction;
 use collections::CollectionsComponent;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
 use method_url_bar::MethodUrlBarComponent;
 use placeholder::PlaceholderView;
 use ratatui::{
@@ -21,7 +21,7 @@ use request_response::ResponseViewerComponent;
 
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
-    config::Config,
+    config::{keybinding, Config},
     events::EventSender,
 };
 
@@ -72,6 +72,7 @@ pub struct Pane {
     response_viewer_component: ResponseViewerComponent,
     placeholder_view: PlaceholderView,
     focus: ElementFocus,
+    config: Rc<Config>,
     _sender: EventSender,
 }
 
@@ -89,6 +90,7 @@ impl Pane {
             request_builder_component: RequestEditorComponent::new(Rc::clone(&config)),
             response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config)),
             placeholder_view: PlaceholderView::new(),
+            config,
             _sender: sender,
         }
     }
@@ -214,24 +216,40 @@ impl Pane {
         }
     }
 
+    fn handle_pane_action(&mut self, key: KeyEvent) -> bool {
+        if let Some(key_action) = self.config.keymap.match_global_action(key) {
+            match key_action {
+                keybinding::GlobalKeyAction::Undo => {
+                    if let Some(component) = self.get_with_history_component() {
+                        component.undo();
+                    }
+                }
+                keybinding::GlobalKeyAction::Redo => {
+                    if let Some(component) = self.get_with_history_component() {
+                        component.redo();
+                    }
+                }
+                keybinding::GlobalKeyAction::SendRequest => {
+                    self.handle_action(PaneAction::ExecuteRequest);
+                }
+                keybinding::GlobalKeyAction::SaveProject => {
+                    self.handle_action(PaneAction::SaveLocal);
+                }
+                _ => return false,
+            }
+
+            return true;
+        }
+
+        false
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent) {
         // TODO: handle the undo of creation
-        // Context: when I create a request and exeute it, and after, make an undo
+        // CONTEXT: when I create a request and exeute it, and after, make an undo
         // the system delete the request, but the background task is still running
 
-        if KeyCode::Char('u') == key.code && key.modifiers == KeyModifiers::ALT {
-            if let Some(component) = self.get_with_history_component() {
-                component.undo();
-            }
-        } else if KeyCode::Char('y') == key.code && key.modifiers == KeyModifiers::ALT {
-            if let Some(component) = self.get_with_history_component() {
-                component.redo();
-            }
-        } else if KeyCode::Char('x') == key.code && key.modifiers == KeyModifiers::ALT {
-            self.handle_action(PaneAction::ExecuteRequest);
-        } else if KeyCode::Char('s') == key.code && key.modifiers == KeyModifiers::ALT {
-            self.handle_action(PaneAction::SaveLocal);
-        } else {
+        if !self.handle_pane_action(key) {
             match self.focus {
                 ElementFocus::Collections => {
                     if let Some(effect) = self.collections_component.on_key(key) {
