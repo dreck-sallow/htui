@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
@@ -8,9 +10,12 @@ use ratatui::{
 use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
-    programs::tui::common::{
-        action_history::{ActionHistory, History, TrackAction},
-        component::{Drawable, Interactive, WithHistory},
+    programs::tui::{
+        common::{
+            action_history::{ActionHistory, History, TrackAction},
+            component::{Drawable, Interactive, WithHistory},
+        },
+        config::{keybinding, Config},
     },
     store::models::KeyValueParam,
 };
@@ -122,11 +127,12 @@ pub struct TableParams {
     input: TextArea<'static>,
     /// For show the input for editing a field
     show_popup: bool,
+    config: Rc<Config>,
     _history: ActionHistory<TableParamsAction>,
 }
 
 impl TableParams {
-    pub fn new() -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         let mut input = TextArea::default();
         input.set_block(
             Block::bordered()
@@ -140,6 +146,7 @@ impl TableParams {
             state: TableParamState::new(),
             input,
             show_popup: false,
+            config,
             _history: ActionHistory::new(),
         }
     }
@@ -224,88 +231,115 @@ impl Interactive for TableParams {
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
         if self.show_popup {
-            match key.code {
-                KeyCode::Esc => {
-                    self.show_popup = false;
-                    self.clean_lines();
-                }
-                KeyCode::Enter => {
-                    if let Some((row, col)) = self.state.index_cell {
-                        let txt = self.input.lines()[0].to_owned();
-                        match col {
-                            1 => {
-                                self._history
-                                    .apply(TableParamsAction::EditKey(row, txt), &mut self.state);
-                                self.clean_lines();
-                            }
-                            2 => {
-                                self._history
-                                    .apply(TableParamsAction::EditValue(row, txt), &mut self.state);
-                                self.clean_lines();
-                            }
-                            _ => {}
-                        }
+            let is_consumed = match self.config.keymap.match_global_action(key) {
+                Some(action) => match action {
+                    keybinding::GlobalKeyAction::ClosePopup => {
+                        self.show_popup = false;
+                        self.clean_lines();
+                        true
                     }
+                    keybinding::GlobalKeyAction::SubmitPopup => {
+                        if let Some((row, col)) = self.state.index_cell {
+                            let txt = self.input.lines()[0].to_owned();
+                            match col {
+                                1 => {
+                                    self._history.apply(
+                                        TableParamsAction::EditKey(row, txt),
+                                        &mut self.state,
+                                    );
+                                    self.clean_lines();
+                                }
+                                2 => {
+                                    self._history.apply(
+                                        TableParamsAction::EditValue(row, txt),
+                                        &mut self.state,
+                                    );
+                                    self.clean_lines();
+                                }
+                                _ => {}
+                            }
+                        }
 
-                    self.show_popup = false;
-                    self.clean_lines();
-                }
-                _ => {
-                    self.input.input(Input::from(key));
-                }
+                        self.show_popup = false;
+                        self.clean_lines();
+                        true
+                    }
+                    _ => false,
+                },
+                None => key.code == KeyCode::Enter,
+            };
+
+            if !is_consumed {
+                self.input.input(Input::from(key));
             }
         } else {
-            match key.code {
-                KeyCode::Char('n') => self._history.apply(
-                    TableParamsAction::AddItem(KeyValueParam::default()),
-                    &mut self.state,
-                ),
-                KeyCode::Char('h') | KeyCode::Left => {
-                    self.state.previous_cell();
-                }
-                KeyCode::Char('l') | KeyCode::Right => {
-                    self.state.next_cell();
-                }
-                KeyCode::Char('j') | KeyCode::Down => {
-                    self.state.next_item();
-                }
-                KeyCode::Char('k') | KeyCode::Up => {
-                    self.state.previous_item();
-                }
-
-                KeyCode::Char('d') | KeyCode::Delete => {
-                    if let Some((row, _)) = self.state.index_cell {
-                        self._history
-                            .apply(TableParamsAction::RemoveItem(row), &mut self.state);
+            let is_consumed = self
+                .config
+                .keymap
+                .match_global_action(key)
+                .map_or(false, |action| match action {
+                    keybinding::GlobalKeyAction::MoveDown => {
+                        self.state.next_item();
+                        true
                     }
-                }
-                KeyCode::Char('e') | KeyCode::Enter => {
-                    if let Some((row, col)) = self.state.index_cell {
-                        match col {
-                            0 => {
-                                let key_value = self.state.get_item(row).unwrap();
-                                self._history.apply(
-                                    TableParamsAction::MarkApply(row, !key_value.enable),
-                                    &mut self.state,
-                                );
+                    keybinding::GlobalKeyAction::MoveUp => {
+                        self.state.previous_item();
+                        true
+                    }
+                    keybinding::GlobalKeyAction::MoveLeft => {
+                        self.state.previous_cell();
+                        true
+                    }
+                    keybinding::GlobalKeyAction::MoveRight => {
+                        self.state.next_cell();
+                        true
+                    }
+                    _ => false,
+                });
+
+            if !is_consumed {
+                if let Some(action) = self.config.keymap.match_table_action(key) {
+                    match action {
+                        keybinding::TableKeyAction::New => {
+                            self._history.apply(
+                                TableParamsAction::AddItem(KeyValueParam::default()),
+                                &mut self.state,
+                            );
+                        }
+                        keybinding::TableKeyAction::Delete => {
+                            if let Some((row, _)) = self.state.index_cell {
+                                self._history
+                                    .apply(TableParamsAction::RemoveItem(row), &mut self.state);
+                            };
+                        }
+                        keybinding::TableKeyAction::Edit => {
+                            if let Some((row, col)) = self.state.index_cell {
+                                match col {
+                                    0 => {
+                                        let key_value = self.state.get_item(row).unwrap();
+                                        self._history.apply(
+                                            TableParamsAction::MarkApply(row, !key_value.enable),
+                                            &mut self.state,
+                                        );
+                                    }
+                                    1 => {
+                                        self.clean_lines();
+                                        let key_value = self.state.get_item(row).unwrap();
+                                        self.show_popup = true;
+                                        self.input.insert_str(&key_value.key);
+                                    }
+                                    2 => {
+                                        self.clean_lines();
+                                        let key_value = self.state.get_item(row).unwrap();
+                                        self.show_popup = true;
+                                        self.input.insert_str(&key_value.value);
+                                    }
+                                    _ => {}
+                                }
                             }
-                            1 => {
-                                self.clean_lines();
-                                let key_value = self.state.get_item(row).unwrap();
-                                self.show_popup = true;
-                                self.input.insert_str(&key_value.key);
-                            }
-                            2 => {
-                                self.clean_lines();
-                                let key_value = self.state.get_item(row).unwrap();
-                                self.show_popup = true;
-                                self.input.insert_str(&key_value.value);
-                            }
-                            _ => {}
                         }
                     }
                 }
-                _ => {}
             }
         }
         None

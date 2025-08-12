@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crossterm::event::{KeyEvent, KeyEventKind};
+use crossterm::event::KeyEvent;
 use list::{CollectionList, Item};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -229,232 +229,150 @@ impl Interactive for CollectionsComponent {
     type Effect = PaneAction;
 
     fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
-        if key.kind == KeyEventKind::Press {
-            if self.show_popup {
-                if let Some(key_action) = self.config.keymap.match_global_action(key) {
-                    match key_action {
-                        GlobalKeyAction::ClosePopup => {
-                            self.show_popup = false;
-                        }
-                        GlobalKeyAction::SubmitPopup => {
-                            let text = self.menu.text();
-
-                            match self.menu.method_type() {
-                                UpsertMethod::CreateRequest => {
-                                    self._history.apply(
-                                        CollectionAction::CreateRequest {
-                                            coll_idx: self.state.idx().parent_idx(),
-                                            name: text,
-                                        },
-                                        &mut self.state,
-                                    );
-                                }
-                                UpsertMethod::CreateCollection => {
-                                    self._history.apply(
-                                        CollectionAction::CreateCollection(text),
-                                        &mut self.state,
-                                    );
-                                }
-                                UpsertMethod::EditRequest => {
-                                    self._history.apply(
-                                        CollectionAction::EditRequestName {
-                                            idx: self.state.idx().child_idx(),
-                                            name: text,
-                                        },
-                                        &mut self.state,
-                                    );
-                                }
-                                UpsertMethod::EditCollection => {
-                                    self._history.apply(
-                                        CollectionAction::EditCollectionName {
-                                            idx: self.state.idx().parent_idx(),
-                                            new_name: text,
-                                        },
-                                        &mut self.state,
-                                    );
-                                }
-                            }
-
-                            self.show_popup = false;
-                        }
-                        _ => {}
+        if self.show_popup {
+            if let Some(key_action) = self.config.keymap.match_global_action(key) {
+                match key_action {
+                    GlobalKeyAction::ClosePopup => {
+                        self.show_popup = false;
                     }
-                } else {
-                    self.menu.handle_input(Input::from(key));
+                    GlobalKeyAction::SubmitPopup => {
+                        let text = self.menu.text();
+
+                        match self.menu.method_type() {
+                            UpsertMethod::CreateRequest => {
+                                self._history.apply(
+                                    CollectionAction::CreateRequest {
+                                        coll_idx: self.state.idx().parent_idx(),
+                                        name: text,
+                                    },
+                                    &mut self.state,
+                                );
+                            }
+                            UpsertMethod::CreateCollection => {
+                                self._history.apply(
+                                    CollectionAction::CreateCollection(text),
+                                    &mut self.state,
+                                );
+                            }
+                            UpsertMethod::EditRequest => {
+                                self._history.apply(
+                                    CollectionAction::EditRequestName {
+                                        idx: self.state.idx().child_idx(),
+                                        name: text,
+                                    },
+                                    &mut self.state,
+                                );
+                            }
+                            UpsertMethod::EditCollection => {
+                                self._history.apply(
+                                    CollectionAction::EditCollectionName {
+                                        idx: self.state.idx().parent_idx(),
+                                        new_name: text,
+                                    },
+                                    &mut self.state,
+                                );
+                            }
+                        }
+
+                        self.show_popup = false;
+                    }
+                    _ => {
+                        self.menu.handle_input(Input::from(key));
+                    }
                 }
             } else {
-                let mut pane_action = None;
+                self.menu.handle_input(Input::from(key));
+            }
+        } else {
+            let mut pane_action = None;
 
-                let is_consumed_action =
-                    self.config
-                        .keymap
-                        .match_global_action(key)
-                        .map_or(false, |key_action| {
-                            match key_action {
-                                GlobalKeyAction::NextFocus => {
-                                    pane_action = Some(PaneAction::NextFocus);
-                                }
-                                GlobalKeyAction::PreviousFocus => {
-                                    pane_action = Some(PaneAction::ChangeRequest);
-                                }
-                                GlobalKeyAction::MoveDown => {
-                                    self.state.next();
-                                }
-                                GlobalKeyAction::MoveUp => {
-                                    self.state.prev();
-                                }
-                                GlobalKeyAction::MoveLeft => {
-                                    self.state.close_collection(true);
-                                }
-                                GlobalKeyAction::MoveRight => {
-                                    self.state.open_collection(true);
-                                }
-                                _ => return false,
-                            }
-                            true
-                        });
-
-                if !is_consumed_action {
-                    if let Some(key_action) = self.config.keymap.match_collections_action(key) {
+            let is_consumed_action =
+                self.config
+                    .keymap
+                    .match_global_action(key)
+                    .map_or(false, |key_action| {
                         match key_action {
-                            CollectionsKeyAction::Delete => match self.state.idx() {
-                                state::Idx::None => {}
-                                state::Idx::Parent(i) => {
-                                    self._history.apply(
-                                        CollectionAction::DeleteCollection { idx: i },
-                                        &mut self.state,
-                                    );
-                                }
-                                state::Idx::Child(i, sub_i) => {
-                                    self._history.apply(
-                                        CollectionAction::DeleteRequest((i, sub_i)),
-                                        &mut self.state,
-                                    );
-                                }
-                            },
-                            CollectionsKeyAction::Edit => match self.state.idx() {
-                                state::Idx::None => {}
-                                state::Idx::Parent(i) => {
-                                    let collection = self.state.collections().get(i).unwrap();
-                                    self.menu
-                                        .set_state(UpsertMethod::EditCollection, &collection.name);
-                                    self.show_popup = true;
-                                }
-                                state::Idx::Child(_, _) => {
-                                    let name = self.state.current_request().unwrap().name();
-                                    self.menu.set_state(UpsertMethod::EditRequest, name);
-                                    self.show_popup = true;
-                                }
-                            },
-                            CollectionsKeyAction::SelectRequest => {
-                                if let state::Idx::Child(i, sub_i) = self.state.idx() {
-                                    self._history.apply(
-                                        CollectionAction::SelectRequestIdx(Some((i, sub_i))),
-                                        &mut self.state,
-                                    );
-                                    // return Some(CollectionEffect::ChangeCurrentRequest);
-                                    return Some(PaneAction::ChangeRequest);
-                                }
+                            GlobalKeyAction::NextFocus => {
+                                pane_action = Some(PaneAction::NextFocus);
                             }
-                            CollectionsKeyAction::CreateCollection => {
+                            GlobalKeyAction::PreviousFocus => {
+                                pane_action = Some(PaneAction::PreviousFocus);
+                            }
+                            GlobalKeyAction::MoveDown => {
+                                self.state.next();
+                            }
+                            GlobalKeyAction::MoveUp => {
+                                self.state.prev();
+                            }
+                            GlobalKeyAction::MoveLeft => {
+                                self.state.close_collection(true);
+                            }
+                            GlobalKeyAction::MoveRight => {
+                                self.state.open_collection(true);
+                            }
+                            _ => return false,
+                        }
+                        true
+                    });
+
+            if !is_consumed_action {
+                if let Some(key_action) = self.config.keymap.match_collections_action(key) {
+                    match key_action {
+                        CollectionsKeyAction::Delete => match self.state.idx() {
+                            state::Idx::None => {}
+                            state::Idx::Parent(i) => {
+                                self._history.apply(
+                                    CollectionAction::DeleteCollection { idx: i },
+                                    &mut self.state,
+                                );
+                            }
+                            state::Idx::Child(i, sub_i) => {
+                                self._history.apply(
+                                    CollectionAction::DeleteRequest((i, sub_i)),
+                                    &mut self.state,
+                                );
+                            }
+                        },
+                        CollectionsKeyAction::Edit => match self.state.idx() {
+                            state::Idx::None => {}
+                            state::Idx::Parent(i) => {
+                                let collection = self.state.collections().get(i).unwrap();
+                                self.menu
+                                    .set_state(UpsertMethod::EditCollection, &collection.name);
                                 self.show_popup = true;
-                                self.menu.set_state(UpsertMethod::CreateCollection, "");
                             }
-                            CollectionsKeyAction::CreateRequest => {
-                                if !self.state.idx().is_none() {
-                                    self.show_popup = true;
-                                    self.menu.set_state(UpsertMethod::CreateRequest, "");
-                                }
+                            state::Idx::Child(_, _) => {
+                                let name = self.state.current_request().unwrap().name();
+                                self.menu.set_state(UpsertMethod::EditRequest, name);
+                                self.show_popup = true;
+                            }
+                        },
+                        CollectionsKeyAction::SelectRequest => {
+                            if let state::Idx::Child(i, sub_i) = self.state.idx() {
+                                self._history.apply(
+                                    CollectionAction::SelectRequestIdx(Some((i, sub_i))),
+                                    &mut self.state,
+                                );
+                                // return Some(CollectionEffect::ChangeCurrentRequest);
+                                return Some(PaneAction::ChangeRequest);
+                            }
+                        }
+                        CollectionsKeyAction::CreateCollection => {
+                            self.show_popup = true;
+                            self.menu.set_state(UpsertMethod::CreateCollection, "");
+                        }
+                        CollectionsKeyAction::CreateRequest => {
+                            if !self.state.idx().is_none() {
+                                self.show_popup = true;
+                                self.menu.set_state(UpsertMethod::CreateRequest, "");
                             }
                         }
                     }
                 }
-
-                return pane_action;
             }
+
+            return pane_action;
         }
-
-        // match key.code {
-        //                     KeyCode::Tab => {
-        //                         // return Some(CollectionEffect::NextFocus);
-        //                         return Some(PaneAction::NextFocus);
-        //                     }
-        //                     KeyCode::Enter => {
-        //                         if let state::Idx::Child(i, sub_i) = self.state.idx() {
-        //                             self._history.apply(
-        //                                 CollectionAction::SelectRequestIdx(Some((i, sub_i))),
-        //                                 &mut self.state,
-        //                             );
-        //                             // return Some(CollectionEffect::ChangeCurrentRequest);
-        //                             return Some(PaneAction::ChangeRequest);
-        //                         }
-        //                     }
-        //                     KeyCode::BackTab => {
-        //                         // return Some(CollectionEffect::PreviousFocus);
-        //                         return Some(PaneAction::PreviousFocus);
-        //                     }
-        //                     KeyCode::Left | KeyCode::Char('h') => {
-        //                         self.state.close_collection(true);
-        //                     }
-        //                     KeyCode::Right | KeyCode::Char('l') => {
-        //                         self.state.open_collection(true);
-        //                     }
-        //                     KeyCode::Down | KeyCode::Char('j') => {
-        //                         self.state.next();
-        //                     }
-        //                     KeyCode::Up | KeyCode::Char('k') => {
-        //                         // let prev_idx = self.state.idx();
-        //                         self.state.prev();
-
-        //                         // if prev_idx != self.state.idx() {
-        //                         //     match self.state.idx() {
-        //                         //         state::Idx::None => todo!(),
-        //                         //         state::Idx::Parent(_) => todo!(),
-        //                         //         state::Idx::Child(_, _) => todo!(),
-        //                         //     }
-        //                         // }
-        //                     }
-        // KeyCode::Char('d') | KeyCode::Delete => match self.state.idx() {
-        //     state::Idx::None => {}
-        //     state::Idx::Parent(i) => {
-        //         self._history.apply(
-        //             CollectionAction::DeleteCollection { idx: i },
-        //             &mut self.state,
-        //         );
-        //     }
-        //     state::Idx::Child(i, sub_i) => {
-        //         self._history.apply(
-        //             CollectionAction::DeleteRequest((i, sub_i)),
-        //             &mut self.state,
-        //         );
-        //     }
-        // },
-        //                     KeyCode::Char('c') => {
-        //                         self.show_popup = true;
-        //                         self.menu.set_state(UpsertMethod::CreateCollection, "");
-        //                     }
-        //                     KeyCode::Char('r') => {
-        //                         if !self.state.idx().is_none() {
-        //                             self.show_popup = true;
-        //                             self.menu.set_state(UpsertMethod::CreateRequest, "");
-        //                         }
-        //                     }
-        //                     KeyCode::Char('e') => match self.state.idx() {
-        //                         state::Idx::None => {}
-        //                         state::Idx::Parent(i) => {
-        //                             let collection = self.state.collections().get(i).unwrap();
-        //                             self.menu
-        //                                 .set_state(UpsertMethod::EditCollection, &collection.name);
-        //                             self.show_popup = true;
-        //                         }
-        //                         state::Idx::Child(_, _) => {
-        //                             let name = self.state.current_request().unwrap().name();
-        //                             self.menu.set_state(UpsertMethod::EditRequest, name);
-        //                             self.show_popup = true;
-        //                         }
-        //                     },
-        //                     _ => {}
-        //                 }
 
         None
     }

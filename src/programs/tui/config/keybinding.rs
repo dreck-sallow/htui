@@ -78,10 +78,6 @@ impl<T: KeyAction> KeyBinding<T> {
     pub fn new(action: T, key_event: KeyEvent) -> Self {
         Self { key_event, action }
     }
-
-    pub fn raw(&self) -> (&KeyEvent, &T) {
-        (&self.key_event, &self.action)
-    }
 }
 
 impl<T: KeyAction> std::fmt::Debug for KeyBinding<T> {
@@ -96,14 +92,15 @@ impl<T: KeyAction> std::fmt::Debug for KeyBinding<T> {
 
 default_key_actions!(GlobalKeyAction {
     NextFocus => "Tab",
-    PreviousFocus=> "BackTab",
+    PreviousFocus=> "Shift+BackTab",
+
     MoveDown  => "j",
     MoveUp => "k",
     MoveLeft => "h",
     MoveRight => "l",
 
-    NextTab => "L",
-    PreviousTab => "H",
+    NextTab => "Shift+L",
+    PreviousTab => "Shift+H",
 
     SendRequest => "Alt+Enter",
     SaveProject => "Alt+s",
@@ -130,7 +127,11 @@ default_key_actions!(TableKeyAction {
 });
 
 default_key_actions!(MethodUrlKeyAction {
-    OpenDropdown => "Ctrl+Enter"
+    OpenDropdown => "Enter"
+});
+
+default_key_actions!(RequestBuilderKeyAction {
+    OpenDropdown => "Shift+O"
 });
 
 // Implementations for deserializing a key_event

@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
@@ -10,7 +9,7 @@ use ratatui::{
 use crate::{
     programs::tui::{
         common::component::{Drawable, Interactive, WithHistory},
-        config::Config,
+        config::{keybinding, Config},
     },
     store::models::{BodyContent, KeyValueParam},
 };
@@ -63,8 +62,8 @@ impl RequestEditorComponent {
             tab: Tab::Params,
             header_area: Rect::default(),
             render_area: Rect::default(),
-            params_table: TableParams::new(),
-            headers_table: TableParams::new(),
+            params_table: TableParams::new(Rc::clone(&config)),
+            headers_table: TableParams::new(Rc::clone(&config)),
             // headers_editor: TextEditor::new(true),
             body_editor_component: BodyEditorComponent::new(Rc::clone(&config)),
             config,
@@ -90,8 +89,7 @@ impl RequestEditorComponent {
         )
     }
 
-    /// on corners tab, return bool for indicate set focus
-    pub fn change_tab(&mut self, is_next: bool) -> bool {
+    pub fn change_tab(&mut self, is_next: bool) {
         match self.tab {
             Tab::Headers => {
                 if !self.headers_table.is_editing() {
@@ -104,11 +102,7 @@ impl RequestEditorComponent {
             }
             Tab::Body => {
                 if !self.body_editor_component.is_editing() {
-                    if is_next {
-                        // outof
-                        // self.tab = Tab::Params;
-                        return true;
-                    } else {
+                    if !is_next {
                         self.tab = Tab::Headers;
                     }
                 }
@@ -117,15 +111,10 @@ impl RequestEditorComponent {
                 if !self.params_table.is_editing() {
                     if is_next {
                         self.tab = Tab::Headers;
-                    } else {
-                        return true;
-                        // self.tab = Tab::Body;
                     }
                 }
             }
         }
-
-        false
     }
 }
 
@@ -201,33 +190,34 @@ impl Interactive for RequestEditorComponent {
     type Effect = PaneAction;
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
-        if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Tab => {
-                    if self.change_tab(true) {
-                        // next focus
-                        // return Some(RequestEditorEffect::NextFocus);
-                        return Some(PaneAction::NextFocus);
-                    }
+        if let Some(action) = self.config.keymap.match_global_action(key) {
+            match action {
+                keybinding::GlobalKeyAction::NextTab => {
+                    self.change_tab(true);
                 }
-                KeyCode::BackTab => {
-                    if self.change_tab(false) {
-                        // previous focus
-                        // return Some(RequestEditorEffect::PreviousFocus);
-                        return Some(PaneAction::PreviousFocus);
-                    }
+                keybinding::GlobalKeyAction::PreviousTab => {
+                    self.change_tab(false);
                 }
-                _ => match self.tab {
-                    Tab::Headers => {
-                        self.headers_table.on_key(key);
-                    }
-                    Tab::Body => {
-                        self.body_editor_component.on_key(key);
-                    }
-                    Tab::Params => {
-                        self.params_table.on_key(key);
-                    }
-                },
+                keybinding::GlobalKeyAction::NextFocus => {
+                    return Some(PaneAction::NextFocus);
+                }
+                keybinding::GlobalKeyAction::PreviousFocus => {
+                    return Some(PaneAction::PreviousFocus);
+                }
+
+                _ => {}
+            }
+        }
+
+        match self.tab {
+            Tab::Headers => {
+                self.headers_table.on_key(key);
+            }
+            Tab::Body => {
+                self.body_editor_component.on_key(key);
+            }
+            Tab::Params => {
+                self.params_table.on_key(key);
             }
         }
         None

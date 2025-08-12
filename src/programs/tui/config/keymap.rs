@@ -7,7 +7,7 @@ use crate::programs::tui::config::keybinding::key_event;
 
 use super::keybinding::{
     CollectionsKeyAction, GlobalKeyAction, KeyAction, KeyBinding, MethodUrlKeyAction,
-    TableKeyAction,
+    RequestBuilderKeyAction, TableKeyAction,
 };
 
 #[derive(Deserialize)]
@@ -23,6 +23,10 @@ pub struct KeyMap {
     #[serde(deserialize_with = "default_keybindings_deserializer")]
     #[serde(default = "KeyBinding::default_list")]
     method_url: Vec<KeyBinding<MethodUrlKeyAction>>,
+
+    #[serde(deserialize_with = "default_keybindings_deserializer")]
+    #[serde(default = "KeyBinding::default_list")]
+    request_builder: Vec<KeyBinding<RequestBuilderKeyAction>>,
 
     #[serde(deserialize_with = "default_keybindings_deserializer")]
     #[serde(default = "KeyBinding::default_list")]
@@ -50,6 +54,13 @@ impl KeyMap {
 
     pub fn match_method_url_action(&self, key_event: KeyEvent) -> Option<MethodUrlKeyAction> {
         Self::_match(&self.method_url, key_event)
+    }
+
+    pub fn match_request_builder_action(
+        &self,
+        key_event: KeyEvent,
+    ) -> Option<RequestBuilderKeyAction> {
+        Self::_match(&self.request_builder, key_event)
     }
 }
 

@@ -1,4 +1,3 @@
-use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -179,18 +178,6 @@ impl<T: PartialEq + Copy + Clone> OverlayDropdown<T> {
         let idx = self.idx();
         if idx > 0 {
             self.selected = self.items[idx - 1];
-        }
-    }
-
-    pub fn handle_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char('j') | KeyCode::Down => {
-                self.next();
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                self.prev();
-            }
-            _ => {}
         }
     }
 }

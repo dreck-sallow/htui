@@ -1,6 +1,5 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
@@ -13,7 +12,7 @@ use crate::{
             action_history::{ActionHistory, History, TrackAction},
             component::{Drawable, Interactive, WithHistory},
         },
-        config::Config,
+        config::{keybinding, Config},
         elements::dropdown::OverlayDropdown,
     },
     store::models::BodyContent,
@@ -185,54 +184,70 @@ impl Interactive for BodyEditorComponent {
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
         if self.show_dropdown {
-            match key.code {
-                KeyCode::Enter => {
-                    self.show_dropdown = false;
-                    match self.dropdown.selected() {
-                        BodyTypeV2::Empty => {
-                            self._history.apply(
-                                BodyEditorAction::SetBodyType(BodyContent::Empty),
-                                &mut self.body_content,
-                            );
-                        }
-                        BodyTypeV2::FormUrlEncoded => {
-                            self._history.apply(
-                                BodyEditorAction::SetBodyType(BodyContent::Form(HashMap::new())),
-                                &mut self.body_content,
-                            );
-                        }
-                        BodyTypeV2::Text => {
-                            self._history.apply(
-                                BodyEditorAction::SetBodyType(BodyContent::Text(String::new())),
-                                &mut self.body_content,
-                            );
-                        }
+            if let Some(key) = self.config.keymap.match_global_action(key) {
+                match key {
+                    keybinding::GlobalKeyAction::MoveDown => {
+                        self.dropdown.next();
                     }
-                    // TODO: delete the text editor lines?
-                    self.text_editor.clean_lines();
-                }
-                KeyCode::Esc => {
-                    self.show_dropdown = false;
-                }
-                _ => {
-                    self.dropdown.handle_key(key);
+                    keybinding::GlobalKeyAction::MoveUp => {
+                        self.dropdown.prev();
+                    }
+                    keybinding::GlobalKeyAction::ClosePopup => {
+                        self.show_dropdown = false;
+                    }
+                    keybinding::GlobalKeyAction::SubmitPopup => {
+                        self.show_dropdown = false;
+                        match self.dropdown.selected() {
+                            BodyTypeV2::Empty => {
+                                self._history.apply(
+                                    BodyEditorAction::SetBodyType(BodyContent::Empty),
+                                    &mut self.body_content,
+                                );
+                            }
+                            BodyTypeV2::FormUrlEncoded => {
+                                self._history.apply(
+                                    BodyEditorAction::SetBodyType(
+                                        BodyContent::Form(HashMap::new()),
+                                    ),
+                                    &mut self.body_content,
+                                );
+                            }
+                            BodyTypeV2::Text => {
+                                self._history.apply(
+                                    BodyEditorAction::SetBodyType(BodyContent::Text(String::new())),
+                                    &mut self.body_content,
+                                );
+                            }
+                        }
+                        // TODO: delete the text editor lines?
+                        self.text_editor.clean_lines();
+                    }
+                    _ => {}
                 }
             }
         } else {
-            match key.code {
-                KeyCode::Enter if key.modifiers == KeyModifiers::ALT => {
-                    self.show_dropdown = true;
-                    self.dropdown.select(BodyTypeV2::Empty);
+            if self.text_editor.mode().is_write_mode() {
+                self.text_editor.handle_key(key);
+            } else {
+                match self.config.keymap.match_request_builder_action(key) {
+                    Some(action) => match action {
+                        keybinding::RequestBuilderKeyAction::OpenDropdown => {
+                            self.show_dropdown = true;
+                            // self.dropdown.select(BodyTypeV2::Empty);
+                        }
+                    },
+                    None => {
+                        match &self.body_content {
+                            BodyContent::Empty => {}
+                            BodyContent::File(_) => {
+                                //TODO: Show a menu for select files
+                            }
+                            _ => {
+                                self.text_editor.handle_key(key);
+                            }
+                        }
+                    }
                 }
-                _ => match &self.body_content {
-                    BodyContent::Empty => {}
-                    BodyContent::File(_) => {
-                        //TODO: Show a menu for select files
-                    }
-                    _ => {
-                        self.text_editor.handle_key(key);
-                    }
-                },
             }
         }
         None

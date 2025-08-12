@@ -4,7 +4,6 @@ use std::{
 };
 
 use body_viewer::{BodyContentView, HexDumpViewer};
-use crossterm::event::{KeyCode, KeyEventKind};
 use encoding_rs::{Encoding, UTF_8};
 use headers_table::HeadersTable;
 use mime::Mime;
@@ -22,7 +21,7 @@ use tokio::time::Instant;
 use crate::{
     programs::tui::{
         common::component::{Drawable, Interactive},
-        config::Config,
+        config::{keybinding, Config},
         elements::Separator,
         events::EventSender,
         pane::text_editor::TextEditor,
@@ -36,7 +35,7 @@ mod body_viewer;
 mod headers_table;
 mod state;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Tab {
     Response,
     Headers,
@@ -341,44 +340,63 @@ impl Interactive for ResponseViewerComponent {
     type Effect = PaneAction;
 
     fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
-        if key.kind == KeyEventKind::Press {
-            match key.code {
-                KeyCode::Tab => match self.tab {
-                    Tab::Headers => return Some(PaneAction::NextFocus),
-                    Tab::Response => self.tab = Tab::Headers,
-                },
-                KeyCode::BackTab => match self.tab {
-                    Tab::Headers => self.tab = Tab::Response,
-                    Tab::Response => return Some(PaneAction::PreviousFocus),
-                },
-                _ => match self.tab {
-                    Tab::Headers => {
-                        let mut response_content = self.response_content.write().unwrap();
-                        let headers_editor = &mut response_content.headers_table;
-                        match key.code {
-                            KeyCode::Left | KeyCode::Char('h') => {
+        let is_consumed = match self.config.keymap.match_global_action(key) {
+            Some(action) => match action {
+                keybinding::GlobalKeyAction::NextFocus => return Some(PaneAction::NextFocus),
+                keybinding::GlobalKeyAction::PreviousFocus => {
+                    return Some(PaneAction::PreviousFocus)
+                }
+                keybinding::GlobalKeyAction::NextTab => {
+                    if Tab::Response == self.tab {
+                        self.tab = Tab::Headers
+                    }
+                    true
+                }
+                keybinding::GlobalKeyAction::PreviousTab => {
+                    if Tab::Headers == self.tab {
+                        self.tab = Tab::Response
+                    }
+                    true
+                }
+                _ => false,
+            },
+            None => false,
+        };
+
+        if !is_consumed {
+            match self.tab {
+                Tab::Headers => {
+                    let mut response_content = self.response_content.write().unwrap();
+                    let headers_editor = &mut response_content.headers_table;
+                    if let Some(key) = self.config.keymap.match_global_action(key) {
+                        match key {
+                            keybinding::GlobalKeyAction::MoveDown => {
+                                headers_editor.move_row_idx(true)
+                            }
+                            keybinding::GlobalKeyAction::MoveUp => {
+                                headers_editor.move_row_idx(false)
+                            }
+                            keybinding::GlobalKeyAction::MoveLeft => {
                                 headers_editor.move_col_idx(false)
                             }
-                            KeyCode::Right | KeyCode::Char('l') => {
+                            keybinding::GlobalKeyAction::MoveRight => {
                                 headers_editor.move_col_idx(true)
                             }
-                            KeyCode::Up | KeyCode::Char('k') => headers_editor.move_row_idx(false),
-                            KeyCode::Down | KeyCode::Char('j') => headers_editor.move_row_idx(true),
                             _ => {}
                         }
                     }
-                    Tab::Response => {
-                        let mut response_content = self.response_content.write().unwrap();
-                        let body_viewer = &mut response_content.body_viewer;
-                        match body_viewer {
-                            BodyContentView::Text(text_editor) => {
-                                text_editor.handle_key(key);
-                            }
-                            BodyContentView::Binary(_hex_dump_viewer) => {}
-                            BodyContentView::Empty => {}
+                }
+                Tab::Response => {
+                    let mut response_content = self.response_content.write().unwrap();
+                    let body_viewer = &mut response_content.body_viewer;
+                    match body_viewer {
+                        BodyContentView::Text(text_editor) => {
+                            text_editor.handle_key(key);
                         }
+                        BodyContentView::Binary(_hex_dump_viewer) => {}
+                        BodyContentView::Empty => {}
                     }
-                },
+                }
             }
         }
 

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
@@ -145,16 +145,16 @@ impl Drawable for MethodUrlBarComponent {
             );
 
             frame.render_widget(&self.url_input, url_area);
-            frame.render_widget(
-                Span::from(expand(
-                    if self.show_dropdown { "--" } else { "Send" },
-                    " ",
-                    10,
-                ))
-                .on_light_green()
-                .black(),
-                indicator_area,
-            );
+            // frame.render_widget(
+            //     Span::from(expand(
+            //         if self.show_dropdown { "--" } else { "Send" },
+            //         " ",
+            //         10,
+            //     ))
+            //     .on_light_green()
+            //     .black(),
+            //     indicator_area,
+            // );
         });
 
         if self.show_dropdown {
@@ -176,41 +176,56 @@ impl Interactive for MethodUrlBarComponent {
     type Effect = PaneAction;
 
     fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
-        if key.kind == KeyEventKind::Press {
-            if self.show_dropdown {
-                match key.code {
-                    KeyCode::Enter => {
+        if self.show_dropdown {
+            if let Some(action) = self.config.keymap.match_global_action(key) {
+                match action {
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::ClosePopup => {
+                        self.show_dropdown = false;
+                    }
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::SubmitPopup => {
                         self.show_dropdown = false;
                         self._history.apply(
                             MethodUrlAction::ChangeMethod(self.dropdown.selected().to_owned()),
                             &mut self.method,
                         );
                     }
-                    KeyCode::Esc => {
-                        self.show_dropdown = false;
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::MoveDown => {
+                        self.dropdown.next();
+                        
+                    },
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::MoveUp => {
+                        self.dropdown.prev();
+                        
                     }
-                    _ => {
-                        self.dropdown.handle_key(key);
-                    }
-                }
-            } else {
-                match key.code {
-                    KeyCode::Tab => {
+                    _ => {},
+                }                
+            }
+        } else {
+            let is_key_consumed = match self.config.keymap.match_global_action(key) {
+                Some(action) => match action {
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::NextFocus => {
                         return Some(PaneAction::NextFocus);
                     }
-                    KeyCode::BackTab => {
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::PreviousFocus => {
                         return Some(PaneAction::PreviousFocus);
                     }
-                    KeyCode::Enter => {
-                        // Change to pending
-                        if key.modifiers == KeyModifiers::ALT {
-                            self.show_dropdown = true;
-                        }
-                    }
+                    _ => false,
+                },
+                None => false,
+            };
 
-                    _ => {
-                        let key_input = Input::from(key);
-                        self.url_input.input(key_input);
+            if !is_key_consumed {
+                match self.config.keymap.match_method_url_action(key) {
+                    Some(action) => match action {
+                        crate::programs::tui::config::keybinding::MethodUrlKeyAction::OpenDropdown => {
+                            self.show_dropdown = true;                            
+                        },
+                    },
+                    None => {
+                        // Avoid new line on enter
+                        if key.code != KeyCode::Enter {
+                            self.url_input.input(Input::from(key));
+                        }
                     }
                 }
             }
