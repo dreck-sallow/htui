@@ -3,6 +3,7 @@ use paths::Paths;
 use programs::tui;
 use store::{LocalStore, Store};
 
+mod app_project;
 mod paths;
 mod programs;
 mod store;
