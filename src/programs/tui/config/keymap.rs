@@ -6,7 +6,7 @@ use serde::{de::Visitor, Deserialize, Deserializer};
 use crate::programs::tui::config::keybinding::key_event;
 
 use super::keybinding::{
-    CollectionsKeyAction, GlobalKeyAction, KeyAction, KeyBinding, MethodUrlKeyAction,
+    AppKeyAction, CollectionsKeyAction, GlobalKeyAction, KeyAction, KeyBinding, MethodUrlKeyAction,
     RequestBuilderKeyAction, TableKeyAction,
 };
 
@@ -31,6 +31,10 @@ pub struct KeyMap {
     #[serde(deserialize_with = "default_keybindings_deserializer")]
     #[serde(default = "KeyBinding::default_list")]
     collections: Vec<KeyBinding<CollectionsKeyAction>>,
+
+    #[serde(deserialize_with = "default_keybindings_deserializer")]
+    #[serde(default = "KeyBinding::default_list")]
+    app: Vec<KeyBinding<AppKeyAction>>,
 }
 
 impl KeyMap {
@@ -61,6 +65,10 @@ impl KeyMap {
         key_event: KeyEvent,
     ) -> Option<RequestBuilderKeyAction> {
         Self::_match(&self.request_builder, key_event)
+    }
+
+    pub fn match_app_action(&self, key_event: KeyEvent) -> Option<AppKeyAction> {
+        Self::_match(&self.app, key_event)
     }
 }
 
@@ -122,6 +130,7 @@ impl Default for KeyMap {
             method_url: KeyBinding::default_list(),
             request_builder: KeyBinding::default_list(),
             collections: KeyBinding::default_list(),
+            app: KeyBinding::default_list(),
         }
     }
 }

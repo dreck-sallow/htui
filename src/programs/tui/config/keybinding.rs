@@ -126,6 +126,11 @@ default_key_actions!(TableKeyAction {
     Edit => "e"
 });
 
+default_key_actions!(AppKeyAction {
+    SearchProject => "Alt+Shift+N",
+    DeleteProject => "Alt+Shift+D"
+});
+
 default_key_actions!(MethodUrlKeyAction {
     OpenDropdown => "Enter"
 });

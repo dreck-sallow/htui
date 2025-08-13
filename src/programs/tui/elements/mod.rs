@@ -4,6 +4,8 @@ pub mod dropdown;
 pub mod table;
 
 pub mod utils {
+    use ratatui::layout::{Constraint, Layout, Rect};
+
     pub fn expand(txt: &str, fill: &str, width: usize) -> String {
         let missing_len = width - txt.len();
 
@@ -14,6 +16,18 @@ pub mod utils {
         let right = &fill.repeat(right_half);
 
         format!("{left}{txt}{right}")
+    }
+
+    pub fn center_area(total_area: Rect, height: Constraint, width: Constraint) -> Rect {
+        let [area] = Layout::vertical([height])
+            .flex(ratatui::layout::Flex::Center)
+            .areas(total_area);
+
+        let [area] = Layout::horizontal([width])
+            .flex(ratatui::layout::Flex::Center)
+            .areas(area);
+
+        area
     }
 }
 

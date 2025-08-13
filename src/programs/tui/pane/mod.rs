@@ -99,6 +99,10 @@ impl Pane {
         &self.project_name
     }
 
+    pub fn id(&self) -> String {
+        self.project_id.clone()
+    }
+
     pub fn set_render_area(&mut self, area: Rect) {
         let (collections_area, placeholder_area, content_areas) = {
             let [collections_area, content_area] =

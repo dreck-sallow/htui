@@ -12,6 +12,7 @@ use crate::{
 };
 
 mod app;
+mod app_components;
 mod common;
 mod config;
 mod elements;
@@ -71,7 +72,7 @@ pub async fn run_tui(project_name: Option<String>) -> TuiResult<()> {
                     })?;
                 }
                 events::Event::Input(key_event) => {
-                    app.handle_key(key_event);
+                    app.handle_key(key_event, events.sender());
                     terminal.draw(|frame| {
                         app.handle_draw(frame);
                     })?;

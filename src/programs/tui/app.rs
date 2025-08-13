@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 
 use crossterm::event::KeyEvent;
 use ratatui::{
@@ -10,13 +10,21 @@ use ratatui::{
 
 use crate::store::models::ProjectModel;
 
-use super::{config::Config, events::EventSender, pane::Pane};
+use super::{
+    app_components::SearchProjects,
+    common::component::{Drawable, Interactive, Painter},
+    config::{keybinding, Config},
+    events::EventSender,
+    pane::Pane,
+};
 
 pub struct App {
     panes: Vec<Pane>,
     selected: Option<usize>,
     tabs_area: Rect,
+    search_projects: SearchProjects,
     config: Rc<Config>,
+    show_search_projects: bool,
 }
 
 impl App {
@@ -35,6 +43,8 @@ impl App {
             panes: Vec::new(),
             selected: None,
             tabs_area: Rect::default(),
+            search_projects: SearchProjects::new(Rc::clone(&config)),
+            show_search_projects: false,
             config,
         }
     }
@@ -81,11 +91,47 @@ impl App {
         if let Some(pane) = self.current_pane() {
             pane.draw(frame);
         }
+
+        if self.show_search_projects {
+            let mut painter = Painter::new();
+            self.search_projects.draw(&mut painter, ());
+            painter.draw(frame);
+        }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) {
-        if let Some(pane) = self.current_pane_mut() {
-            pane.handle_key(key);
+    pub fn handle_key(&mut self, key: KeyEvent, sender: EventSender) {
+        if self.show_search_projects {
+            if let Some(effect) = self.search_projects.on_key(key) {
+                match effect {
+                    super::app_components::SearchProjectsEffect::Submit(_project) => {
+                        // TODO: replace the current ProjectModel from app_project::models::ProjectModel
+                        self.add_project(ProjectModel::new(_project.id().into()), sender);
+                    }
+                    super::app_components::SearchProjectsEffect::Hidden => {
+                        self.show_search_projects = false;
+                    }
+                }
+            }
+        } else {
+            match self.config.keymap.match_app_action(key) {
+                Some(key) => match key {
+                    keybinding::AppKeyAction::SearchProject => {
+                        let mut openeds = HashSet::new();
+
+                        for pane in &self.panes {
+                            openeds.insert(pane.id());
+                        }
+                        self.search_projects.search(openeds);
+                        self.show_search_projects = true;
+                    }
+                    keybinding::AppKeyAction::DeleteProject => {}
+                },
+                None => {
+                    if let Some(pane) = self.current_pane_mut() {
+                        pane.handle_key(key);
+                    }
+                }
+            }
         }
     }
 }
