@@ -12,6 +12,9 @@ use tui_textarea::Input;
 use upsert_item::{UpsertItemPopup, UpsertMethod};
 
 use crate::{
+    app_project::models::{
+        BodyContent, CollectionsModel, HttpMethod, KeyValueParam, RequestModel, SendRequestKey,
+    },
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
@@ -21,9 +24,6 @@ use crate::{
             keybinding::{CollectionsKeyAction, GlobalKeyAction},
             Config,
         },
-    },
-    store::models::{
-        BodyContent, CollectionsModel, HttpMethod, KeyValueParam, RequestModel, SendRequestKey,
     },
 };
 

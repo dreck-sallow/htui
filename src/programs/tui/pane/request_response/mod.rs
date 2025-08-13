@@ -19,6 +19,7 @@ use state::{RequestResponseState, RequestTask, SendRequestResponse};
 use tokio::time::Instant;
 
 use crate::{
+    app_project::models::{self, RequestModel, ResponseModel, SendRequest, SendRequestKey},
     programs::tui::{
         common::component::{Drawable, Interactive},
         config::{keybinding, Config},
@@ -26,7 +27,6 @@ use crate::{
         events::EventSender,
         pane::text_editor::TextEditor,
     },
-    store::models::{RequestModel, ResponseModel, SendRequest, SendRequestKey},
 };
 
 use super::{action::PaneAction, ElementFocus};
@@ -235,7 +235,7 @@ impl Drawable for ResponseViewerComponent {
                 });
             }
             Some(send_request_response) => match &*send_request_response.read().unwrap() {
-                crate::store::models::SendRequest::Pending => {
+                models::SendRequest::Pending => {
                     painter.render(|frame| {
                         let placeholder_text = Span::from("Sending...");
                         let center_area = {
@@ -255,7 +255,7 @@ impl Drawable for ResponseViewerComponent {
                         frame.render_widget(placeholder_text, center_area);
                     });
                 }
-                crate::store::models::SendRequest::Finish(response) => {
+                models::SendRequest::Finish(response) => {
                     // Draw the status line
                     let status_line = self.status_line_ui(response);
 
@@ -467,13 +467,13 @@ fn send_request(
 fn request_into_builder(req: &RequestModel) -> RequestBuilder {
     let url = Url::parse(req.url()).unwrap();
     let method = match req.method() {
-        crate::store::models::HttpMethod::Options => reqwest::Method::OPTIONS,
-        crate::store::models::HttpMethod::Get => reqwest::Method::GET,
-        crate::store::models::HttpMethod::Post => reqwest::Method::POST,
-        crate::store::models::HttpMethod::Put => reqwest::Method::PUT,
-        crate::store::models::HttpMethod::Delete => reqwest::Method::DELETE,
-        crate::store::models::HttpMethod::Head => reqwest::Method::HEAD,
-        crate::store::models::HttpMethod::Patch => reqwest::Method::PATCH,
+        models::HttpMethod::Options => reqwest::Method::OPTIONS,
+        models::HttpMethod::Get => reqwest::Method::GET,
+        models::HttpMethod::Post => reqwest::Method::POST,
+        models::HttpMethod::Put => reqwest::Method::PUT,
+        models::HttpMethod::Delete => reqwest::Method::DELETE,
+        models::HttpMethod::Head => reqwest::Method::HEAD,
+        models::HttpMethod::Patch => reqwest::Method::PATCH,
     };
 
     let mut client_builder = ClientBuilder::new()

@@ -4,7 +4,8 @@ use keymap::KeyMap;
 use ratatui::style::Color;
 use serde::Deserialize;
 
-use crate::paths::Paths;
+use crate::app_project::paths::Paths;
+
 pub mod keybinding;
 // pub mod keybindings;
 pub mod keymap;
@@ -62,7 +63,7 @@ impl Theme {
 
 const CONFIG_FILE: &str = "config.toml";
 
-pub fn load_config(paths: &Paths) -> Result<Config, toml::de::Error> {
+pub fn load_config<P: Paths>(paths: &P) -> Result<Config, toml::de::Error> {
     let config_folder = paths.config_folder();
     let config_file = config_folder.join(CONFIG_FILE);
 

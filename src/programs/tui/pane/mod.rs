@@ -1,12 +1,5 @@
 use std::rc::Rc;
 
-use crate::{
-    paths::Paths,
-    store::{
-        models::{KeyValueParam, ProjectModel},
-        LocalStore, Store,
-    },
-};
 use action::PaneAction;
 use collections::CollectionsComponent;
 use crossterm::event::KeyEvent;
@@ -18,6 +11,11 @@ use ratatui::{
 };
 use request_builder::RequestEditorComponent;
 use request_response::ResponseViewerComponent;
+
+use crate::app_project::{
+    models::{KeyValueParam, ProjectModel},
+    store::{LocalStore, Store},
+};
 
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
@@ -155,7 +153,16 @@ impl Pane {
     pub fn handle_action(&mut self, action: PaneAction) {
         match action {
             PaneAction::NextFocus => {
-                self.focus = self.focus.next();
+                if self.focus == ElementFocus::Collections {
+                    if self.collections_component.current_request().is_some() {
+                        self.focus = self.focus.next();
+                    }
+                } else if self.focus == ElementFocus::RequestBuilder {
+                    // TODO: hadle next focus when no request sent
+                    self.focus = self.focus.next();
+                } else {
+                    self.focus = self.focus.next();
+                }
             }
             PaneAction::PreviousFocus => {
                 self.focus = self.focus.previous();
@@ -208,14 +215,8 @@ impl Pane {
                     self.collections_component.as_collections(),
                 );
 
-                // QUESTION: We need the store async?
-                let _ = tokio::task::spawn_blocking(move || {
-                    let rt = tokio::runtime::Handle::current();
-                    let store = LocalStore::new(Paths::new("store"));
-                    rt.block_on(async move {
-                        let _ = store.save_project(model).await;
-                    })
-                });
+                let store = LocalStore::new();
+                let _ = store.save_project(model);
             }
         }
     }

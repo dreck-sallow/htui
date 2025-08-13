@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Debug, ops::Not};
 
-use crate::store::models::{CollectionsModel, RequestModel};
+use crate::app_project::models::{CollectionsModel, RequestModel};
 
 pub trait MutableList {
     fn insert_collection(&mut self, idx: usize, collection: CollectionsModel);

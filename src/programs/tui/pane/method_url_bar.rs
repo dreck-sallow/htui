@@ -10,15 +10,14 @@ use ratatui::{
 use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
-    programs::tui::{
+    app_project::models::HttpMethod, programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
             component::{Drawable, Interactive, WithHistory},
         },
         config::Config,
         elements::{dropdown::OverlayDropdown, utils::expand, Separator},
-    },
-    store::models::HttpMethod,
+    }
 };
 
 use super::{action::PaneAction, ElementFocus};

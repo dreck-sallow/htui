@@ -5,7 +5,7 @@ use std::{
 
 use tokio::{sync::oneshot, task::JoinHandle};
 
-use crate::store::models::{SendRequest, SendRequestKey};
+use crate::app_project::models::{SendRequest, SendRequestKey};
 
 pub type SendRequestResponse = Arc<RwLock<SendRequest>>;
 

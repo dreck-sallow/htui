@@ -128,7 +128,9 @@ default_key_actions!(TableKeyAction {
 
 default_key_actions!(AppKeyAction {
     SearchProject => "Alt+Shift+N",
-    DeleteProject => "Alt+Shift+D"
+    DeleteProject => "Alt+Shift+D",
+    NextProject => "Alt+Shift+L",
+    PreviousProject => "Alt+Shift+H"
 });
 
 default_key_actions!(MethodUrlKeyAction {

@@ -10,6 +10,7 @@ use ratatui::{
 use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
+    app_project::models::KeyValueParam,
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
@@ -17,7 +18,6 @@ use crate::{
         },
         config::{keybinding, Config},
     },
-    store::models::KeyValueParam,
 };
 
 pub struct TableParamState {

@@ -7,11 +7,11 @@ use ratatui::{
 };
 
 use crate::{
+    app_project::models::{BodyContent, KeyValueParam},
     programs::tui::{
         common::component::{Drawable, Interactive, WithHistory},
         config::{keybinding, Config},
     },
-    store::models::{BodyContent, KeyValueParam},
 };
 
 use super::{

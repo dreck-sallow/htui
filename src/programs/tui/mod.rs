@@ -6,9 +6,11 @@ use events::Events;
 use ratatui::layout::Rect;
 use sources::TerminalSource;
 
-use crate::{
-    paths::Paths,
-    store::{models::ProjectModel, LocalStore, Store, StoreError, StoreResult},
+use crate::app_project::{
+    self,
+    models::ProjectModel,
+    paths::ProjectPaths,
+    store::{LocalStore, Store, StoreError},
 };
 
 mod app;
@@ -41,8 +43,8 @@ impl From<toml::de::Error> for TuiError {
 pub type TuiResult<T> = Result<T, TuiError>;
 
 pub async fn run_tui(project_name: Option<String>) -> TuiResult<()> {
-    let project = load_project(project_name).await.unwrap();
-    let config = load_config(&Paths::new("store"))?;
+    let project = load_project(project_name).unwrap();
+    let config = load_config(&ProjectPaths::new())?;
 
     let mut terminal = ratatui::init();
 
@@ -88,15 +90,15 @@ pub async fn run_tui(project_name: Option<String>) -> TuiResult<()> {
     Ok(())
 }
 
-async fn load_project(project_name: Option<String>) -> StoreResult<ProjectModel> {
-    let local_store = LocalStore::new(Paths::new("store"));
+fn load_project(project_name: Option<String>) -> app_project::store::Result<ProjectModel> {
+    let local_store = LocalStore::new();
 
     if let Some(name) = project_name {
-        let list = local_store.project_list().await?;
+        let list = local_store.project_list()?;
         let found_itm = list.iter().find(|p| p.name == name);
 
         if let Some(itm) = found_itm {
-            return match local_store.get_project(itm.id.clone()).await {
+            return match local_store.get_project(itm.id.clone()) {
                 Ok(p) => Ok(p),
                 Err(StoreError::NotFound) => Ok(ProjectModel::new(name)),
                 Err(err) => Err(err),

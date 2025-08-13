@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::{
+    app_project::models::BodyContent,
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
@@ -15,7 +16,6 @@ use crate::{
         config::{keybinding, Config},
         elements::dropdown::OverlayDropdown,
     },
-    store::models::BodyContent,
 };
 
 use super::text_editor::TextEditor;
