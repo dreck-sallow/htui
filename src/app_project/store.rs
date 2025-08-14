@@ -90,8 +90,6 @@ impl Store for LocalStore<ProjectPaths> {
     fn save_project(&self, project: ProjectModel) -> Result<()> {
         let mut projects = self.project_list()?;
 
-        let exists_project = projects.iter().any(|p| project.id() == p.id);
-
         // Search for the project (on mapping), and update the name
         let mut found_project = false;
         for project_item in &mut projects {

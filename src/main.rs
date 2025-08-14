@@ -1,12 +1,8 @@
+use app_project::store::{LocalStore, Store};
 use clap::Parser;
-use paths::Paths;
 use programs::tui;
-use store::{LocalStore, Store};
-
 mod app_project;
-mod paths;
 mod programs;
-mod store;
 
 #[derive(Parser)]
 #[command(name = "POSTUI")]
@@ -23,8 +19,8 @@ async fn main() {
     let cli = CliOptions::parse();
 
     if cli.list_projects {
-        let local_store = LocalStore::new(Paths::new("store"));
-        let project_list = local_store.project_list().await.unwrap();
+        let local_store = LocalStore::new();
+        let project_list = local_store.project_list().unwrap();
 
         for project in project_list {
             println!("{} - {}", project.id, project.name);
