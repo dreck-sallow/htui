@@ -96,10 +96,18 @@ impl Drawable for SearchProjects {
         painter.render_last(|frame| {
             // height = borders(Top | Bottom) + input + line + max_items
             // let height = 2 + 1 + 1 + 8;
-            let height = 2 + 8;
+            let height = {
+                let content_size = if self.filtereds.is_empty() {
+                    1 // placeholder
+                } else {
+                    8.min(self.filtereds.len())
+                };
+
+                2 + content_size
+            };
             let area = center_area(
                 frame.area(),
-                Constraint::Length(height),
+                Constraint::Length(height as u16),
                 Constraint::Percentage(30),
             );
 
@@ -114,22 +122,6 @@ impl Drawable for SearchProjects {
             frame.render_widget(Clear, area);
 
             frame.render_widget(block, area);
-            // frame.render_widget(
-            //     &self.search_input,
-            //     Rect {
-            //         height: 1,
-            //         ..inner_area
-            //     },
-            // );
-
-            // frame.render_widget(
-            //     Separator::default().symbol(line::HORIZONTAL),
-            //     Rect {
-            //         height: 1,
-            //         y: inner_area.top(),
-            //         ..inner_area
-            //     },
-            // );
             for (idx, itm) in self.list_page(inner_area.height).iter().enumerate() {
                 // TODO: reuse the inner_area
                 let item_area = Rect {

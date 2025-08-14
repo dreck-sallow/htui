@@ -92,28 +92,36 @@ impl Store for LocalStore<ProjectPaths> {
 
         let exists_project = projects.iter().any(|p| project.id() == p.id);
 
+        // Search for the project (on mapping), and update the name
+        let mut found_project = false;
+        for project_item in &mut projects {
+            if project_item.id == project.id() {
+                project_item.name = project.name.to_owned();
+                found_project = true;
+                break;
+            }
+        }
+
+        if !found_project {
+            projects.push(StoreProjectItem {
+                id: project.id().to_string(),
+                name: project.name().to_string(),
+            });
+        }
+
+        // Mapping file & project file paths
+        let store_path = self.paths.store_folder().join(Self::MAPPING_FILE);
         let project_file_path = self
             .paths
             .store_folder()
             .join(format!("{}.json", project.id()));
 
+        // Serialize the mapping & project
+        let store_mapping = serde_json::to_string(&StoreMapping { projects })?;
         let contents = serde_json::to_string_pretty(&project)?;
 
-        if exists_project {
-            fs::write(project_file_path, contents)?;
-        } else {
-            projects.push(StoreProjectItem {
-                id: project.id().to_string(),
-                name: project.name().to_string(),
-            });
-
-            let store_path = self.paths.store_folder().join(Self::MAPPING_FILE);
-            let store_mapping = serde_json::to_string(&StoreMapping { projects })?;
-
-            // TODO: add a transaction for avoid write in mapping and not save in josn file
-            fs::write(store_path, store_mapping)?;
-            fs::write(project_file_path, contents)?;
-        }
+        fs::write(store_path, store_mapping)?;
+        fs::write(project_file_path, contents)?;
 
         Ok(())
     }

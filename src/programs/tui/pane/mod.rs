@@ -96,6 +96,9 @@ impl Pane {
     pub fn project_name(&self) -> &str {
         &self.project_name
     }
+    pub fn set_project_name(&mut self, name: String) {
+        self.project_name = name;
+    }
 
     pub fn id(&self) -> String {
         self.project_id.clone()

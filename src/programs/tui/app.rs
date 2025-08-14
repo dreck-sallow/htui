@@ -7,6 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Tabs},
     Frame,
 };
+use tui_textarea::{Input, TextArea};
 
 use crate::app_project::models::ProjectModel;
 
@@ -17,6 +18,7 @@ use super::{
         list_utils::{next, prev},
     },
     config::{keybinding, Config},
+    elements::utils::center_area,
     events::EventSender,
     pane::Pane,
 };
@@ -26,8 +28,10 @@ pub struct App {
     selected: Option<usize>,
     tabs_area: Rect,
     search_projects: SearchProjects,
+    project_name_input: TextArea<'static>,
     config: Rc<Config>,
     show_search_projects: bool,
+    show_project_name_input: bool,
     pane_area: Rect,
 }
 
@@ -50,6 +54,8 @@ impl App {
             search_projects: SearchProjects::new(Rc::clone(&config)),
             show_search_projects: false,
             pane_area: Rect::default(),
+            project_name_input: input_element(),
+            show_project_name_input: false,
             config,
         }
     }
@@ -103,6 +109,13 @@ impl App {
             let mut painter = Painter::new();
             self.search_projects.draw(&mut painter, ());
             painter.draw(frame);
+        } else if self.show_project_name_input {
+            let area = center_area(
+                frame.area(),
+                Constraint::Length(3),
+                Constraint::Percentage(40),
+            );
+            frame.render_widget(&self.project_name_input, area);
         }
     }
 
@@ -120,6 +133,36 @@ impl App {
                     }
                 }
             }
+        } else if self.show_project_name_input {
+            if let Some(key_action) = self.config.keymap.match_global_action(key) {
+                match key_action {
+                    keybinding::GlobalKeyAction::ClosePopup => {
+                        self.project_name_input
+                            .move_cursor(tui_textarea::CursorMove::End);
+                        self.project_name_input.delete_line_by_head();
+                        self.show_project_name_input = false;
+                    }
+                    keybinding::GlobalKeyAction::SubmitPopup => {
+                        let renamed = self.project_name_input.lines()[0].to_owned();
+                        self.current_pane_mut().unwrap().set_project_name(renamed);
+
+                        // Save new name on mapping file
+                        // {
+                        //     let store = LocalStore::new();
+                        // }
+
+                        self.project_name_input
+                            .move_cursor(tui_textarea::CursorMove::End);
+                        self.project_name_input.delete_line_by_head();
+                        self.show_project_name_input = false;
+                    }
+                    _ => {
+                        self.project_name_input.input(Input::from(key));
+                    }
+                }
+            } else {
+                self.project_name_input.input(Input::from(key));
+            }
         } else {
             match self.config.keymap.match_app_action(key) {
                 Some(key) => match key {
@@ -132,15 +175,29 @@ impl App {
                         self.search_projects.search(openeds);
                         self.show_search_projects = true;
                     }
-                    keybinding::AppKeyAction::DeleteProject => {
+                    keybinding::AppKeyAction::CloseProject => {
                         // TODO: alert user when the data is not saved?
-                        // or save, and after apply the delete?
+                        if let Some(idx) = self.selected {
+                            // when close las project, finish the program?
+                            if self.panes.len() > 1 {
+                                // TODO: handle the stop pending requests!
+                                self.panes.remove(idx);
+                                self.selected = Some(if idx == 0 { 0 } else { idx - 1 });
+                            }
+                        }
                     }
                     keybinding::AppKeyAction::NextProject => {
                         self.selected = next(self.selected, self.panes.len());
                     }
                     keybinding::AppKeyAction::PreviousProject => {
                         self.selected = prev(self.selected);
+                    }
+                    keybinding::AppKeyAction::RenameProject => {
+                        if let Some(name) = self.current_pane().map(|p| p.project_name().to_owned())
+                        {
+                            self.project_name_input.insert_str(&name);
+                            self.show_project_name_input = true;
+                        }
                     }
                 },
                 None => {
@@ -151,4 +208,17 @@ impl App {
             }
         }
     }
+}
+
+fn input_element() -> TextArea<'static> {
+    let mut input = TextArea::default();
+    input.set_block(
+        Block::bordered()
+            .title(format!(" {} ", "Project Name"))
+            .border_style(Style::default().blue()),
+    );
+
+    input.set_cursor_line_style(Style::default());
+
+    input
 }
