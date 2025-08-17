@@ -50,10 +50,10 @@ File example:
   previous_focus = "Shift+BackTab"
 
   # Keys used for movements through lists, table (index positions)
-  move_down  => "j"
-  move_up => "k"
-  move_left => "h"
-  move_right => "l"
+  move_down  = "j"
+  move_up = "k"
+  move_left = "h"
+  move_right = "l"
 
   # Change the tab focused
   next_tab = "Shift+L"
