@@ -2,7 +2,7 @@ use std::{collections::HashSet, ops::Not, rc::Rc};
 
 use ratatui::{
     layout::{Constraint, Rect},
-    style::Style,
+    style::{Style, Stylize},
     text::Span,
     widgets::{Block, Clear},
 };
@@ -122,29 +122,34 @@ impl Drawable for SearchProjects {
             frame.render_widget(Clear, area);
 
             frame.render_widget(block, area);
-            for (idx, itm) in self.list_page(inner_area.height).iter().enumerate() {
-                // TODO: reuse the inner_area
-                let item_area = Rect {
-                    height: 1,
-                    ..inner_area
-                };
-                frame.render_widget(itm, item_area);
 
-                let style = if self.selected.map(|i| i == idx).unwrap_or(false) {
-                    Style::default()
-                        .fg(self.config.theme.dropdown_highlight.fg)
-                        .bg(self.config.theme.dropdown_highlight.bg)
-                } else {
-                    Style::default().fg(self.config.theme.dropdown.fg).bg(self
-                        .config
-                        .theme
-                        .dropdown
-                        .bg)
-                };
+            if self.filtereds.is_empty() {
+                frame.render_widget(Span::from("No projects to select").italic(), inner_area);
+            } else {
+                for (idx, itm) in self.list_page(inner_area.height).iter().enumerate() {
+                    // TODO: reuse the inner_area
+                    let item_area = Rect {
+                        height: 1,
+                        ..inner_area
+                    };
+                    frame.render_widget(itm, item_area);
 
-                frame.buffer_mut().set_style(item_area, style);
+                    let style = if self.selected.map(|i| i == idx).unwrap_or(false) {
+                        Style::default()
+                            .fg(self.config.theme.dropdown_highlight.fg)
+                            .bg(self.config.theme.dropdown_highlight.bg)
+                    } else {
+                        Style::default().fg(self.config.theme.dropdown.fg).bg(self
+                            .config
+                            .theme
+                            .dropdown
+                            .bg)
+                    };
 
-                inner_area.y += 1;
+                    frame.buffer_mut().set_style(item_area, style);
+
+                    inner_area.y += 1;
+                }
             }
         });
     }
