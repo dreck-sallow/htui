@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use ratatui::{
     layout::Rect,
     style::Style,
+    symbols,
     text::Span,
     widgets::{Block, Widget},
 };
@@ -142,124 +143,127 @@ impl Widget for CollectionList<'_, '_> {
             return;
         }
 
+        // Draw the block, and set the area from the block inner_area
         if let Some(block) = &self.block {
             let inner_area = block.inner(area);
-
             block.render(area, buf);
-
             area = inner_area
         };
 
-        let mut acc_area = Rect { height: 1, ..area };
-
-        fn is_selected(idx: Idx, cursor: (usize, Option<usize>)) -> bool {
-            match idx {
-                Idx::None => false,
-                Idx::Parent(i) => (cursor.0 == i) && cursor.1.is_none(),
-                Idx::Child(i, sub_i) => {
-                    (cursor.0 == i)
-                        && cursor
-                            .1
-                            .map(|cursor_sub_i| cursor_sub_i == sub_i)
-                            .unwrap_or_default()
-                }
-            }
-        }
-
-        let blank_symbol = "  ";
-
+        // Draw the items
+        // let mut top = area.top();
         if let Some((start, end)) = self.get_page_items(area.height as usize) {
-            let symbol = if self.openeds.contains(&start.0) {
-                self.open_symbol
-            } else {
-                self.close_symbol
-            };
-            let (x, _) = buf.set_stringn(
-                acc_area.x,
-                acc_area.y,
-                symbol,
-                symbol.len(),
-                self.items[start.0].label.style,
-            );
-            let mut render_area = acc_area;
-            render_area.x = x;
+            let mut line_area = Rect { height: 1, ..area };
 
-            (&self.items[start.0].label).render(render_area, buf);
-            if is_selected(self.idx, start) {
-                buf.set_style(acc_area, self.highlight_style);
-            }
-            acc_area.y += 1;
-
-            if self.openeds.contains(&start.0) {
-                for (sub_i, itm) in self.items[start.0].children[start.1.unwrap_or(0)..]
-                    .iter()
-                    .enumerate()
-                {
-                    let (x, _) = buf.set_stringn(
-                        acc_area.x,
-                        acc_area.y,
-                        blank_symbol,
-                        blank_symbol.len(),
-                        itm.label.style,
-                    );
-                    let mut render_area = acc_area;
-                    render_area.x = x;
-
-                    (&itm.label).render(render_area, buf);
-
-                    if is_selected(self.idx, (start.0, Some(sub_i))) {
-                        buf.set_style(acc_area, self.highlight_style);
+            // Walk over the items page slice
+            for (collection_loop_i, collection) in
+                self.items[start.0..(end.0 + 1)].iter().enumerate()
+            {
+                let (show_collection, children, padded_children): (bool, &[Item<'_>], usize) = {
+                    if (start.0 + collection_loop_i) == start.0 && start.0 == end.0 {
+                        // We have only 1 collection, then check the children
+                        match (start.1, end.1) {
+                            (None, None) => (true, &[], 0),
+                            (None, Some(end_children)) => (true, &self.items[0..end_children], 0),
+                            (Some(start_children), Some(end_children)) => (
+                                false,
+                                &self.items[start_children..end_children],
+                                start_children,
+                            ),
+                            (Some(_), None) => {
+                                // This cannot would happened
+                                unreachable!()
+                            }
+                        }
+                    } else if (start.0 + collection_loop_i) == start.0 {
+                        let children_start_idx = start.1.unwrap_or(0);
+                        (
+                            true,
+                            &self.items[start.0].children[children_start_idx..],
+                            children_start_idx,
+                        )
+                    } else if (start.0 + collection_loop_i) == end.0 {
+                        (
+                            true,
+                            &self.items[end.0].children
+                                [0..end.1.unwrap_or(self.items[end.0].children.len())],
+                            0,
+                        )
+                    } else {
+                        (true, &self.items[collection_loop_i].children, 0)
                     }
-                    acc_area.y += 1;
-                }
-            }
-
-            for i in (start.0 + 1)..(end.0 + 1) {
-                let symbol = if self.openeds.contains(&i) {
-                    self.open_symbol
-                } else {
-                    self.close_symbol
                 };
 
-                let (x, _) = buf.set_stringn(
-                    acc_area.x,
-                    acc_area.y,
-                    symbol,
-                    symbol.len(),
-                    self.items[i].label.style,
-                );
-                let mut render_area = acc_area;
-                render_area.x = x;
+                if show_collection {
+                    // Draw the collection
+                    let symbol = if self.openeds.contains(&start.0) {
+                        self.open_symbol
+                    } else {
+                        self.close_symbol
+                    };
 
-                (&self.items[i].label).render(render_area, buf);
+                    // Draw the open/close collection symbol
+                    let (x, y) = buf.set_stringn(
+                        line_area.x,
+                        line_area.y,
+                        symbol,
+                        symbol.len(),
+                        self.items[start.0].label.style,
+                    );
 
-                if is_selected(self.idx, (i, None)) {
-                    buf.set_style(acc_area, self.highlight_style);
+                    // Draw the collection label, and add 1 to top area
+                    buf.set_span(x, y, &collection.label, collection.label.width() as u16);
+                    match self.idx {
+                        Idx::Parent(selected_idx) => {
+                            if selected_idx == (collection_loop_i + start.0) {
+                                buf.set_style(line_area, self.highlight_style);
+                            }
+                        }
+                        _ => {}
+                    }
+                    line_area.y += 1;
                 }
 
-                acc_area.y += 1;
+                if self.openeds.contains(&(start.0 + collection_loop_i)) {
+                    for (i, child) in children.iter().enumerate() {
+                        let border_tree_symbol = if i == children.len() - 1 {
+                            symbols::line::BOTTOM_LEFT
+                        } else {
+                            symbols::line::VERTICAL_RIGHT
+                        };
 
-                let current_len = self.items[i].children.len();
-                if self.openeds.contains(&i) && current_len > 0 {
-                    let end_list = end.1.unwrap_or(current_len - 1);
-
-                    for (sub_i, itm) in self.items[i].children[0..(end_list + 1)].iter().enumerate()
-                    {
-                        let (x, _) = buf.set_stringn(
-                            acc_area.x,
-                            acc_area.y,
-                            blank_symbol,
-                            blank_symbol.len(),
-                            itm.label.style,
+                        let (mut x, y) = buf.set_stringn(
+                            line_area.x + 1,
+                            line_area.y,
+                            border_tree_symbol,
+                            border_tree_symbol.len(),
+                            child.label.style,
                         );
-                        let mut render_area = acc_area;
-                        render_area.x = x;
+                        x += 1;
 
-                        (&itm.label).render(render_area, buf);
-                        if is_selected(self.idx, (i, Some(sub_i))) {
-                            buf.set_style(acc_area, self.highlight_style);
+                        buf.set_span(x, y, &child.label, child.label.width() as u16);
+
+                        match self.idx {
+                            Idx::Child(collection_idx, request_idx) => {
+                                if collection_idx == (collection_loop_i + start.0)
+                                    && (padded_children + i) == request_idx
+                                {
+                                    buf.set_style(
+                                        // Rect {
+                                        //     x,
+                                        //     y,
+                                        //     width: child.label.width() as u16,
+                                        //     height: 1,
+                                        // },
+                                        line_area,
+                                        self.highlight_style,
+                                    );
+                                }
+                            }
+                            _ => {}
                         }
-                        acc_area.y += 1;
+
+                        line_area.y += 1;
                     }
                 }
             }
