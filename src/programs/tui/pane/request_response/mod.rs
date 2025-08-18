@@ -297,18 +297,24 @@ impl Drawable for ResponseViewerComponent {
                             },
                         );
 
-                        let tabs = Tabs::new([
-                            format!(" {} ", Tab::Response.as_ref()),
-                            format!(" {} ", Tab::Headers.as_ref()),
-                        ])
-                        .select(self.tab.as_idx())
-                        .block(
-                            Block::new()
-                                .borders(Borders::BOTTOM)
-                                .border_type(border_type)
-                                .border_style(border_style),
-                        )
-                        .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
+                        let tab_titles = {
+                            let locked = self.response_content.read().unwrap();
+                            let headers_count = locked.headers_table.len_items();
+                            [
+                                format!(" {} ", Tab::Response.as_ref()),
+                                format!(" {} ({})", Tab::Headers.as_ref(), headers_count),
+                            ]
+                        };
+
+                        let tabs = Tabs::new(tab_titles)
+                            .select(self.tab.as_idx())
+                            .block(
+                                Block::new()
+                                    .borders(Borders::BOTTOM)
+                                    .border_type(border_type)
+                                    .border_style(border_style),
+                            )
+                            .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
 
                         frame.render_widget(tabs, self.header_area);
                     });

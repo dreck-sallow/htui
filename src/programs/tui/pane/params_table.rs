@@ -17,6 +17,7 @@ use crate::{
             component::{Drawable, Interactive, WithHistory},
         },
         config::{keybinding, Config},
+        elements::utils::center_area,
     },
 };
 
@@ -136,8 +137,9 @@ impl TableParams {
         let mut input = TextArea::default();
         input.set_block(
             Block::bordered()
-                .title(" Edit ")
-                .border_style(Style::default().blue()),
+                .title("| Edit |")
+                .border_style(Style::default().fg(config.theme.border_focus))
+                .border_type(ratatui::widgets::BorderType::Thick),
         );
         input.set_cursor_line_style(Style::default());
 
@@ -149,6 +151,10 @@ impl TableParams {
             config,
             _history: ActionHistory::new(),
         }
+    }
+
+    pub fn len_items(&self) -> usize {
+        self.state.items.len()
     }
 
     pub fn set_state(&mut self, params: Vec<KeyValueParam>) {
@@ -207,17 +213,11 @@ impl Drawable for TableParams {
 
         if self.show_popup {
             painter.render_last(|frame| {
-                let area = {
-                    let [area] = Layout::vertical([Constraint::Length(3)])
-                        .flex(ratatui::layout::Flex::Center)
-                        .areas(frame.area());
-
-                    let [area] = Layout::horizontal([Constraint::Percentage(40)])
-                        .flex(ratatui::layout::Flex::Center)
-                        .areas(area);
-
-                    area
-                };
+                let area = center_area(
+                    self.render_area,
+                    Constraint::Length(3),
+                    Constraint::Percentage(50),
+                );
 
                 frame.render_widget(Clear, area);
                 frame.render_widget(&self.input, area);

@@ -16,6 +16,10 @@ impl HeadersTable {
         Self { items, index: idx }
     }
 
+    pub fn len_items(&self) -> usize {
+        self.items.len()
+    }
+
     pub fn move_col_idx(&mut self, is_next: bool) {
         if is_next {
             self.index.next_col(2);

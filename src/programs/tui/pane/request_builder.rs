@@ -51,7 +51,6 @@ pub struct RequestEditorComponent {
     render_area: Rect,
     params_table: TableParams,
     headers_table: TableParams,
-    // headers_editor: TextEditor,
     body_editor_component: BodyEditorComponent,
     config: Rc<Config>,
 }
@@ -64,7 +63,6 @@ impl RequestEditorComponent {
             render_area: Rect::default(),
             params_table: TableParams::new(Rc::clone(&config)),
             headers_table: TableParams::new(Rc::clone(&config)),
-            // headers_editor: TextEditor::new(true),
             body_editor_component: BodyEditorComponent::new(Rc::clone(&config)),
             config,
         }
@@ -145,8 +143,16 @@ impl Drawable for RequestEditorComponent {
             frame.render_widget(block, self.render_area);
 
             let tabs = Tabs::new([
-                format!(" {} ", Tab::Params.as_ref().fg(self.config.theme.tab)),
-                format!(" {} ", Tab::Headers.as_ref().fg(self.config.theme.tab)),
+                format!(
+                    " {} ({})",
+                    Tab::Params.as_ref().fg(self.config.theme.tab),
+                    self.params_table.len_items()
+                ),
+                format!(
+                    " {} ({})",
+                    Tab::Headers.as_ref().fg(self.config.theme.tab),
+                    self.headers_table.len_items()
+                ),
                 format!(" {} ", Tab::Body.as_ref().fg(self.config.theme.tab)),
             ])
             .select(self.tab.as_idx())

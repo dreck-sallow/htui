@@ -72,17 +72,18 @@ impl<const N: usize> Widget for TableGrid<'_, '_, N> {
             // draw content rows
             let (index_start, index_end) = {
                 let height = area.height.saturating_sub(1);
-                // TODO: use an iterator sentence when support multine on table cell text
+                // TODO: loop on items when support multine on table cell text
                 let (start_page_idx, end_page_idx) = match self.index_cell {
                     Some((i, _)) => {
                         let in_page_idx = i as u16 / height;
-                        (in_page_idx * height, (in_page_idx * height) + height - 1)
+                        let start = in_page_idx * height;
+                        (start, start + height)
                     }
                     None => (0, height),
                 };
 
                 let max_end = if end_page_idx as usize > self.rows.len() {
-                    (self.rows.len() - 1) as u16
+                    self.rows.len() as u16
                 } else {
                     end_page_idx
                 };
