@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ratatui::{
     layout::Rect,
     style::{Style, Stylize},
@@ -5,6 +7,8 @@ use ratatui::{
     Frame,
 };
 use tui_textarea::{CursorMove, Input, TextArea};
+
+use crate::programs::tui::config::Config;
 
 #[derive(Clone, Copy)]
 pub enum UpsertMethod {
@@ -28,23 +32,26 @@ impl UpsertMethod {
 pub struct UpsertItemPopup {
     input: TextArea<'static>,
     method_type: UpsertMethod,
+    config: Rc<Config>,
 }
 
 impl UpsertItemPopup {
-    pub fn new() -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         let upsert_method = UpsertMethod::CreateRequest;
 
         let mut input = TextArea::default();
         input.set_block(
             Block::bordered()
-                .title(format!(" {} ", upsert_method.as_title()))
-                .border_style(Style::default().blue()),
+                .title(format!("| {} |", upsert_method.as_title()))
+                .border_style(Style::default().fg(config.theme.border_focus))
+                .border_type(ratatui::widgets::BorderType::Thick),
         );
         input.set_cursor_line_style(Style::default());
 
         Self {
             input,
             method_type: upsert_method,
+            config,
         }
     }
 
@@ -68,8 +75,9 @@ impl UpsertItemPopup {
 
         self.input.set_block(
             Block::bordered()
-                .title(format!(" {} ", self.method_type.as_title()))
-                .border_style(Style::default().blue()),
+                .title(format!("| {} |", self.method_type.as_title()))
+                .border_style(Style::default().fg(self.config.theme.border_focus))
+                .border_type(ratatui::widgets::BorderType::Thick),
         );
     }
 

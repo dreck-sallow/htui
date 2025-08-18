@@ -47,7 +47,7 @@ impl CollectionsComponent {
         Self {
             state: CollectionsState::from_list(collections),
             render_area: Rect::default(),
-            menu: UpsertItemPopup::new(),
+            menu: UpsertItemPopup::new(Rc::clone(&config)),
             show_popup: false,
             config,
             _history: ActionHistory::new(),
