@@ -1,11 +1,6 @@
 use std::rc::Rc;
 
-use ratatui::{
-    layout::Rect,
-    style::{Style, Stylize},
-    widgets::Block,
-    Frame,
-};
+use ratatui::{layout::Rect, style::Style, widgets::Block, Frame};
 use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::programs::tui::config::Config;

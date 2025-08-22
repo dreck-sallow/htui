@@ -1,12 +1,14 @@
-use std::{collections::HashSet, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, io::Stdout, rc::Rc};
 
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
+    prelude::CrosstermBackend,
     style::{Style, Stylize},
     widgets::{Block, Borders, Tabs},
-    Frame,
+    Frame, Terminal,
 };
+use tokio::sync::mpsc;
 use tui_textarea::{Input, TextArea};
 
 use crate::app_project::models::ProjectModel;
@@ -19,7 +21,7 @@ use super::{
     },
     config::{keybinding, Config},
     elements::utils::center_area,
-    events::EventSender,
+    event_handler::{AppMessage, Events},
     pane::Pane,
 };
 
@@ -39,7 +41,7 @@ impl App {
     pub fn new_from_project(
         project: ProjectModel,
         config: Rc<Config>,
-        sender: EventSender,
+        sender: mpsc::Sender<AppMessage>,
     ) -> Self {
         let mut this = Self::new(Rc::clone(&config));
         this.add_project(project, sender);
@@ -60,7 +62,7 @@ impl App {
         }
     }
 
-    fn add_project(&mut self, project: ProjectModel, sender: EventSender) {
+    fn add_project(&mut self, project: ProjectModel, sender: mpsc::Sender<AppMessage>) {
         let mut pane = Pane::from_project(project, Rc::clone(&self.config), sender);
         pane.set_render_area(self.pane_area);
         self.panes.push(pane);
@@ -119,12 +121,17 @@ impl App {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, sender: EventSender) {
+    pub fn handle_key(
+        &mut self,
+        key: KeyEvent,
+        events: Rc<RefCell<Events<AppMessage>>>,
+        terminal: Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+    ) {
         if self.show_search_projects {
-            if let Some(effect) = self.search_projects.on_key(key) {
+            if let Some(effect) = self.search_projects.on_key(key, ()) {
                 match effect {
                     super::app_components::SearchProjectsEffect::Submit(project) => {
-                        self.add_project(project, sender);
+                        self.add_project(project, events.borrow().sender());
                         self.selected = next(self.selected, self.panes.len());
                         self.show_search_projects = false;
                     }
@@ -202,7 +209,7 @@ impl App {
                 },
                 None => {
                     if let Some(pane) = self.current_pane_mut() {
-                        pane.handle_key(key);
+                        pane.handle_key(key, events, terminal);
                     }
                 }
             }

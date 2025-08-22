@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crossterm::event::KeyCode;
 use ratatui::{
-    layout::{Constraint, Layout, Margin, Rect},
+    layout::{Constraint, Margin, Rect},
     style::{Style, Stylize},
     text::Span,
     widgets::{Block, Clear, Widget},
@@ -228,8 +228,13 @@ impl Drawable for TableParams {
 
 impl Interactive for TableParams {
     type Effect = ();
+    type Params = ();
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
+    fn on_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        _params: Self::Params,
+    ) -> Option<Self::Effect> {
         if self.show_popup {
             let is_consumed = match self.config.keymap.match_global_action(key) {
                 Some(action) => match action {

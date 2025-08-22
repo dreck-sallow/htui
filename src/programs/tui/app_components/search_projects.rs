@@ -157,8 +157,13 @@ impl Drawable for SearchProjects {
 
 impl Interactive for SearchProjects {
     type Effect = SearchProjectsEffect;
+    type Params = ();
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
+    fn on_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        _params: Self::Params,
+    ) -> Option<Self::Effect> {
         if let Some(action) = self.config.keymap.match_global_action(key) {
             match action {
                 keybinding::GlobalKeyAction::MoveDown => {

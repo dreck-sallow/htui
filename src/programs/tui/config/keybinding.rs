@@ -139,7 +139,8 @@ default_key_actions!(MethodUrlKeyAction {
 });
 
 default_key_actions!(RequestBuilderKeyAction {
-    OpenDropdown => "Shift+O"
+    OpenDropdown => "Shift+O",
+    OpenEditor => "Shift+E"
 });
 
 // Implementations for deserializing a key_event

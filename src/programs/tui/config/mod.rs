@@ -7,16 +7,7 @@ use serde::Deserialize;
 use crate::app_project::paths::Paths;
 
 pub mod keybinding;
-// pub mod keybindings;
 pub mod keymap;
-// mod toml;
-
-// #[derive(Deserialize)]
-// pub struct Config {
-//     #[serde(default)]
-//     pub theme: Theme,
-//     pub keymap: KeyMapV2,
-// }
 
 #[derive(Deserialize)]
 pub struct ColorPair {
@@ -42,23 +33,20 @@ pub struct Theme {
     pub border: Color,
     pub border_focus: Color,
 }
+
 impl Default for Theme {
     fn default() -> Self {
-        Self::DEFAULT
+        Self {
+            ui: ColorPair::new(Color::Indexed(254), Color::Indexed(236)),
+            selection: ColorPair::new(Color::Indexed(16), Color::Indexed(107)),
+            dropdown: ColorPair::new(Color::Indexed(15), Color::Indexed(60)),
+            dropdown_highlight: ColorPair::new(Color::Indexed(15), Color::Indexed(61)),
+            border: Color::Indexed(148),
+            border_focus: Color::Indexed(107),
+            tab: Color::Indexed(237),
+            tab_highlight: Color::Indexed(148),
+        }
     }
-}
-
-impl Theme {
-    pub const DEFAULT: Self = Self {
-        ui: ColorPair::new(Color::Indexed(254), Color::Indexed(236)),
-        selection: ColorPair::new(Color::Indexed(16), Color::Indexed(107)),
-        dropdown: ColorPair::new(Color::Indexed(15), Color::Indexed(60)),
-        dropdown_highlight: ColorPair::new(Color::Indexed(15), Color::Indexed(61)),
-        border: Color::Indexed(148),
-        border_focus: Color::Indexed(107),
-        tab: Color::Indexed(237),
-        tab_highlight: Color::Indexed(148),
-    };
 }
 
 const CONFIG_FILE: &str = "config.toml";

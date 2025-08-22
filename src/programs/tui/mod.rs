@@ -1,10 +1,9 @@
-use std::{io, rc::Rc};
+use std::{cell::RefCell, io, rc::Rc};
 
 use app::App;
 use config::load_config;
-use events::Events;
 use ratatui::layout::Rect;
-use sources::TerminalSource;
+use sources::TerminalSourceV2;
 
 use crate::app_project::{
     self,
@@ -18,7 +17,7 @@ mod app_components;
 mod common;
 mod config;
 mod elements;
-mod events;
+mod event_handler;
 mod pane;
 mod sources;
 
@@ -46,42 +45,46 @@ pub async fn run_tui(project_name: Option<String>) -> TuiResult<()> {
     let project = load_project(project_name).unwrap();
     let config = load_config(&ProjectPaths::new())?;
 
-    let mut terminal = ratatui::init();
+    let terminal = Rc::new(RefCell::new(ratatui::init()));
 
-    let mut events = Events::new();
-    events.add_source(TerminalSource::default());
+    let events = Rc::new(RefCell::new(event_handler::Events::from_sources(vec![
+        Box::new(TerminalSourceV2::new()),
+    ])));
 
-    events.listen();
+    events.borrow_mut().run();
 
-    let mut app = App::new_from_project(project, Rc::new(config), events.sender());
+    let mut app = App::new_from_project(project, Rc::new(config), events.borrow().sender());
     app.viewport_area(Rect {
         x: 0,
         y: 0,
-        width: terminal.size().unwrap().width,
-        height: terminal.size().unwrap().height,
+        width: terminal.borrow().size().unwrap().width,
+        height: terminal.borrow().size().unwrap().height,
     });
 
-    terminal.draw(|frame| {
+    terminal.borrow_mut().draw(|frame| {
         app.handle_draw(frame);
     })?;
 
     loop {
-        if let Some(ev) = events.next_event().await {
-            match ev {
-                events::Event::Draw => {
-                    terminal.draw(|frame| {
+        let ev_result = events.borrow_mut().next_message().await;
+
+        match ev_result {
+            Some(ev) => match ev {
+                event_handler::AppMessage::Draw => {
+                    terminal.borrow_mut().draw(|frame| {
                         app.handle_draw(frame);
                     })?;
                 }
-                events::Event::Input(key_event) => {
-                    app.handle_key(key_event, events.sender());
-                    terminal.draw(|frame| {
+                event_handler::AppMessage::Input(key_event) => {
+                    // let value = events.try_borrow_mut();
+                    app.handle_key(key_event, Rc::clone(&events), Rc::clone(&terminal));
+                    terminal.borrow_mut().draw(|frame| {
                         app.handle_draw(frame);
                     })?;
                 }
-                events::Event::KeyBinding(_key_event, _key_event1) => todo!(),
-                events::Event::Quit => break,
-            }
+                event_handler::AppMessage::Quit => break,
+            },
+            None => {}
         }
     }
 

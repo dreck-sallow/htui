@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cell::RefCell, io::Stdout, rc::Rc};
 
 use action::PaneAction;
 use collections::CollectionsComponent;
@@ -7,10 +7,12 @@ use method_url_bar::MethodUrlBarComponent;
 use placeholder::PlaceholderView;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    Frame,
+    prelude::CrosstermBackend,
+    Frame, Terminal,
 };
 use request_builder::RequestEditorComponent;
 use request_response::ResponseViewerComponent;
+use tokio::sync::mpsc;
 
 use crate::app_project::{
     models::{KeyValueParam, ProjectModel},
@@ -20,7 +22,7 @@ use crate::app_project::{
 use super::{
     common::component::{Drawable, Interactive, Painter, WithHistory},
     config::{keybinding, Config},
-    events::EventSender,
+    event_handler::{AppMessage, Events},
 };
 
 mod action;
@@ -71,11 +73,15 @@ pub struct Pane {
     placeholder_view: PlaceholderView,
     focus: ElementFocus,
     config: Rc<Config>,
-    _sender: EventSender,
+    sender: mpsc::Sender<AppMessage>,
 }
 
 impl Pane {
-    pub fn from_project(project: ProjectModel, config: Rc<Config>, sender: EventSender) -> Self {
+    pub fn from_project(
+        project: ProjectModel,
+        config: Rc<Config>,
+        sender: mpsc::Sender<AppMessage>,
+    ) -> Self {
         Self {
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
@@ -89,7 +95,7 @@ impl Pane {
             response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config)),
             placeholder_view: PlaceholderView::new(),
             config,
-            _sender: sender,
+            sender: sender,
         }
     }
 
@@ -197,7 +203,7 @@ impl Pane {
                     self.response_viewer_component.execute_req(
                         self.collections_component.current_request_key().unwrap(),
                         req,
-                        self._sender.clone(),
+                        self.sender.clone(),
                     );
                 }
             }
@@ -252,7 +258,12 @@ impl Pane {
         false
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) {
+    pub fn handle_key(
+        &mut self,
+        key: KeyEvent,
+        events: Rc<RefCell<Events<AppMessage>>>,
+        terminal: Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+    ) {
         // TODO: handle the undo of creation
         // CONTEXT: when I create a request and exeute it, and after, make an undo
         // the system delete the request, but the background task is still running
@@ -260,24 +271,27 @@ impl Pane {
         if !self.handle_pane_action(key) {
             match self.focus {
                 ElementFocus::Collections => {
-                    if let Some(effect) = self.collections_component.on_key(key) {
+                    if let Some(effect) = self.collections_component.on_key(key, ()) {
                         self.handle_action(effect);
                     }
                 }
                 ElementFocus::MethodUrlBar => {
-                    if let Some(effect) = self.method_url_component.on_key(key) {
+                    if let Some(effect) = self.method_url_component.on_key(key, ()) {
                         self.handle_action(effect);
                         self.handle_action(PaneAction::SetUrlAndMethod);
                     }
                 }
                 ElementFocus::RequestBuilder => {
-                    if let Some(effect) = self.request_builder_component.on_key(key) {
+                    if let Some(effect) = self
+                        .request_builder_component
+                        .on_key(key, (events, terminal))
+                    {
                         self.handle_action(effect);
                         self.handle_action(PaneAction::SetHeadersAndBody);
                     }
                 }
                 ElementFocus::ResponseViewer => {
-                    if let Some(effect) = self.response_viewer_component.on_key(key) {
+                    if let Some(effect) = self.response_viewer_component.on_key(key, ()) {
                         self.handle_action(effect);
                     }
                 }

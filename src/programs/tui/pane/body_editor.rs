@@ -1,9 +1,20 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    io::{stdout, Stdout},
+    rc::Rc,
+};
 
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
+    prelude::CrosstermBackend,
     style::{Style, Stylize},
     text::Span,
+    Terminal,
 };
 
 use crate::{
@@ -15,6 +26,7 @@ use crate::{
         },
         config::{keybinding, Config},
         elements::dropdown::OverlayDropdown,
+        event_handler::{AppMessage, Events},
     },
 };
 
@@ -112,10 +124,7 @@ impl Drawable for BodyEditorComponent {
                 Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
                     .areas(self.render_area);
 
-            let title = Span::from(format!(" Type: {} ", self.body_content.as_tag()))
-                .italic()
-                .fg(self.config.theme.dropdown.fg)
-                .bg(self.config.theme.dropdown.bg);
+            let title = Span::from(format!(" Type: {} ", self.body_content.as_tag())).italic();
             let body_type = Span::from("\u{25bc} ");
 
             let [title_area, body_type_area] = Layout::horizontal([
@@ -127,9 +136,14 @@ impl Drawable for BodyEditorComponent {
 
             frame.render_widget(title, title_area);
             frame.render_widget(body_type, body_type_area);
-            frame
-                .buffer_mut()
-                .set_style(header_area, Style::default().on_dark_gray());
+            frame.buffer_mut().set_style(
+                header_area,
+                Style::default().fg(self.config.theme.dropdown.fg).bg(self
+                    .config
+                    .theme
+                    .dropdown
+                    .bg),
+            );
 
             match &self.body_content {
                 BodyContent::Empty => {
@@ -181,8 +195,16 @@ impl Drawable for BodyEditorComponent {
 
 impl Interactive for BodyEditorComponent {
     type Effect = ();
+    type Params = (
+        Rc<RefCell<Events<AppMessage>>>,
+        Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+    );
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
+    fn on_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        (events, terminal): Self::Params,
+    ) -> Option<Self::Effect> {
         if self.show_dropdown {
             if let Some(key) = self.config.keymap.match_global_action(key) {
                 match key {
@@ -235,6 +257,24 @@ impl Interactive for BodyEditorComponent {
                             self.show_dropdown = true;
                             // self.dropdown.select(BodyTypeV2::Empty);
                         }
+                        keybinding::RequestBuilderKeyAction::OpenEditor => {
+                            events.borrow_mut().stop();
+                            disable_raw_mode().unwrap();
+                            stdout().execute(LeaveAlternateScreen).unwrap();
+
+                            self.text_editor.open_in_editor();
+
+                            // let editor_text = { self.text_editor.lines().join("\n") };
+                            // let text = edit_text_on_editor(&editor_text);
+
+                            // self.text_editor.clean_lines();
+                            // self.text_editor.insert_str(&text);
+
+                            enable_raw_mode().unwrap();
+                            stdout().execute(EnterAlternateScreen).unwrap();
+                            let _ = terminal.borrow_mut().clear();
+                            events.borrow_mut().run();
+                        }
                     },
                     None => {
                         match &self.body_content {
@@ -285,3 +325,23 @@ impl WithHistory for BodyEditorComponent {
         self._history.redo(&mut self.body_content);
     }
 }
+
+// pub fn edit_text_on_editor(text: &str) -> String {
+//     disable_raw_mode().unwrap();
+//     stdout().execute(LeaveAlternateScreen).unwrap();
+
+//     // Start the editing
+//     let mut file = NamedTempFile::new().unwrap();
+//     file.write_all(text.as_bytes()).unwrap();
+
+//     let file_path = file.into_temp_path();
+
+//     Command::new(var("EDITOR").unwrap())
+//         .args([&file_path])
+//         .status()
+//         .expect("Error executing editor");
+//     // file_path.close();
+//     enable_raw_mode().unwrap();
+//     stdout().execute(EnterAlternateScreen).unwrap();
+//     fs::read_to_string(file_path).unwrap()
+// }

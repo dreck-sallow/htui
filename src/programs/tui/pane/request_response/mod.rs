@@ -24,7 +24,7 @@ use crate::{
         common::component::{Drawable, Interactive},
         config::{keybinding, Config},
         elements::Separator,
-        events::EventSender,
+        event_handler::{AppMessage, EventSender},
         pane::text_editor::TextEditor,
     },
 };
@@ -344,8 +344,13 @@ impl Drawable for ResponseViewerComponent {
 
 impl Interactive for ResponseViewerComponent {
     type Effect = PaneAction;
+    type Params = ();
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
+    fn on_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        _params: Self::Params,
+    ) -> Option<Self::Effect> {
         let is_consumed = match self.config.keymap.match_global_action(key) {
             Some(action) => match action {
                 keybinding::GlobalKeyAction::NextFocus => return Some(PaneAction::NextFocus),
@@ -464,7 +469,7 @@ fn send_request(
 
         }
 
-        let _ = sender.send(crate::programs::tui::events::Event::Draw);
+        let _ = sender.send(AppMessage::Draw).await;
     });
 
     RequestTask::new(tx, jh)

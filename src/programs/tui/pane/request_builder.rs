@@ -1,17 +1,19 @@
-use std::rc::Rc;
-
-use ratatui::{
-    layout::{Constraint, Layout, Margin, Rect},
-    style::{Style, Stylize},
-    widgets::{Block, BorderType, Borders, Tabs},
-};
+use std::{cell::RefCell, io::Stdout, rc::Rc};
 
 use crate::{
     app_project::models::{BodyContent, KeyValueParam},
     programs::tui::{
         common::component::{Drawable, Interactive, WithHistory},
         config::{keybinding, Config},
+        event_handler::{AppMessage, Events},
     },
+};
+use ratatui::{
+    layout::{Constraint, Layout, Margin, Rect},
+    prelude::CrosstermBackend,
+    style::{Style, Stylize},
+    widgets::{Block, BorderType, Borders, Tabs},
+    Terminal,
 };
 
 use super::{
@@ -194,8 +196,16 @@ impl Drawable for RequestEditorComponent {
 
 impl Interactive for RequestEditorComponent {
     type Effect = PaneAction;
+    type Params = (
+        Rc<RefCell<Events<AppMessage>>>,
+        Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+    );
 
-    fn on_key(&mut self, key: crossterm::event::KeyEvent) -> Option<Self::Effect> {
+    fn on_key(
+        &mut self,
+        key: crossterm::event::KeyEvent,
+        params: Self::Params,
+    ) -> Option<Self::Effect> {
         if let Some(action) = self.config.keymap.match_global_action(key) {
             match action {
                 keybinding::GlobalKeyAction::NextTab => {
@@ -217,13 +227,13 @@ impl Interactive for RequestEditorComponent {
 
         match self.tab {
             Tab::Headers => {
-                self.headers_table.on_key(key);
+                self.headers_table.on_key(key, ());
             }
             Tab::Body => {
-                self.body_editor_component.on_key(key);
+                self.body_editor_component.on_key(key, params);
             }
             Tab::Params => {
-                self.params_table.on_key(key);
+                self.params_table.on_key(key, ());
             }
         }
         None

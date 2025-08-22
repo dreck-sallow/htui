@@ -46,7 +46,8 @@ pub trait Drawable {
 
 pub trait Interactive {
     type Effect;
-    fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect>;
+    type Params;
+    fn on_key(&mut self, key: KeyEvent, params: Self::Params) -> Option<Self::Effect>;
 }
 
 pub trait WithHistory {

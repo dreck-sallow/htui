@@ -175,7 +175,10 @@ impl Drawable for CollectionsComponent {
                 .set_items(items)
                 .set_block(
                     Block::bordered()
-                        .title(" Collections ")
+                        .title(format!(
+                            " Collections ({}) ",
+                            self.state.collections().len()
+                        ))
                         .border_type(if is_focus {
                             BorderType::Thick
                         } else {
@@ -227,8 +230,9 @@ impl Drawable for CollectionsComponent {
 
 impl Interactive for CollectionsComponent {
     type Effect = PaneAction;
+    type Params = ();
 
-    fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
+    fn on_key(&mut self, key: KeyEvent, _params: Self::Params) -> Option<Self::Effect> {
         if self.show_popup {
             if let Some(key_action) = self.config.keymap.match_global_action(key) {
                 match key_action {

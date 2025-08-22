@@ -117,7 +117,7 @@ impl Drawable for MethodUrlBarComponent {
             let area = line_block.inner(self.render_area);
             frame.render_widget(line_block, self.render_area);
 
-            let [method_area, left_separator_area, url_area, right_reparator_area, indicator_area] =
+            let [method_area, left_separator_area, url_area, right_reparator_area, _indicator_area] =
                 Layout::horizontal([
                     Constraint::Length(11),
                     Constraint::Length(1),
@@ -171,10 +171,10 @@ impl Drawable for MethodUrlBarComponent {
 }
 
 impl Interactive for MethodUrlBarComponent {
-    // type Effect = MethodUrlEffect;
     type Effect = PaneAction;
+    type Params = ();
 
-    fn on_key(&mut self, key: KeyEvent) -> Option<Self::Effect> {
+    fn on_key(&mut self, key: KeyEvent, _params: Self::Params) -> Option<Self::Effect> {
         if self.show_dropdown {
             if let Some(action) = self.config.keymap.match_global_action(key) {
                 match action {

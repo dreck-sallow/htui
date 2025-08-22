@@ -1,9 +1,12 @@
+use std::{fs, io::Write, process::Command};
+
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     style::{Style, Stylize},
     text::Span,
     widgets::Widget,
 };
+use tempfile::NamedTempFile;
 use tui_textarea::{CursorMove, Input, TextArea};
 
 #[derive(Clone, Copy)]
@@ -72,6 +75,7 @@ impl TextEditor {
     pub fn clean_lines(&mut self) {
         let lines_count = self.textarea.lines().len();
         self.textarea.move_cursor(CursorMove::Bottom);
+        self.textarea.move_cursor(CursorMove::Forward);
 
         for _i in 0..lines_count {
             self.textarea.delete_line_by_head();
@@ -82,6 +86,22 @@ impl TextEditor {
     pub fn insert_str(&mut self, txt: &str) {
         self.textarea.insert_str(txt);
         self.textarea.move_cursor(CursorMove::Head);
+    }
+
+    pub fn open_in_editor(&mut self) {
+        let text = self.textarea.lines().join("\n");
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(text.as_bytes()).unwrap();
+
+        let file_path = file.into_temp_path();
+
+        Command::new(std::env::var("EDITOR").unwrap())
+            .args([&file_path])
+            .status()
+            .expect("Error executing editor");
+
+        self.clean_lines();
+        self.insert_str(&fs::read_to_string(file_path).unwrap());
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {

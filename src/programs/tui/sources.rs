@@ -1,49 +1,68 @@
 use crossterm::event::{
     Event as TerminalEvent, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
 };
-use futures::{FutureExt, StreamExt};
-use tokio::sync::mpsc;
+use futures::StreamExt;
+use tokio::sync::{broadcast, mpsc};
 
-use super::events::{Event, Source};
+use super::event_handler::{AppMessage, EventSource};
 
-#[derive(Default)]
-pub struct TerminalSource {
-    tx: Option<mpsc::UnboundedSender<Event>>,
+pub struct TerminalSourceV2 {
+    signal_sender: broadcast::Sender<()>,
 }
 
-impl Source for TerminalSource {
-    fn register_sender(&mut self, sender: mpsc::UnboundedSender<super::events::Event>) {
-        self.tx = Some(sender);
+impl TerminalSourceV2 {
+    pub fn new() -> Self {
+        let (tx, _rx) = tokio::sync::broadcast::channel::<()>(1);
+        Self { signal_sender: tx }
     }
+}
 
-    fn start_process(&mut self) {
-        if let Some(tx) = self.tx.take() {
-            let _ = tokio::spawn(async move {
-                let mut stream = EventStream::new();
-                while let Some(Ok(ev)) = stream.next().fuse().await {
-                    match ev {
-                        TerminalEvent::Key(key_event) => {
-                            let event = if let KeyEvent {
-                                code: KeyCode::Char('c'),
-                                kind: KeyEventKind::Press,
-                                modifiers: KeyModifiers::CONTROL,
-                                ..
-                            } = key_event
-                            {
-                                Event::Quit
-                            } else {
-                                Event::Input(key_event)
-                            };
+impl EventSource for TerminalSourceV2 {
+    type Message = AppMessage;
 
-                            if tx.send(event).is_err() {
-                                break;
+    fn run(&mut self, sender: mpsc::Sender<Self::Message>) {
+        let mut signal = self.signal_sender.subscribe();
+
+        tokio::spawn(async move {
+            let mut stream = EventStream::new();
+            loop {
+                tokio::select! {
+                    event_recevied = stream.next() => {
+                        if let Some(Ok(ev)) = event_recevied {
+                            match ev {
+                                TerminalEvent::Key(key_event) => {
+                                    let event = if let KeyEvent {
+                                        code: KeyCode::Char('c'),
+                                        kind: KeyEventKind::Press,
+                                        modifiers: KeyModifiers::CONTROL,
+                                        ..
+                                    } = key_event
+                                    {
+                                        AppMessage::Quit
+                                    } else {
+                                        AppMessage::Input(key_event)
+                                    };
+
+                                    if sender.send(event).await.is_err() {
+                                        break;
+                                    }
+                                }
+
+                                _ => {}
                             }
                         }
-
-                        _ => {}
+                    }
+                    _ = signal.recv() => {
+                        // println!("stream dropped!");
+                        // drop(stream);
+                        break;
                     }
                 }
-            });
-        }
+            }
+        });
+    }
+
+    fn end(&mut self) {
+        let _ = self.signal_sender.send(());
     }
 }
