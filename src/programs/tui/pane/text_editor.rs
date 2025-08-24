@@ -100,8 +100,10 @@ impl TextEditor {
             .status()
             .expect("Error executing editor");
 
-        self.clean_lines();
-        self.insert_str(&fs::read_to_string(file_path).unwrap());
+        if self.mode.is_read_mode() {
+            self.clean_lines();
+            self.insert_str(&fs::read_to_string(file_path).unwrap());
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {

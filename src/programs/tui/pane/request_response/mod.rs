@@ -1,20 +1,27 @@
 use std::{
     cell::RefCell,
+    io::{stdout, Stdout},
     rc::Rc,
     sync::{Arc, RwLock},
 };
 
 use arboard::Clipboard;
 use body_viewer::{BodyContentView, HexDumpViewer};
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
 use encoding_rs::{Encoding, UTF_8};
 use headers_table::HeadersTable;
 use mime::Mime;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
+    prelude::CrosstermBackend,
     style::{Style, Stylize},
     symbols::line,
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Tabs},
+    Terminal,
 };
 use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Url};
 use state::{RequestResponseState, RequestTask, SendRequestResponse};
@@ -26,7 +33,7 @@ use crate::{
         common::component::{Drawable, Interactive},
         config::{keybinding, Config},
         elements::Separator,
-        event_handler::{AppMessage, EventSender},
+        event_handler::{AppMessage, EventSender, Events},
         pane::text_editor::TextEditor,
     },
 };
@@ -348,12 +355,15 @@ impl Drawable for ResponseViewerComponent {
 
 impl Interactive for ResponseViewerComponent {
     type Effect = PaneAction;
-    type Params = ();
+    type Params = (
+        Rc<RefCell<Events<AppMessage>>>,
+        Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+    );
 
     fn on_key(
         &mut self,
         key: crossterm::event::KeyEvent,
-        _params: Self::Params,
+        (events, terminal): Self::Params,
     ) -> Option<Self::Effect> {
         let is_consumed = match self.config.keymap.match_global_action(key) {
             Some(action) => match action {
@@ -411,7 +421,24 @@ impl Interactive for ResponseViewerComponent {
                     let body_viewer = &mut response_content.body_viewer;
                     match body_viewer {
                         BodyContentView::Text(text_editor) => {
-                            text_editor.handle_key(key);
+                            match self.config.keymap.match_request_builder_action(key) {
+                                Some(action) => match action {
+                                    keybinding::RequestBuilderKeyAction::OpenEditor => {
+                                        events.borrow_mut().stop();
+                                        disable_raw_mode().unwrap();
+                                        stdout().execute(LeaveAlternateScreen).unwrap();
+
+                                        text_editor.open_in_editor();
+
+                                        enable_raw_mode().unwrap();
+                                        stdout().execute(EnterAlternateScreen).unwrap();
+                                        let _ = terminal.borrow_mut().clear();
+                                        events.borrow_mut().run();
+                                    }
+                                    _ => text_editor.handle_key(key),
+                                },
+                                None => text_editor.handle_key(key),
+                            }
                         }
                         BodyContentView::Binary(_hex_dump_viewer) => {}
                         BodyContentView::Empty => {}

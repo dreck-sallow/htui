@@ -264,12 +264,6 @@ impl Interactive for BodyEditorComponent {
 
                             self.text_editor.open_in_editor();
 
-                            // let editor_text = { self.text_editor.lines().join("\n") };
-                            // let text = edit_text_on_editor(&editor_text);
-
-                            // self.text_editor.clean_lines();
-                            // self.text_editor.insert_str(&text);
-
                             enable_raw_mode().unwrap();
                             stdout().execute(EnterAlternateScreen).unwrap();
                             let _ = terminal.borrow_mut().clear();

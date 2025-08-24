@@ -296,7 +296,10 @@ impl Pane {
                     }
                 }
                 ElementFocus::ResponseViewer => {
-                    if let Some(effect) = self.response_viewer_component.on_key(key, ()) {
+                    if let Some(effect) = self
+                        .response_viewer_component
+                        .on_key(key, (events, terminal))
+                    {
                         self.handle_action(effect);
                     }
                 }
