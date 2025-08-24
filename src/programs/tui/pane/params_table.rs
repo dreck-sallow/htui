@@ -1,5 +1,6 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
+use arboard::Clipboard;
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Margin, Rect},
@@ -172,6 +173,18 @@ impl TableParams {
         self.input.delete_line_by_head();
     }
 
+    pub fn cell_text(&self) -> Option<&str> {
+        self.state.index_cell.and_then(|(row_i, col_i)| {
+            let row = &self.state.items[row_i];
+            match col_i {
+                0 => Some(if row.enable { "true" } else { "false" }),
+                1 => Some(row.key.as_ref()),
+                2 => Some(row.value.as_ref()),
+                _ => None,
+            }
+        })
+    }
+
     pub fn is_editing(&self) -> bool {
         self.show_popup
     }
@@ -228,12 +241,12 @@ impl Drawable for TableParams {
 
 impl Interactive for TableParams {
     type Effect = ();
-    type Params = ();
+    type Params = Rc<RefCell<Clipboard>>;
 
     fn on_key(
         &mut self,
         key: crossterm::event::KeyEvent,
-        _params: Self::Params,
+        clipboard: Self::Params,
     ) -> Option<Self::Effect> {
         if self.show_popup {
             let is_consumed = match self.config.keymap.match_global_action(key) {
@@ -297,6 +310,12 @@ impl Interactive for TableParams {
                     }
                     keybinding::GlobalKeyAction::MoveRight => {
                         self.state.next_cell();
+                        true
+                    }
+                    keybinding::GlobalKeyAction::CopyToClipboard => {
+                        if let Some(txt) = self.cell_text() {
+                            clipboard.borrow_mut().set_text(txt).unwrap();
+                        }
                         true
                     }
                     _ => false,

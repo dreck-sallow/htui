@@ -1,6 +1,7 @@
 use std::{cell::RefCell, io, rc::Rc};
 
 use app::App;
+use arboard::Clipboard;
 use config::load_config;
 use ratatui::layout::Rect;
 use sources::TerminalSourceV2;
@@ -53,7 +54,12 @@ pub async fn run_tui(project_name: Option<String>) -> TuiResult<()> {
 
     events.borrow_mut().run();
 
-    let mut app = App::new_from_project(project, Rc::new(config), events.borrow().sender());
+    let mut app = App::new_from_project(
+        project,
+        Rc::new(config),
+        events.borrow().sender(),
+        Rc::new(RefCell::new(Clipboard::new().unwrap())),
+    );
     app.viewport_area(Rect {
         x: 0,
         y: 0,

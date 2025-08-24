@@ -1,8 +1,10 @@
 use std::{
+    cell::RefCell,
     rc::Rc,
     sync::{Arc, RwLock},
 };
 
+use arboard::Clipboard;
 use body_viewer::{BodyContentView, HexDumpViewer};
 use encoding_rs::{Encoding, UTF_8};
 use headers_table::HeadersTable;
@@ -69,6 +71,7 @@ pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
     response_content: Arc<RwLock<ResponseContent>>,
+    clipboard: Rc<RefCell<Clipboard>>,
     config: Rc<Config>,
 
     status_bar_area: Rect,
@@ -78,7 +81,7 @@ pub struct ResponseViewerComponent {
 }
 
 impl ResponseViewerComponent {
-    pub fn new(config: Rc<Config>) -> Self {
+    pub fn new(config: Rc<Config>, clipboard: Rc<RefCell<Clipboard>>) -> Self {
         Self {
             state: RequestResponseState::new(),
             tab: Tab::Response,
@@ -88,6 +91,7 @@ impl ResponseViewerComponent {
                 request_key: None,
             })),
             config,
+            clipboard,
             status_bar_area: Rect::default(),
             render_area: Rect::default(),
             header_area: Rect::default(),
@@ -159,7 +163,7 @@ impl ResponseViewerComponent {
             if size < KB {
                 format!("Size: {} B", size)
             } else if size < MB {
-                format!("Size: {} KB", size as f64 / KB as f64)
+                format!("Size: {:.2} KB", size as f64 / KB as f64)
             } else {
                 format!("Size: {:.2} MB", size as f64 / MB as f64)
             }
@@ -392,6 +396,11 @@ impl Interactive for ResponseViewerComponent {
                             }
                             keybinding::GlobalKeyAction::MoveRight => {
                                 headers_editor.move_col_idx(true)
+                            }
+                            keybinding::GlobalKeyAction::CopyToClipboard => {
+                                if let Some(txt) = headers_editor.cell_txt() {
+                                    self.clipboard.borrow_mut().set_text(txt).unwrap();
+                                }
                             }
                             _ => {}
                         }

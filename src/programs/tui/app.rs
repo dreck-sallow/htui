@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashSet, io::Stdout, rc::Rc};
 
+use arboard::Clipboard;
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -35,6 +36,7 @@ pub struct App {
     show_search_projects: bool,
     show_project_name_input: bool,
     pane_area: Rect,
+    clipboard: Rc<RefCell<Clipboard>>,
 }
 
 impl App {
@@ -42,13 +44,14 @@ impl App {
         project: ProjectModel,
         config: Rc<Config>,
         sender: mpsc::Sender<AppMessage>,
+        clipboard: Rc<RefCell<Clipboard>>,
     ) -> Self {
-        let mut this = Self::new(Rc::clone(&config));
-        this.add_project(project, sender);
+        let mut this = Self::new(Rc::clone(&config), Rc::clone(&clipboard));
+        this.add_project(project, sender, clipboard);
         this
     }
 
-    fn new(config: Rc<Config>) -> Self {
+    fn new(config: Rc<Config>, clipboard: Rc<RefCell<Clipboard>>) -> Self {
         Self {
             panes: Vec::new(),
             selected: None,
@@ -59,11 +62,17 @@ impl App {
             project_name_input: input_element(),
             show_project_name_input: false,
             config,
+            clipboard,
         }
     }
 
-    fn add_project(&mut self, project: ProjectModel, sender: mpsc::Sender<AppMessage>) {
-        let mut pane = Pane::from_project(project, Rc::clone(&self.config), sender);
+    fn add_project(
+        &mut self,
+        project: ProjectModel,
+        sender: mpsc::Sender<AppMessage>,
+        clipboard: Rc<RefCell<Clipboard>>,
+    ) {
+        let mut pane = Pane::from_project(project, Rc::clone(&self.config), sender, clipboard);
         pane.set_render_area(self.pane_area);
         self.panes.push(pane);
         if self.selected.is_none() {
@@ -131,7 +140,11 @@ impl App {
             if let Some(effect) = self.search_projects.on_key(key, ()) {
                 match effect {
                     super::app_components::SearchProjectsEffect::Submit(project) => {
-                        self.add_project(project, events.borrow().sender());
+                        self.add_project(
+                            project,
+                            events.borrow().sender(),
+                            Rc::clone(&self.clipboard),
+                        );
                         self.selected = next(self.selected, self.panes.len());
                         self.show_search_projects = false;
                     }

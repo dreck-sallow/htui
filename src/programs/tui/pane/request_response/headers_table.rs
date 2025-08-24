@@ -36,6 +36,18 @@ impl HeadersTable {
         }
     }
 
+    pub fn cell_txt(&self) -> Option<&str> {
+        self.index.index().map(|(row_i, col_i)| {
+            if col_i == 0 {
+                self.items[row_i].0.as_ref()
+            } else if col_i == 1 {
+                self.items[row_i].1.as_ref()
+            } else {
+                unreachable!()
+            }
+        })
+    }
+
     pub fn replace<Items: Into<Vec<(String, String)>>>(&mut self, items: Items) {
         let items = items.into();
         self.index = TableGridIndex::new(items.len());

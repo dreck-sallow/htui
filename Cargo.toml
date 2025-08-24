@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+arboard = "3.6.0"
 async-trait = "0.1.88"
 clap = { version = "4.5.13", features = ["derive"] }
 crossterm = { version = "0.28.0", features = ["event-stream"] }

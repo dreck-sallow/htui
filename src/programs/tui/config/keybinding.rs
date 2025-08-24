@@ -107,6 +107,7 @@ default_key_actions!(GlobalKeyAction {
 
     Undo => "Alt+u",
     Redo => "Alt+y",
+    CopyToClipboard => "y",
 
     ClosePopup => "Esc",
     SubmitPopup => "Enter"

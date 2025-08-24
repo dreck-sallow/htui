@@ -1,6 +1,7 @@
 use std::{cell::RefCell, io::Stdout, rc::Rc};
 
 use action::PaneAction;
+use arboard::Clipboard;
 use collections::CollectionsComponent;
 use crossterm::event::KeyEvent;
 use method_url_bar::MethodUrlBarComponent;
@@ -81,6 +82,7 @@ impl Pane {
         project: ProjectModel,
         config: Rc<Config>,
         sender: mpsc::Sender<AppMessage>,
+        clipboard: Rc<RefCell<Clipboard>>,
     ) -> Self {
         Self {
             project_id: project.id().to_string(),
@@ -91,8 +93,11 @@ impl Pane {
                 Rc::clone(&config),
             ),
             method_url_component: MethodUrlBarComponent::new(Rc::clone(&config)),
-            request_builder_component: RequestEditorComponent::new(Rc::clone(&config)),
-            response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config)),
+            request_builder_component: RequestEditorComponent::new(
+                Rc::clone(&config),
+                Rc::clone(&clipboard),
+            ),
+            response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config), clipboard),
             placeholder_view: PlaceholderView::new(),
             config,
             sender: sender,

@@ -8,6 +8,7 @@ use crate::{
         event_handler::{AppMessage, Events},
     },
 };
+use arboard::Clipboard;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     prelude::CrosstermBackend,
@@ -55,10 +56,11 @@ pub struct RequestEditorComponent {
     headers_table: TableParams,
     body_editor_component: BodyEditorComponent,
     config: Rc<Config>,
+    clipboard: Rc<RefCell<Clipboard>>,
 }
 
 impl RequestEditorComponent {
-    pub fn new(config: Rc<Config>) -> Self {
+    pub fn new(config: Rc<Config>, clipboard: Rc<RefCell<Clipboard>>) -> Self {
         Self {
             tab: Tab::Params,
             header_area: Rect::default(),
@@ -67,6 +69,7 @@ impl RequestEditorComponent {
             headers_table: TableParams::new(Rc::clone(&config)),
             body_editor_component: BodyEditorComponent::new(Rc::clone(&config)),
             config,
+            clipboard,
         }
     }
 
@@ -227,13 +230,13 @@ impl Interactive for RequestEditorComponent {
 
         match self.tab {
             Tab::Headers => {
-                self.headers_table.on_key(key, ());
+                self.headers_table.on_key(key, Rc::clone(&self.clipboard));
             }
             Tab::Body => {
                 self.body_editor_component.on_key(key, params);
             }
             Tab::Params => {
-                self.params_table.on_key(key, ());
+                self.params_table.on_key(key, Rc::clone(&self.clipboard));
             }
         }
         None
