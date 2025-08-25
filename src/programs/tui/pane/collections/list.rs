@@ -196,7 +196,7 @@ impl Widget for CollectionList<'_, '_> {
 
                 if show_collection {
                     // Draw the collection
-                    let symbol = if self.openeds.contains(&start.0) {
+                    let symbol = if self.openeds.contains(&(start.0 + collection_loop_i)) {
                         self.open_symbol
                     } else {
                         self.close_symbol
