@@ -6,7 +6,8 @@ use std::{
 };
 
 use arboard::Clipboard;
-use body_viewer::{BodyContentView, HexDumpViewer};
+use binary_viewer::BinaryViewer;
+use body_viewer::BodyContentView;
 use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -40,6 +41,7 @@ use crate::{
 
 use super::{action::PaneAction, ElementFocus};
 
+mod binary_viewer;
 mod body_viewer;
 mod headers_table;
 mod state;
@@ -440,7 +442,10 @@ impl Interactive for ResponseViewerComponent {
                                 None => text_editor.handle_key(key),
                             }
                         }
-                        BodyContentView::Binary(_hex_dump_viewer) => {}
+                        BodyContentView::Binary(binary_viewer) => {
+                            binary_viewer
+                                .on_key(key, (Rc::clone(&self.config), Rc::clone(&self.clipboard)));
+                        }
                         BodyContentView::Empty => {}
                     }
                 }
@@ -568,6 +573,6 @@ fn response_into_body_content(bytes: &[u8], content_type: &Option<Mime>) -> Body
     }
 
     // Fallback: show the content as hexdump
-    let dump_viewer = HexDumpViewer::new(bytes);
+    let dump_viewer = BinaryViewer::from_bytes(bytes);
     BodyContentView::Binary(dump_viewer)
 }
