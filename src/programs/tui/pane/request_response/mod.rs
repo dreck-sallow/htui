@@ -6,15 +6,12 @@ use std::{
 };
 
 use arboard::Clipboard;
-use binary_viewer::BinaryViewer;
 use body_viewer::BodyContentView;
 use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use encoding_rs::{Encoding, UTF_8};
 use headers_table::HeadersTable;
-use mime::Mime;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     prelude::CrosstermBackend,
@@ -24,18 +21,16 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Tabs},
     Terminal,
 };
-use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Url};
-use state::{RequestResponseState, RequestTask, SendRequestResponse};
-use tokio::time::Instant;
+use reqwest::header::CONTENT_TYPE;
+use state::RequestResponseState;
 
 use crate::{
     app_project::models::{self, RequestModel, ResponseModel, SendRequest, SendRequestKey},
     programs::tui::{
-        common::component::{Drawable, Interactive},
+        common::component::{Drawable, Interactive, Painter},
         config::{keybinding, Config},
         elements::Separator,
         event_handler::{AppMessage, EventSender, Events},
-        pane::text_editor::TextEditor,
     },
 };
 
@@ -44,6 +39,7 @@ use super::{action::PaneAction, ElementFocus};
 mod binary_viewer;
 mod body_viewer;
 mod headers_table;
+mod request;
 mod state;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -114,13 +110,7 @@ impl ResponseViewerComponent {
 
         if let Some(req) = self.state.get(&id) {
             if let SendRequest::Finish(response) = &*req.read().unwrap() {
-                locked.headers_table.replace(response.headers.as_slice());
-                let mime_type = response
-                    .headers
-                    .iter()
-                    .find(|(k, _v)| k == CONTENT_TYPE.as_str())
-                    .and_then(|(_k, v)| v.parse::<mime::Mime>().ok());
-                locked.body_viewer = response_into_body_content(&response.body, &mime_type);
+                request::request_model_to_state(response, &mut *locked);
             }
         }
     }
@@ -134,10 +124,13 @@ impl ResponseViewerComponent {
             None => Arc::new(RwLock::new(SendRequest::Pending)),
         };
 
-        let send_req_task = send_request(
-            req,
-            (Arc::clone(&send_req), id.clone()),
-            Arc::clone(&self.response_content),
+        let send_req_task = request::send_request(
+            request::request_into_builder(req),
+            request::SendRequestContext {
+                request_response: Arc::clone(&send_req),
+                current_key: id.clone(),
+                response_content: Arc::clone(&self.response_content),
+            },
             sender,
         );
 
@@ -332,10 +325,9 @@ impl Drawable for ResponseViewerComponent {
                         frame.render_widget(tabs, self.header_area);
                     });
 
-                    let response_content = Arc::clone(&self.response_content);
-
                     match self.tab {
                         Tab::Headers => {
+                            let response_content = Arc::clone(&self.response_content);
                             painter.render(move |frame| {
                                 let locked = response_content.read().unwrap();
                                 let table_ui = locked.headers_table.table_ui(&self.config.theme);
@@ -343,9 +335,14 @@ impl Drawable for ResponseViewerComponent {
                             });
                         }
                         Tab::Response => {
+                            let response_content = Arc::clone(&self.response_content);
+
                             painter.render(move |frame| {
+                                // FIXME: use the same painter from the draw tree call (because on overlays cannot work in nested painters)
                                 let locked = response_content.read().unwrap();
-                                frame.render_widget(&locked.body_viewer, self.content_area);
+                                let mut _painter = Painter::new();
+                                locked.body_viewer.draw(&mut _painter, self.content_area);
+                                _painter.draw(frame);
                             });
                         }
                     }
@@ -454,125 +451,4 @@ impl Interactive for ResponseViewerComponent {
 
         None
     }
-}
-
-// pub enum ResponseViewerEffect {
-//     NextFocus,
-//     PreviousFocus,
-// }
-
-fn send_request(
-    req: &RequestModel,
-    (state, request_key): (SendRequestResponse, SendRequestKey),
-    response_content: Arc<RwLock<ResponseContent>>,
-    sender: EventSender,
-) -> RequestTask {
-    let (tx, tr) = tokio::sync::oneshot::channel();
-
-    let client_builder = request_into_builder(req);
-
-    let jh = tokio::spawn(async move {
-        let timer = Instant::now();
-
-        tokio::select! {
-            result = client_builder.send() => {
-                match result {
-                    Ok(res) => {
-                        let key_value_headers: Vec<(String, String)> = res.headers().iter().map(|(k,v)| (k.to_string(), v.to_str().unwrap().into())).collect();
-                        let content_type = res.headers().get(CONTENT_TYPE).and_then(|val| val.to_str().ok()).and_then(|val| val.parse::<Mime>().ok());
-                        let response_status = res.status().as_u16();
-                        let response_body = res.bytes().await.unwrap();
-
-
-                        let response = ResponseModel { duration:timer.elapsed(), status: response_status, body: response_body.to_vec(), headers: key_value_headers.clone() };
-                        *state.write().unwrap() = SendRequest::Finish(response);
-
-                        if response_content.read().unwrap().request_key.as_ref().map(|key| *key != request_key).unwrap_or(false) {
-                            // So the current visual UI request is diferent from the local request executing
-                            return;
-                        }
-
-                        {
-                            // Mutate the headers state
-                            let mut locked = response_content.write().unwrap();
-                            locked.headers_table.replace(key_value_headers);
-                        };
-
-                        // set body content
-                        let mut locked = response_content.write().unwrap();
-                        locked.body_viewer = response_into_body_content(&response_body, &content_type);
-                    },
-                    Err(_e) => {},
-                }
-            }
-            _ = tr => {
-            }
-
-        }
-
-        let _ = sender.send(AppMessage::Draw).await;
-    });
-
-    RequestTask::new(tx, jh)
-}
-
-fn request_into_builder(req: &RequestModel) -> RequestBuilder {
-    let url = Url::parse(req.url()).unwrap();
-    let method = match req.method() {
-        models::HttpMethod::Options => reqwest::Method::OPTIONS,
-        models::HttpMethod::Get => reqwest::Method::GET,
-        models::HttpMethod::Post => reqwest::Method::POST,
-        models::HttpMethod::Put => reqwest::Method::PUT,
-        models::HttpMethod::Delete => reqwest::Method::DELETE,
-        models::HttpMethod::Head => reqwest::Method::HEAD,
-        models::HttpMethod::Patch => reqwest::Method::PATCH,
-    };
-
-    let mut client_builder = ClientBuilder::new()
-        .referer(false)
-        .build()
-        .unwrap()
-        .request(method, url);
-
-    for (key, value) in req.headers_map() {
-        client_builder = client_builder.header(key, value);
-    }
-
-    client_builder
-}
-
-fn response_into_body_content(bytes: &[u8], content_type: &Option<Mime>) -> BodyContentView {
-    if let Some(mime_type) = content_type {
-        let is_text_based = match (mime_type.type_(), mime_type.subtype()) {
-            (mime::TEXT, _) => true,
-            (mime::APPLICATION, sub) => {
-                matches!(
-                    sub.as_str(),
-                    "json" | "xml" | "xhtml+xml" | "x-www-form-urlencoded"
-                )
-            }
-            _ => false,
-        };
-
-        if is_text_based {
-            let encoding_name = mime_type
-                .get_param("charset")
-                .map(|charset| charset.as_str())
-                .unwrap_or("utf-8");
-
-            let encoding = Encoding::for_label(encoding_name.as_bytes()).unwrap_or(UTF_8);
-
-            let (text, _, _) = encoding.decode(bytes);
-
-            let mut text_editor = TextEditor::new(false);
-
-            text_editor.insert_str(text.as_ref());
-
-            return BodyContentView::Text(text_editor);
-        }
-    }
-
-    // Fallback: show the content as hexdump
-    let dump_viewer = BinaryViewer::from_bytes(bytes);
-    BodyContentView::Binary(dump_viewer)
 }

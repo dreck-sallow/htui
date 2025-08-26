@@ -1,47 +1,135 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, str::FromStr};
 
 use arboard::Clipboard;
 use ratatui::{
-    layout::Rect,
+    layout::{Constraint, Rect},
     style::{Style, Stylize},
-    widgets::Widget,
+    widgets::{Clear, Widget},
+    Frame,
 };
+use tui_textarea::{Input, TextArea};
 
 use crate::programs::tui::{
-    common::{component::Interactive, list_utils},
+    common::{
+        component::{Drawable, Interactive},
+        list_utils,
+    },
     config::{keybinding, Config},
+    elements::utils::center_area,
 };
+
+fn create_input() -> TextArea<'static> {
+    let mut input = TextArea::default();
+
+    input.set_cursor_line_style(Style::default());
+    input
+}
 
 pub struct BinaryViewer {
     hexdump: HexDump,
+    file_path: Option<PathBuf>,
+    path_input: TextArea<'static>,
+    show_input: bool,
 }
 
 impl BinaryViewer {
     pub fn new() -> Self {
         Self {
             hexdump: HexDump::new(&[], Style::default()),
+            file_path: None,
+            path_input: create_input(),
+            show_input: false,
         }
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
         Self {
             hexdump: HexDump::new(bytes, Style::default().italic().bold()),
+            file_path: None,
+            path_input: create_input(),
+            show_input: false,
         }
     }
 
     pub fn set_data(&mut self, bytes: &[u8]) {
         self.hexdump.set_data(bytes);
+        self.file_path = None;
     }
 }
 
-impl Widget for &BinaryViewer {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
-        (&self.hexdump).render(area, buf);
+impl Drawable for BinaryViewer {
+    type Params = Rect;
+
+    fn draw<'a: 'painter, 'painter>(
+        &'a self,
+        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
+        mut area: Self::Params,
+    ) {
+        painter.render(move |frame| {
+            let buf = frame.buffer_mut();
+            let left = buf
+                .set_stringn(
+                    area.left() + 1,
+                    area.top(),
+                    "Save as: ",
+                    area.width as usize,
+                    Style::default(),
+                )
+                .0;
+
+            match self.file_path {
+                Some(ref path) => {
+                    let path_txt = path.to_str().unwrap();
+                    buf.set_stringn(
+                        left,
+                        area.top(),
+                        path_txt,
+                        path_txt.chars().count(),
+                        Style::default().green().underlined(),
+                    );
+                }
+                None => {
+                    buf.set_stringn(
+                        left,
+                        area.top(),
+                        "No path specified",
+                        17,
+                        Style::default().italic().dark_gray().underlined(),
+                    );
+                }
+            }
+
+            area.y += 2;
+            (&self.hexdump).render(
+                Rect {
+                    y: area.y + 2,
+                    ..area
+                },
+                buf,
+            );
+        });
+
+        if self.show_input {
+            painter.render(move |frame| {
+                let center_area =
+                    center_area(area, Constraint::Length(1), Constraint::Percentage(50));
+                frame.render_widget(Clear, center_area);
+                frame.render_widget(&self.path_input, center_area);
+            });
+        }
     }
 }
+
+// impl Widget for &BinaryViewer {
+//     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
+//     where
+//         Self: Sized,
+//     {
+//         if area.is_empty() {
+//             return;
+//         }
+//     }
+// }
 
 impl Interactive for BinaryViewer {
     type Effect = ();
@@ -53,16 +141,83 @@ impl Interactive for BinaryViewer {
         key: crossterm::event::KeyEvent,
         (config, clipboard): Self::Params,
     ) -> Option<Self::Effect> {
-        if let Some(action) = config.keymap.match_global_action(key) {
-            match action {
-                keybinding::GlobalKeyAction::MoveDown => self.hexdump.next(),
-                keybinding::GlobalKeyAction::MoveUp => self.hexdump.previous(),
-                keybinding::GlobalKeyAction::CopyToClipboard => {
-                    if let Some(txt) = self.hexdump.line_to_txt() {
-                        let _ = clipboard.borrow_mut().set_text(txt);
+        if self.show_input {
+            let consumed = config
+                .keymap
+                .match_global_action(key)
+                .map_or(false, |action| match action {
+                    keybinding::GlobalKeyAction::SubmitPopup => {
+                        let txt = &self.path_input.lines()[0];
+                        // TODO: check for error, when parsing the text
+                        self.file_path = Some(PathBuf::from_str(txt).unwrap());
+                        self.show_input = false;
+                        true
+                    }
+                    keybinding::GlobalKeyAction::ClosePopup => {
+                        self.show_input = false;
+                        true
+                    }
+                    _ => false,
+                });
+
+            if !consumed {
+                self.path_input.input(Input::from(key));
+            }
+        } else {
+            let consumed = config
+                .keymap
+                .match_global_action(key)
+                .map_or(false, |action| match action {
+                    keybinding::GlobalKeyAction::MoveDown => {
+                        self.hexdump.next();
+                        true
+                    }
+                    keybinding::GlobalKeyAction::MoveUp => {
+                        self.hexdump.previous();
+                        true
+                    }
+                    keybinding::GlobalKeyAction::CopyToClipboard => {
+                        if let Some(txt) = self.hexdump.line_to_txt() {
+                            let _ = clipboard.borrow_mut().set_text(txt);
+                        }
+
+                        true
+                    }
+                    _ => false,
+                });
+
+            if !consumed {
+                if let Some(action) = config.keymap.match_response_viewer_action(key) {
+                    match action {
+                        keybinding::ResponseViewerAction::SaveBytes => {
+                            match self.file_path {
+                                Some(ref path) => {
+                                    let _ = fs::write(path, []);
+                                }
+                                None => {
+                                    self.show_input = true;
+                                }
+                            }
+                            // if self.file_path.is_none() {
+                            //     self.show_input = true;
+                            // } else {
+                            //     fs::write(, contents)
+                            //     // TODO: write to path using the file path
+                            // }
+                        }
+                        keybinding::ResponseViewerAction::EditFilePath => {
+                            self.path_input.move_cursor(tui_textarea::CursorMove::End);
+                            self.path_input.delete_line_by_head();
+                            self.path_input.insert_str(
+                                self.file_path
+                                    .as_ref()
+                                    .and_then(|path| path.to_str())
+                                    .unwrap_or(""),
+                            );
+                            self.show_input = true;
+                        }
                     }
                 }
-                _ => {}
             }
         }
 
