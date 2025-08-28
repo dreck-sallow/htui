@@ -1,4 +1,8 @@
-use crate::programs::tui::{common::component::Drawable, pane::text_editor::TextEditor};
+use std::rc::Rc;
+
+use crate::programs::tui::{
+    common::component::Drawable, config::Config, pane::text_editor::TextEditor,
+};
 use ratatui::{layout::Rect, style::Stylize, text::Span};
 
 use super::binary_viewer::BinaryViewer;
@@ -10,12 +14,12 @@ pub enum BodyContentView {
 }
 
 impl Drawable for BodyContentView {
-    type Params = Rect;
+    type Params = (Rect, Rc<Config>);
 
     fn draw<'a: 'painter, 'painter>(
         &'a self,
         painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        area: Self::Params,
+        (area, config): Self::Params,
     ) {
         match self {
             BodyContentView::Text(text_editor) => {
@@ -24,7 +28,7 @@ impl Drawable for BodyContentView {
                 });
             }
             BodyContentView::Binary(binary_viewer) => {
-                binary_viewer.draw(painter, area);
+                binary_viewer.draw(painter, (area, config));
             }
             BodyContentView::Empty => {
                 if area.is_empty() {

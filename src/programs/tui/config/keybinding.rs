@@ -144,6 +144,11 @@ default_key_actions!(RequestBuilderKeyAction {
     OpenEditor => "Shift+E"
 });
 
+default_key_actions!(ResponseViewerAction {
+    SaveBytes => "s",
+    EditFilePath => "e"
+});
+
 // Implementations for deserializing a key_event
 pub mod key_event {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

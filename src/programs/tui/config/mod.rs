@@ -9,7 +9,7 @@ use crate::app_project::paths::Paths;
 pub mod keybinding;
 pub mod keymap;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct ColorPair {
     pub fg: Color,
     pub bg: Color,
@@ -21,7 +21,7 @@ impl ColorPair {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Theme {
     pub ui: ColorPair,
     pub tab: Color,

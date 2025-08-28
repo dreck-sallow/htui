@@ -7,7 +7,7 @@ use crate::programs::tui::config::keybinding::key_event;
 
 use super::keybinding::{
     AppKeyAction, CollectionsKeyAction, GlobalKeyAction, KeyAction, KeyBinding, MethodUrlKeyAction,
-    RequestBuilderKeyAction, TableKeyAction,
+    RequestBuilderKeyAction, ResponseViewerAction, TableKeyAction,
 };
 
 #[derive(Deserialize)]
@@ -31,6 +31,10 @@ pub struct KeyMap {
     #[serde(deserialize_with = "default_keybindings_deserializer")]
     #[serde(default = "KeyBinding::default_list")]
     collections: Vec<KeyBinding<CollectionsKeyAction>>,
+
+    #[serde(deserialize_with = "default_keybindings_deserializer")]
+    #[serde(default = "KeyBinding::default_list")]
+    response_viewer: Vec<KeyBinding<ResponseViewerAction>>,
 
     #[serde(deserialize_with = "default_keybindings_deserializer")]
     #[serde(default = "KeyBinding::default_list")]
@@ -58,6 +62,13 @@ impl KeyMap {
 
     pub fn match_method_url_action(&self, key_event: KeyEvent) -> Option<MethodUrlKeyAction> {
         Self::_match(&self.method_url, key_event)
+    }
+
+    pub fn match_response_viewer_action(
+        &self,
+        key_event: KeyEvent,
+    ) -> Option<ResponseViewerAction> {
+        Self::_match(&self.response_viewer, key_event)
     }
 
     pub fn match_request_builder_action(
@@ -130,6 +141,7 @@ impl Default for KeyMap {
             method_url: KeyBinding::default_list(),
             request_builder: KeyBinding::default_list(),
             collections: KeyBinding::default_list(),
+            response_viewer: KeyBinding::default_list(),
             app: KeyBinding::default_list(),
         }
     }

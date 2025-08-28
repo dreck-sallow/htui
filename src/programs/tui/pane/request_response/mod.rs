@@ -198,7 +198,7 @@ impl Drawable for ResponseViewerComponent {
         let main_areas = Layout::vertical([
             Constraint::Length(2),
             Constraint::Length(2),
-            Constraint::Fill(50),
+            Constraint::Fill(1),
         ])
         .split(area.inner(Margin::new(1, 1)));
 
@@ -341,7 +341,10 @@ impl Drawable for ResponseViewerComponent {
                                 // FIXME: use the same painter from the draw tree call (because on overlays cannot work in nested painters)
                                 let locked = response_content.read().unwrap();
                                 let mut _painter = Painter::new();
-                                locked.body_viewer.draw(&mut _painter, self.content_area);
+                                locked.body_viewer.draw(
+                                    &mut _painter,
+                                    (self.content_area, Rc::clone(&self.config)),
+                                );
                                 _painter.draw(frame);
                             });
                         }

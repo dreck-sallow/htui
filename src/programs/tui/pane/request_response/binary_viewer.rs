@@ -4,8 +4,7 @@ use arboard::Clipboard;
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Style, Stylize},
-    widgets::{Clear, Widget},
-    Frame,
+    widgets::{Block, Clear, Widget},
 };
 use tui_textarea::{Input, TextArea};
 
@@ -58,12 +57,12 @@ impl BinaryViewer {
 }
 
 impl Drawable for BinaryViewer {
-    type Params = Rect;
+    type Params = (Rect, Rc<Config>);
 
     fn draw<'a: 'painter, 'painter>(
         &'a self,
         painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        mut area: Self::Params,
+        (mut area, config): Self::Params,
     ) {
         painter.render(move |frame| {
             let buf = frame.buffer_mut();
@@ -100,21 +99,23 @@ impl Drawable for BinaryViewer {
             }
 
             area.y += 2;
-            (&self.hexdump).render(
-                Rect {
-                    y: area.y + 2,
-                    ..area
-                },
-                buf,
-            );
+            (&self.hexdump).render(Rect { y: area.y, ..area }, buf);
         });
 
         if self.show_input {
             painter.render(move |frame| {
                 let center_area =
-                    center_area(area, Constraint::Length(1), Constraint::Percentage(50));
+                    center_area(area, Constraint::Length(3), Constraint::Percentage(50));
                 frame.render_widget(Clear, center_area);
-                frame.render_widget(&self.path_input, center_area);
+
+                let block = Block::bordered()
+                    .title("| File path |")
+                    .border_type(ratatui::widgets::BorderType::Thick)
+                    .border_style(Style::default().fg(config.theme.border_focus));
+
+                let input_area = block.inner(center_area);
+                frame.render_widget(block, center_area);
+                frame.render_widget(&self.path_input, input_area);
             });
         }
     }
