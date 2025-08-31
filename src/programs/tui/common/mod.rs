@@ -1,6 +1,8 @@
 pub mod action_history;
 pub mod component;
 
+pub mod input;
+
 /// Common utils for work with lists
 pub mod list_utils {
     /// Go to next item index on the list
