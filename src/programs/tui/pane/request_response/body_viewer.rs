@@ -1,68 +1,82 @@
 use std::rc::Rc;
 
-use crate::programs::tui::{
-    common::component::Drawable, config::Config, pane::text_editor::TextEditor,
-};
+use crate::programs::tui::{common::UiElement, config::Config, pane::text_editor::TextEditor};
 use ratatui::{layout::Rect, style::Stylize, text::Span};
 
 use super::binary_viewer::BinaryViewer;
 
 pub enum BodyContentView {
-    Text(TextEditor),
+    Text { area: Rect, editor: TextEditor },
     Binary(BinaryViewer),
-    Empty,
+    Empty(BodyEmptyView),
 }
 
-impl Drawable for BodyContentView {
-    type Params = (Rect, Rc<Config>);
+impl BodyContentView {
+    pub fn empty(area: Rect) -> Self {
+        Self::Empty(BodyEmptyView { area })
+    }
 
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        (area, config): Self::Params,
-    ) {
+    pub fn text(editor: TextEditor, area: Rect) -> Self {
+        Self::Text { area, editor }
+    }
+}
+
+impl UiElement for BodyContentView {
+    type Params = Rc<Config>;
+
+    fn set_area(&mut self, area: Rect) {
         match self {
-            BodyContentView::Text(text_editor) => {
-                painter.render(move |frame| {
-                    frame.render_widget(text_editor, area);
-                });
+            BodyContentView::Text { .. } => {}
+            BodyContentView::Binary(binary_viewer) => {
+                binary_viewer.set_area(area);
+            }
+            BodyContentView::Empty(body_empty_view) => {
+                body_empty_view.set_area(area);
+            }
+        }
+    }
+
+    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+        match self {
+            BodyContentView::Text { editor, area } => {
+                frame.render_widget(editor, *area);
             }
             BodyContentView::Binary(binary_viewer) => {
-                binary_viewer.draw(painter, (area, config));
+                binary_viewer.draw(params, frame);
             }
-            BodyContentView::Empty => {
-                if area.is_empty() {
-                    return;
-                }
+            BodyContentView::Empty(view) => {
+                view.draw((), frame);
+            }
+        }
+    }
 
-                painter.render(move |frame| {
-                    frame.render_widget(Span::from("No body content").italic(), area);
-                });
+    fn draw_overlay(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+        match self {
+            BodyContentView::Text { .. } => {
+                // frame.render_widget(editor, *area);
+            }
+            BodyContentView::Binary(binary_viewer) => {
+                binary_viewer.draw_overlay(params, frame);
+            }
+            BodyContentView::Empty(view) => {
+                // view.draw((), frame);
             }
         }
     }
 }
 
-// impl Widget for &BodyContentView {
-//     fn render(self, area: Rect, buf: &mut ratatui::prelude::Buffer)
-//     where
-//         Self: Sized,
-//     {
-//         match self {
-//             BodyContentView::Text(text_editor) => text_editor.render(area, buf),
-//             BodyContentView::Binary(binary_viewer) => binary_viewer.render(area, buf),
-//             BodyContentView::Empty => {
-//                 if area.is_empty() {
-//                     return;
-//                 }
+pub struct BodyEmptyView {
+    area: Rect,
+}
 
-//                 buf.set_span(
-//                     area.left(),
-//                     area.top(),
-//                     &Span::from("No body content").italic(),
-//                     area.width,
-//                 );
-//             }
-//         }
-//     }
-// }
+impl UiElement for BodyEmptyView {
+    type Params = ();
+
+    fn set_area(&mut self, area: Rect) {
+        self.area = area;
+    }
+
+    fn draw(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+        frame.render_widget(Span::from("No body content").italic(), self.area);
+    }
+}

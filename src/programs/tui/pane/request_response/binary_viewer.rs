@@ -2,135 +2,108 @@ use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, str::FromStr};
 
 use arboard::Clipboard;
 use ratatui::{
-    layout::{Constraint, Rect},
+    layout::{Constraint, Margin, Rect},
     style::{Style, Stylize},
     widgets::{Block, Clear, Widget},
 };
-use tui_textarea::{Input, TextArea};
 
 use crate::programs::tui::{
-    common::{
-        component::{Drawable, Interactive},
-        list_utils,
-    },
+    common::{component::Interactive, input::mode_input::ModeInput, list_utils, UiElement},
     config::{keybinding, Config},
     elements::utils::center_area,
 };
 
-fn create_input() -> TextArea<'static> {
-    let mut input = TextArea::default();
-
-    input.set_cursor_line_style(Style::default());
-    input
-}
-
 pub struct BinaryViewer {
     hexdump: HexDump,
     file_path: Option<PathBuf>,
-    path_input: TextArea<'static>,
+    path_input: ModeInput,
     show_input: bool,
+    _view_area: Rect,
 }
 
 impl BinaryViewer {
-    pub fn new() -> Self {
-        Self {
-            hexdump: HexDump::new(&[], Style::default()),
-            file_path: None,
-            path_input: create_input(),
-            show_input: false,
-        }
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self {
+    pub fn from_bytes(bytes: &[u8], view_area: Rect) -> Self {
+        let mut this = Self {
             hexdump: HexDump::new(bytes, Style::default().italic().bold()),
             file_path: None,
-            path_input: create_input(),
+            path_input: ModeInput::new(),
             show_input: false,
-        }
-    }
+            _view_area: view_area,
+        };
 
-    pub fn set_data(&mut self, bytes: &[u8]) {
-        self.hexdump.set_data(bytes);
-        self.file_path = None;
+        this.set_area(view_area);
+        this
     }
 }
 
-impl Drawable for BinaryViewer {
-    type Params = (Rect, Rc<Config>);
+impl UiElement for BinaryViewer {
+    type Params = Rc<Config>;
 
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        (mut area, config): Self::Params,
-    ) {
-        painter.render(move |frame| {
-            let buf = frame.buffer_mut();
-            let left = buf
-                .set_stringn(
-                    area.left() + 1,
+    fn set_area(&mut self, area: Rect) {
+        self._view_area = area;
+        {
+            let center_area = center_area(area, Constraint::Length(3), Constraint::Percentage(50));
+            self.path_input
+                .set_area(center_area.inner(Margin::new(1, 1)));
+        }
+    }
+
+    fn draw(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+        let mut area = self._view_area;
+        let buf = frame.buffer_mut();
+        let left = buf
+            .set_stringn(
+                area.left() + 1,
+                area.top(),
+                "Save as: ",
+                area.width as usize,
+                Style::default(),
+            )
+            .0;
+
+        match self.file_path {
+            Some(ref path) => {
+                let path_txt = path.to_str().unwrap();
+                buf.set_stringn(
+                    left,
                     area.top(),
-                    "Save as: ",
-                    area.width as usize,
-                    Style::default(),
-                )
-                .0;
-
-            match self.file_path {
-                Some(ref path) => {
-                    let path_txt = path.to_str().unwrap();
-                    buf.set_stringn(
-                        left,
-                        area.top(),
-                        path_txt,
-                        path_txt.chars().count(),
-                        Style::default().green().underlined(),
-                    );
-                }
-                None => {
-                    buf.set_stringn(
-                        left,
-                        area.top(),
-                        "No path specified",
-                        17,
-                        Style::default().italic().dark_gray().underlined(),
-                    );
-                }
+                    path_txt,
+                    path_txt.chars().count(),
+                    Style::default().green().underlined(),
+                );
             }
+            None => {
+                buf.set_stringn(
+                    left,
+                    area.top(),
+                    "No path specified",
+                    17,
+                    Style::default().italic().dark_gray().underlined(),
+                );
+            }
+        }
 
-            area.y += 2;
-            (&self.hexdump).render(Rect { y: area.y, ..area }, buf);
-        });
+        area.y += 2;
+        (&self.hexdump).render(Rect { y: area.y, ..area }, buf);
+    }
 
+    fn draw_overlay(&self, config: Self::Params, frame: &mut ratatui::Frame) {
         if self.show_input {
-            painter.render(move |frame| {
-                let center_area =
-                    center_area(area, Constraint::Length(3), Constraint::Percentage(50));
-                frame.render_widget(Clear, center_area);
+            let area = self._view_area;
+            let center_area = center_area(area, Constraint::Length(3), Constraint::Percentage(50));
+            frame.render_widget(Clear, center_area);
 
-                let block = Block::bordered()
-                    .title("| File path |")
-                    .border_type(ratatui::widgets::BorderType::Thick)
-                    .border_style(Style::default().fg(config.theme.border_focus));
+            let block = Block::bordered()
+                .title("| File path |")
+                .border_type(ratatui::widgets::BorderType::Thick)
+                .border_style(Style::default().fg(config.theme.border_focus));
 
-                let input_area = block.inner(center_area);
-                frame.render_widget(block, center_area);
-                frame.render_widget(&self.path_input, input_area);
-            });
+            // let input_area = block.inner(center_area);
+            frame.render_widget(block, center_area);
+            self.path_input.draw((), frame);
         }
     }
 }
-
-// impl Widget for &BinaryViewer {
-//     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-//     where
-//         Self: Sized,
-//     {
-//         if area.is_empty() {
-//             return;
-//         }
-//     }
-// }
 
 impl Interactive for BinaryViewer {
     type Effect = ();
@@ -148,21 +121,58 @@ impl Interactive for BinaryViewer {
                 .match_global_action(key)
                 .map_or(false, |action| match action {
                     keybinding::GlobalKeyAction::SubmitPopup => {
-                        let txt = &self.path_input.lines()[0];
+                        // let txt = &self.path_input.lines()[0];
+                        let txt = self.path_input.txt();
                         // TODO: check for error, when parsing the text
                         self.file_path = Some(PathBuf::from_str(txt).unwrap());
                         self.show_input = false;
                         true
                     }
-                    keybinding::GlobalKeyAction::ClosePopup => {
+                    keybinding::GlobalKeyAction::ClosePopup
+                        if !self.path_input.mode().is_write_mode() =>
+                    {
                         self.show_input = false;
+                        if self.path_input.txt().is_empty() {
+                            self.path_input.clear();
+                        }
                         true
                     }
                     _ => false,
                 });
 
             if !consumed {
-                self.path_input.input(Input::from(key));
+                self.path_input.handle_key(key);
+                let txt = self.path_input.txt();
+
+                if txt.len() > 0 {
+                    if let Ok(read_dir) = fs::read_dir(txt) {
+                        let mut found = false;
+                        for entry_res in read_dir {
+                            if let Ok(entry) = entry_res {
+                                let path = entry.path();
+                                let name = path
+                                    .components()
+                                    .last()
+                                    .unwrap()
+                                    .as_os_str()
+                                    .to_str()
+                                    .unwrap();
+
+                                if name.starts_with(txt) {
+                                    self.path_input.set_suggestion(Some(name.to_string()));
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if !found {
+                            self.path_input.set_suggestion(None);
+                        }
+                    }
+                }
+            } else {
+                self.path_input.set_suggestion(None);
             }
         } else {
             let consumed = config
@@ -207,14 +217,6 @@ impl Interactive for BinaryViewer {
                             // }
                         }
                         keybinding::ResponseViewerAction::EditFilePath => {
-                            self.path_input.move_cursor(tui_textarea::CursorMove::End);
-                            self.path_input.delete_line_by_head();
-                            self.path_input.insert_str(
-                                self.file_path
-                                    .as_ref()
-                                    .and_then(|path| path.to_str())
-                                    .unwrap_or(""),
-                            );
                             self.show_input = true;
                         }
                     }

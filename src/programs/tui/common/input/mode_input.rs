@@ -8,9 +8,10 @@ use crossterm::{
 use ratatui::{
     layout::{Position, Rect},
     style::{Style, Stylize},
-    widgets::Widget,
     Frame,
 };
+
+use crate::programs::tui::common::UiElement;
 
 use super::input::{EditHandler, Input};
 
@@ -49,7 +50,9 @@ impl Into<&'static str> for &InputMode {
 pub struct ModeInput {
     mode: InputMode,
     input: Input,
-    // suggestion: Option<String>,
+    suggestion: Option<String>,
+    scroll_offset: usize,
+    _render_area: Rect,
 }
 
 impl ModeInput {
@@ -57,7 +60,9 @@ impl ModeInput {
         Self {
             mode: InputMode::default(),
             input: Input::default(),
-            // suggestion: None,
+            scroll_offset: 0,
+            suggestion: None,
+            _render_area: Rect::default(),
         }
     }
 
@@ -73,6 +78,10 @@ impl ModeInput {
         self.input.clear();
     }
 
+    pub fn set_suggestion(&mut self, suggest: Option<String>) {
+        self.suggestion = suggest;
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent) {
         let mut edit_handler = InputModeEditHandler {
             key,
@@ -81,25 +90,48 @@ impl ModeInput {
 
         self.input.edit(&mut edit_handler);
         self.mode = edit_handler.mode;
+
+        // Compute the scroll_offset
+        let right_end = self.scroll_offset + (self._render_area.width.saturating_sub(2) as usize);
+
+        if right_end < (self.input.cursor().saturating_sub(1)) {
+            self.scroll_offset = self.scroll_offset + (self.input.cursor() - right_end);
+        } else if self.input.cursor().saturating_sub(1) < self.scroll_offset {
+            self.scroll_offset =
+                self.scroll_offset - (self.scroll_offset - self.input.cursor().saturating_sub(1));
+        }
     }
 }
 
-impl ModeInput {
-    pub fn draw(&self, mut area: ratatui::prelude::Rect, frame: &mut Frame) {
+impl UiElement for ModeInput {
+    type Params = ();
+
+    fn set_area(&mut self, area: Rect) {
+        self._render_area = area;
+    }
+
+    fn draw(&self, _params: Self::Params, frame: &mut Frame) {
+        let mut area = self._render_area;
         if area.is_empty() {
             return;
         }
 
         let left = area.left();
-
-        for ch in self.input.txt().chars() {
+        for ch in self
+            .input
+            .txt()
+            .chars()
+            .skip(self.scroll_offset)
+            .take(area.width as usize)
+        {
             area.x = frame
                 .buffer_mut()
                 .set_stringn(area.left(), area.top(), ch.to_string(), 1, Style::default())
                 .0;
         }
 
-        frame.set_cursor_position(Position::new(left + self.input.cursor() as u16, area.top()));
+        let cursor_in_range = self.input.cursor() - self.scroll_offset;
+        frame.set_cursor_position(Position::new(left + cursor_in_range as u16, area.top()));
         let cursor_style = if self.mode.is_write_mode() {
             SetCursorStyle::BlinkingBar
         } else {
@@ -107,14 +139,30 @@ impl ModeInput {
         };
 
         if let Some((start, end)) = self.input.selection_range() {
+            let start_left = start.saturating_sub(self.scroll_offset) as u16;
+            let end_right = (end.min(self.scroll_offset + area.width as usize))
+                .saturating_sub(self.scroll_offset) as u16;
+
             frame.buffer_mut().set_style(
                 Rect {
-                    x: left + start as u16,
-                    width: (end - start) as u16 + 1,
+                    x: left + start_left,
+                    width: end_right.saturating_sub(start_left),
                     ..area
                 },
                 Style::default().red(),
             );
+        }
+
+        if self.mode.is_write_mode() {
+            // draw the suggestion
+            if let Some(ref suggest) = self.suggestion {
+                frame.buffer_mut().set_string(
+                    area.left(),
+                    area.top(),
+                    suggest,
+                    Style::default().dark_gray(),
+                );
+            }
         }
 
         // TODO: is this hacky?
@@ -122,36 +170,10 @@ impl ModeInput {
     }
 }
 
-impl Widget for &ModeInput {
-    fn render(self, mut area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
-        if area.is_empty() {
-            return;
-        }
-
-        // let left = area.left();
-
-        for ch in self.input.txt().chars() {
-            area.x = buf
-                .set_stringn(area.left(), area.top(), ch.to_string(), 1, Style::default())
-                .0;
-        }
-
-        // if let Some(cell) = buf.cell_mut((left + self.input.cursor() as u16, area.top())) {
-        //     let (cursor, cursor_style) = if self.mode.is_write_mode() {
-        //         (symbols::block::ONE_EIGHTH, Style::default().red())
-        //     } else {
-        //         (" ", Style::default().reversed())
-        //     };
-        //     cell.set_symbol(cursor).set_style(cursor_style);
-        // }
-
-        // let _ = stdout().execute(Show).execute();
-        // println!("is_error: {}", e.is_err());
-    }
-}
+// pub struct RangeStyle {
+//     range: (usize, usize),
+//     style: Style,
+// }
 
 struct InputModeEditHandler {
     mode: InputMode,
@@ -195,7 +217,6 @@ impl EditHandler for InputModeEditHandler {
                     }
                 }
                 'i' if is_read_mode => self.mode = InputMode::Write,
-                // 'v' if is_read_mode => self.mode = InputMode::Read,
                 'e' if is_read_mode => {
                     input.next_cursor_until(|_ch, next_ch| next_ch.map_or(true, |ch| ch == ' '))
                 }

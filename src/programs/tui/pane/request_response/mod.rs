@@ -27,7 +27,7 @@ use state::RequestResponseState;
 use crate::{
     app_project::models::{self, RequestModel, ResponseModel, SendRequest, SendRequestKey},
     programs::tui::{
-        common::component::{Drawable, Interactive, Painter},
+        common::{component::Interactive, UiElement},
         config::{keybinding, Config},
         elements::Separator,
         event_handler::{AppMessage, EventSender, Events},
@@ -92,7 +92,7 @@ impl ResponseViewerComponent {
             tab: Tab::Response,
             response_content: Arc::new(RwLock::new(ResponseContent {
                 headers_table: HeadersTable::new(vec![]),
-                body_viewer: BodyContentView::Empty,
+                body_viewer: BodyContentView::empty(Rect::default()),
                 request_key: None,
             })),
             config,
@@ -110,7 +110,7 @@ impl ResponseViewerComponent {
 
         if let Some(req) = self.state.get(&id) {
             if let SendRequest::Finish(response) = &*req.read().unwrap() {
-                request::request_model_to_state(response, &mut *locked);
+                request::request_model_to_state(response, &mut *locked, self.content_area);
             }
         }
     }
@@ -132,6 +132,7 @@ impl ResponseViewerComponent {
                 response_content: Arc::clone(&self.response_content),
             },
             sender,
+            self.content_area,
         );
 
         self.state.add_response(id.clone(), send_req, send_req_task);
@@ -191,7 +192,7 @@ impl ResponseViewerComponent {
     }
 }
 
-impl Drawable for ResponseViewerComponent {
+impl UiElement for ResponseViewerComponent {
     type Params = ElementFocus;
 
     fn set_area(&mut self, area: Rect) {
@@ -206,13 +207,14 @@ impl Drawable for ResponseViewerComponent {
         self.status_bar_area = main_areas[0];
         self.header_area = main_areas[1];
         self.content_area = main_areas[2];
+        self.response_content
+            .write()
+            .unwrap()
+            .body_viewer
+            .set_area(main_areas[2]);
     }
 
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        params: Self::Params,
-    ) {
+    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
         match self
             .response_content
             .read()
@@ -222,8 +224,24 @@ impl Drawable for ResponseViewerComponent {
             .and_then(|id| self.state.get(id))
         {
             None => {
-                painter.render(|frame| {
-                    let placeholder_text = Span::from("Not response yet.");
+                let placeholder_text = Span::from("Not response yet.");
+                let center_area = {
+                    let [area] = Layout::vertical([Constraint::Length(1)])
+                        .flex(ratatui::layout::Flex::Center)
+                        .areas(self.render_area);
+
+                    let [area] =
+                        Layout::horizontal([Constraint::Length(placeholder_text.width() as u16)])
+                            .flex(ratatui::layout::Flex::Center)
+                            .areas(area);
+
+                    area
+                };
+                frame.render_widget(placeholder_text, center_area);
+            }
+            Some(send_request_response) => match &*send_request_response.read().unwrap() {
+                models::SendRequest::Pending => {
+                    let placeholder_text = Span::from("Sending...");
                     let center_area = {
                         let [area] = Layout::vertical([Constraint::Length(1)])
                             .flex(ratatui::layout::Flex::Center)
@@ -237,120 +255,114 @@ impl Drawable for ResponseViewerComponent {
 
                         area
                     };
+
                     frame.render_widget(placeholder_text, center_area);
-                });
-            }
-            Some(send_request_response) => match &*send_request_response.read().unwrap() {
-                models::SendRequest::Pending => {
-                    painter.render(|frame| {
-                        let placeholder_text = Span::from("Sending...");
-                        let center_area = {
-                            let [area] = Layout::vertical([Constraint::Length(1)])
-                                .flex(ratatui::layout::Flex::Center)
-                                .areas(self.render_area);
-
-                            let [area] = Layout::horizontal([Constraint::Length(
-                                placeholder_text.width() as u16,
-                            )])
-                            .flex(ratatui::layout::Flex::Center)
-                            .areas(area);
-
-                            area
-                        };
-
-                        frame.render_widget(placeholder_text, center_area);
-                    });
                 }
                 models::SendRequest::Finish(response) => {
                     // Draw the status line
                     let status_line = self.status_line_ui(response);
 
-                    painter.render(move |frame| {
-                        let is_focus = params == ElementFocus::ResponseViewer;
-                        let border_style = Style::default().fg(if is_focus {
-                            self.config.theme.border_focus
-                        } else {
-                            self.config.theme.border
-                        });
-
-                        let border_type = if is_focus {
-                            BorderType::Thick
-                        } else {
-                            BorderType::Plain
-                        };
-
-                        let block = Block::bordered()
-                            .border_type(border_type)
-                            .border_style(border_style);
-                        frame.render_widget(block, self.render_area);
-
-                        // Draw the status line bar
-                        frame.render_widget(
-                            &status_line,
-                            Rect {
-                                height: 1,
-                                ..self.status_bar_area
-                            },
-                        );
-                        frame.render_widget(
-                            Separator::default()
-                                .symbol(line::HORIZONTAL)
-                                .style(border_style),
-                            Rect {
-                                height: 1,
-                                y: self.status_bar_area.top() + 1,
-                                ..self.status_bar_area
-                            },
-                        );
-
-                        let tab_titles = {
-                            let locked = self.response_content.read().unwrap();
-                            let headers_count = locked.headers_table.len_items();
-                            [
-                                format!(" {} ", Tab::Response.as_ref()),
-                                format!(" {} ({})", Tab::Headers.as_ref(), headers_count),
-                            ]
-                        };
-
-                        let tabs = Tabs::new(tab_titles)
-                            .select(self.tab.as_idx())
-                            .block(
-                                Block::new()
-                                    .borders(Borders::BOTTOM)
-                                    .border_type(border_type)
-                                    .border_style(border_style),
-                            )
-                            .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
-
-                        frame.render_widget(tabs, self.header_area);
+                    let is_focus = params == ElementFocus::ResponseViewer;
+                    let border_style = Style::default().fg(if is_focus {
+                        self.config.theme.border_focus
+                    } else {
+                        self.config.theme.border
                     });
+
+                    let border_type = if is_focus {
+                        BorderType::Thick
+                    } else {
+                        BorderType::Plain
+                    };
+
+                    let block = Block::bordered()
+                        .border_type(border_type)
+                        .border_style(border_style);
+                    frame.render_widget(block, self.render_area);
+
+                    // Draw the status line bar
+                    frame.render_widget(
+                        &status_line,
+                        Rect {
+                            height: 1,
+                            ..self.status_bar_area
+                        },
+                    );
+                    frame.render_widget(
+                        Separator::default()
+                            .symbol(line::HORIZONTAL)
+                            .style(border_style),
+                        Rect {
+                            height: 1,
+                            y: self.status_bar_area.top() + 1,
+                            ..self.status_bar_area
+                        },
+                    );
+
+                    let tab_titles = {
+                        let locked = self.response_content.read().unwrap();
+                        let headers_count = locked.headers_table.len_items();
+                        [
+                            format!(" {} ", Tab::Response.as_ref()),
+                            format!(" {} ({})", Tab::Headers.as_ref(), headers_count),
+                        ]
+                    };
+
+                    let tabs = Tabs::new(tab_titles)
+                        .select(self.tab.as_idx())
+                        .block(
+                            Block::new()
+                                .borders(Borders::BOTTOM)
+                                .border_type(border_type)
+                                .border_style(border_style),
+                        )
+                        .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
+
+                    frame.render_widget(tabs, self.header_area);
 
                     match self.tab {
                         Tab::Headers => {
                             let response_content = Arc::clone(&self.response_content);
-                            painter.render(move |frame| {
-                                let locked = response_content.read().unwrap();
-                                let table_ui = locked.headers_table.table_ui(&self.config.theme);
-                                frame.render_widget(table_ui, self.content_area);
-                            });
+                            let locked = response_content.read().unwrap();
+                            let table_ui = locked.headers_table.table_ui(&self.config.theme);
+                            frame.render_widget(table_ui, self.content_area);
                         }
                         Tab::Response => {
-                            let response_content = Arc::clone(&self.response_content);
-
-                            painter.render(move |frame| {
-                                // FIXME: use the same painter from the draw tree call (because on overlays cannot work in nested painters)
-                                let locked = response_content.read().unwrap();
-                                let mut _painter = Painter::new();
-                                locked.body_viewer.draw(
-                                    &mut _painter,
-                                    (self.content_area, Rc::clone(&self.config)),
-                                );
-                                _painter.draw(frame);
-                            });
+                            // FIXME: use the same painter from the draw tree call (because on overlays cannot work in nested painters)
+                            let locked = self.response_content.read().unwrap();
+                            locked.body_viewer.draw(Rc::clone(&self.config), frame);
                         }
                     }
                 }
             },
+        }
+    }
+
+    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+        if let Some(send_request_response) = self
+            .response_content
+            .read()
+            .unwrap()
+            .request_key
+            .as_ref()
+            .and_then(|id| self.state.get(id))
+        {
+            match &*send_request_response.read().unwrap() {
+                models::SendRequest::Pending => {}
+                models::SendRequest::Finish(_) => match self.tab {
+                    Tab::Headers => {
+                        let locked = self.response_content.read().unwrap();
+                        let table_ui = locked.headers_table.table_ui(&self.config.theme);
+                        frame.render_widget(table_ui, self.content_area);
+                    }
+                    Tab::Response => {
+                        let locked = self.response_content.read().unwrap();
+                        locked
+                            .body_viewer
+                            .draw_overlay(Rc::clone(&self.config), frame);
+                    }
+                },
+            }
         }
     }
 }
@@ -422,7 +434,7 @@ impl Interactive for ResponseViewerComponent {
                     let mut response_content = self.response_content.write().unwrap();
                     let body_viewer = &mut response_content.body_viewer;
                     match body_viewer {
-                        BodyContentView::Text(text_editor) => {
+                        BodyContentView::Text { editor, .. } => {
                             match self.config.keymap.match_request_builder_action(key) {
                                 Some(action) => match action {
                                     keybinding::RequestBuilderKeyAction::OpenEditor => {
@@ -430,23 +442,23 @@ impl Interactive for ResponseViewerComponent {
                                         disable_raw_mode().unwrap();
                                         stdout().execute(LeaveAlternateScreen).unwrap();
 
-                                        text_editor.open_in_editor();
+                                        editor.open_in_editor();
 
                                         enable_raw_mode().unwrap();
                                         stdout().execute(EnterAlternateScreen).unwrap();
                                         let _ = terminal.borrow_mut().clear();
                                         events.borrow_mut().run();
                                     }
-                                    _ => text_editor.handle_key(key),
+                                    _ => editor.handle_key(key),
                                 },
-                                None => text_editor.handle_key(key),
+                                None => editor.handle_key(key),
                             }
                         }
                         BodyContentView::Binary(binary_viewer) => {
                             binary_viewer
                                 .on_key(key, (Rc::clone(&self.config), Rc::clone(&self.clipboard)));
                         }
-                        BodyContentView::Empty => {}
+                        BodyContentView::Empty(_) => {}
                     }
                 }
             }

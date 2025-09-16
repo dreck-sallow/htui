@@ -93,7 +93,7 @@ impl Input {
     pub fn forward_cursor(&mut self, idx: usize) {
         let length = self.inner.chars().count();
 
-        if self.cursor_pos + idx > (length - 1) {
+        if self.cursor_pos + idx > (length.saturating_sub(1)) {
             self.cursor_pos = length;
         } else {
             self.cursor_pos += idx;

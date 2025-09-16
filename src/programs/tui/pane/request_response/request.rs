@@ -4,6 +4,7 @@ use std::{
 };
 
 use encoding_rs::{Encoding, UTF_8};
+use ratatui::layout::Rect;
 use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Response, Url};
 use tokio::time::Instant;
 
@@ -22,6 +23,7 @@ use super::{
 pub fn request_model_to_state(
     response_model: &ResponseModel,
     response_content: &mut ResponseContent,
+    view_area: Rect,
 ) {
     response_content
         .headers_table
@@ -57,12 +59,12 @@ pub fn request_model_to_state(
 
             text_editor.insert_str(text.as_ref());
 
-            response_content.body_viewer = BodyContentView::Text(text_editor);
+            response_content.body_viewer = BodyContentView::text(text_editor, view_area);
             return;
         }
     }
 
-    let dump_viewer = BinaryViewer::from_bytes(&response_model.body);
+    let dump_viewer = BinaryViewer::from_bytes(&response_model.body, view_area);
     response_content.body_viewer = BodyContentView::Binary(dump_viewer);
 }
 
@@ -76,6 +78,7 @@ pub fn send_request(
     request_build: RequestBuilder,
     context: SendRequestContext,
     sender: EventSender,
+    view_area: Rect,
 ) -> RequestTask {
     // Signal channel to finish the async task
     let (tx, tr) = tokio::sync::oneshot::channel();
@@ -99,7 +102,7 @@ pub fn send_request(
                         // let response_model = &*context.request_response.read().unwrap();
 
                         if let SendRequest::Finish(response_model) = &*context.request_response.read().unwrap() {
-                            request_model_to_state(response_model, &mut *locked);
+                            request_model_to_state(response_model, &mut *locked, view_area);
                         }
                     }
                     Err(_err) => {

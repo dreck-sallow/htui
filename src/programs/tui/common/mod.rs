@@ -1,3 +1,5 @@
+use ratatui::{layout::Rect, Frame};
+
 pub mod action_history;
 pub mod component;
 
@@ -33,4 +35,23 @@ pub mod list_utils {
         }
         current
     }
+}
+
+pub trait UiElement {
+    type Params;
+
+    /// Set the render visual area into the element
+    fn set_area(&mut self, area: Rect);
+
+    /// Draw the elements in the frame
+    fn draw(&self, params: Self::Params, frame: &mut Frame);
+
+    /// Last rendering, used for show overlays
+    fn draw_overlay(&self, _params: Self::Params, _frame: &mut Frame) {}
+}
+
+pub trait InteractiveElement {
+    type Params;
+
+    fn handle_key(&mut self, params: Self::Params);
 }

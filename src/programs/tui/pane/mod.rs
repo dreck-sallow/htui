@@ -21,7 +21,10 @@ use crate::app_project::{
 };
 
 use super::{
-    common::component::{Drawable, Interactive, Painter, WithHistory},
+    common::{
+        component::{Drawable, Interactive, Painter, WithHistory},
+        UiElement,
+    },
     config::{keybinding, Config},
     event_handler::{AppMessage, Events},
 };
@@ -146,13 +149,14 @@ impl Pane {
             self.method_url_component.draw(&mut painter, self.focus);
             self.request_builder_component
                 .draw(&mut painter, self.focus);
-            self.response_viewer_component
-                .draw(&mut painter, self.focus);
+            self.response_viewer_component.draw(self.focus, frame);
         } else {
             self.placeholder_view.draw(frame);
         }
 
         painter.draw(frame);
+        self.response_viewer_component
+            .draw_overlay(self.focus, frame);
     }
 
     pub fn get_with_history_component(&mut self) -> Option<Box<&mut dyn WithHistory>> {
