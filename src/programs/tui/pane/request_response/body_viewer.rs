@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::programs::tui::{common::UiElement, config::Config, pane::text_editor::TextEditor};
 use ratatui::{layout::Rect, style::Stylize, text::Span};
 
-use super::binary_viewer::BinaryViewer;
+use super::binary_body::BinaryViewer;
 
 pub enum BodyContentView {
     Text { area: Rect, editor: TextEditor },

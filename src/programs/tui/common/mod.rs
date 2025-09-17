@@ -1,3 +1,4 @@
+use crossterm::event::KeyEvent;
 use ratatui::{layout::Rect, Frame};
 
 pub mod action_history;
@@ -50,8 +51,8 @@ pub trait UiElement {
     fn draw_overlay(&self, _params: Self::Params, _frame: &mut Frame) {}
 }
 
-pub trait InteractiveElement {
-    type Params;
+pub trait InteractiveElement<'params> {
+    type Params: 'params;
 
-    fn handle_key(&mut self, params: Self::Params);
+    fn handle_key(&mut self, params: Self::Params, key: KeyEvent);
 }

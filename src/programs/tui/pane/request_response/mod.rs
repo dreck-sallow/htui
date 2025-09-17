@@ -27,7 +27,7 @@ use state::RequestResponseState;
 use crate::{
     app_project::models::{self, RequestModel, ResponseModel, SendRequest, SendRequestKey},
     programs::tui::{
-        common::{component::Interactive, UiElement},
+        common::{component::Interactive, InteractiveElement, UiElement},
         config::{keybinding, Config},
         elements::Separator,
         event_handler::{AppMessage, EventSender, Events},
@@ -36,7 +36,7 @@ use crate::{
 
 use super::{action::PaneAction, ElementFocus};
 
-mod binary_viewer;
+mod binary_body;
 mod body_viewer;
 mod headers_table;
 mod request;
@@ -432,6 +432,7 @@ impl Interactive for ResponseViewerComponent {
                 }
                 Tab::Response => {
                     let mut response_content = self.response_content.write().unwrap();
+                    let request_key = response_content.request_key.clone().unwrap();
                     let body_viewer = &mut response_content.body_viewer;
                     match body_viewer {
                         BodyContentView::Text { editor, .. } => {
@@ -455,8 +456,22 @@ impl Interactive for ResponseViewerComponent {
                             }
                         }
                         BodyContentView::Binary(binary_viewer) => {
-                            binary_viewer
-                                .on_key(key, (Rc::clone(&self.config), Rc::clone(&self.clipboard)));
+                            let send_request_state = self.state.get(&request_key).unwrap();
+                            let request_model = send_request_state.read().unwrap();
+
+                            let slice_bytes = match &*request_model {
+                                SendRequest::Pending => unreachable!(),
+                                SendRequest::Finish(response_model) => &response_model.body,
+                            };
+
+                            binary_viewer.handle_key(
+                                (
+                                    Rc::clone(&self.config),
+                                    Rc::clone(&self.clipboard),
+                                    slice_bytes,
+                                ),
+                                key,
+                            );
                         }
                         BodyContentView::Empty(_) => {}
                     }

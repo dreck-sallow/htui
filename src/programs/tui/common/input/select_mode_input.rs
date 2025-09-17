@@ -208,7 +208,7 @@ impl UiElement for SelectModeInput {
     }
 }
 
-impl InteractiveElement for SelectModeInput {
+impl InteractiveElement<'_> for SelectModeInput {
     type Params = ();
 
     fn handle_key(&mut self, _params: Self::Params, key: crossterm::event::KeyEvent) {

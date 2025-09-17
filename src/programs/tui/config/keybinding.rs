@@ -145,7 +145,7 @@ default_key_actions!(RequestBuilderKeyAction {
 });
 
 default_key_actions!(ResponseViewerAction {
-    SaveBytes => "s",
+    // SaveBytes => "s",
     EditFilePath => "e"
 });
 

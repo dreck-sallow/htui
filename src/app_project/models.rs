@@ -388,6 +388,7 @@ pub struct ResponseModel {
     pub status: u16,
     /// Body types, storing bytes from (Bytes struct)
     pub body: Vec<u8>,
+    pub body_file_path: Option<PathBuf>,
     pub headers: Vec<(String, String)>,
 }
 
