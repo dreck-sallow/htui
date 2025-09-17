@@ -50,20 +50,34 @@ impl Into<&'static str> for &InputMode {
 pub struct ModeInput {
     mode: InputMode,
     input: Input,
-    suggestion: Option<String>,
+    // suggestion: Option<String>,
     scroll_offset: usize,
     _render_area: Rect,
 }
 
 impl ModeInput {
-    pub fn new() -> Self {
+    pub fn new(input: &str) -> Self {
         Self {
             mode: InputMode::default(),
-            input: Input::default(),
+            input: Input::from(input),
             scroll_offset: 0,
-            suggestion: None,
+            // suggestion: None,
             _render_area: Rect::default(),
         }
+    }
+
+    // pub fn new_empty() -> Self {
+    //     Self {
+    //         mode: InputMode::default(),
+    //         input: Input::default(),
+    //         scroll_offset: 0,
+    //         // suggestion: None,
+    //         _render_area: Rect::default(),
+    //     }
+    // }
+
+    pub fn replace(&mut self, input: &str) {
+        self.input.replace(input);
     }
 
     pub fn mode(&self) -> InputMode {
@@ -76,10 +90,6 @@ impl ModeInput {
 
     pub fn clear(&mut self) {
         self.input.clear();
-    }
-
-    pub fn set_suggestion(&mut self, suggest: Option<String>) {
-        self.suggestion = suggest;
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
@@ -153,17 +163,17 @@ impl UiElement for ModeInput {
             );
         }
 
-        if self.mode.is_write_mode() {
-            // draw the suggestion
-            if let Some(ref suggest) = self.suggestion {
-                frame.buffer_mut().set_string(
-                    area.left(),
-                    area.top(),
-                    suggest,
-                    Style::default().dark_gray(),
-                );
-            }
-        }
+        // if self.mode.is_write_mode() {
+        //     // draw the suggestion
+        //     if let Some(ref suggest) = self.suggestion {
+        //         frame.buffer_mut().set_string(
+        //             area.left(),
+        //             area.top(),
+        //             suggest,
+        //             Style::default().dark_gray(),
+        //         );
+        //     }
+        // }
 
         // TODO: is this hacky?
         let _ = execute!(stdout(), cursor_style);
@@ -198,7 +208,7 @@ impl EditHandler for InputModeEditHandler {
             KeyCode::Left => input.backward_cursor(1),
             KeyCode::Right => input.forward_cursor(1),
             KeyCode::Home => input.backward_cursor(input.cursor()),
-            KeyCode::End => input.forward_cursor(usize::MAX),
+            KeyCode::End => input.forward_cursor(input.txt().chars().count()),
             KeyCode::Char(ch) => match ch {
                 'l' if !is_write_mode => input.forward_cursor(1),
                 'h' if !is_write_mode => input.backward_cursor(1),

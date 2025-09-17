@@ -22,7 +22,23 @@ impl Default for Input {
     }
 }
 
+impl From<&str> for Input {
+    fn from(value: &str) -> Self {
+        Self {
+            inner: value.to_string(),
+            cursor_pos: value.chars().count(),
+            selection_start: None,
+        }
+    }
+}
+
 impl Input {
+    pub fn replace(&mut self, input: &str) {
+        self.inner = input.to_string();
+        self.cursor_pos = input.chars().count();
+        self.selection_start = None;
+    }
+
     pub fn txt(&self) -> &str {
         &self.inner
     }
