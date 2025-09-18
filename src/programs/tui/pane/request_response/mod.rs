@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     io::{stdout, Stdout},
+    path::PathBuf,
     rc::Rc,
     sync::{Arc, RwLock},
 };
@@ -25,9 +26,11 @@ use reqwest::header::CONTENT_TYPE;
 use state::RequestResponseState;
 
 use crate::{
-    app_project::models::{self, RequestModel, ResponseModel, SendRequest, SendRequestKey},
+    app_project::models::{
+        self, RequestModel, ResponseFilePath, ResponseModel, SendRequest, SendRequestKey,
+    },
     programs::tui::{
-        common::{component::Interactive, InteractiveElement, UiElement},
+        common::{component::Interactive, InteractiveElementEff, UiElement},
         config::{keybinding, Config},
         elements::Separator,
         event_handler::{AppMessage, EventSender, Events},
@@ -457,21 +460,32 @@ impl Interactive for ResponseViewerComponent {
                         }
                         BodyContentView::Binary(binary_viewer) => {
                             let send_request_state = self.state.get(&request_key).unwrap();
-                            let request_model = send_request_state.read().unwrap();
+                            let mut request_model = send_request_state.write().unwrap();
 
                             let slice_bytes = match &*request_model {
                                 SendRequest::Pending => unreachable!(),
                                 SendRequest::Finish(response_model) => &response_model.body,
                             };
 
-                            binary_viewer.handle_key(
+                            match binary_viewer.handle_key(
                                 (
                                     Rc::clone(&self.config),
                                     Rc::clone(&self.clipboard),
                                     slice_bytes,
                                 ),
                                 key,
-                            );
+                            ) {
+                                binary_body::BinaryViewerEffect::NewFilePath(path) => {
+                                    match &mut *request_model {
+                                        SendRequest::Pending => {}
+                                        SendRequest::Finish(response_model) => {
+                                            response_model.file_path =
+                                                ResponseFilePath::Saved(PathBuf::from(path));
+                                        }
+                                    }
+                                }
+                                binary_body::BinaryViewerEffect::Noop => {}
+                            }
                         }
                         BodyContentView::Empty(_) => {}
                     }

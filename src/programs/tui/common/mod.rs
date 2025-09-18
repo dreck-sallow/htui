@@ -56,3 +56,10 @@ pub trait InteractiveElement<'params> {
 
     fn handle_key(&mut self, params: Self::Params, key: KeyEvent);
 }
+
+pub trait InteractiveElementEff<'params> {
+    type Effect;
+    type Params: 'params;
+
+    fn handle_key(&mut self, params: Self::Params, key: KeyEvent) -> Self::Effect;
+}

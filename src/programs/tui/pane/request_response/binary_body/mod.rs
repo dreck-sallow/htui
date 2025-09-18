@@ -12,7 +12,7 @@ use ratatui::{
 use crate::{
     app_project::models::ResponseFilePath,
     programs::tui::{
-        common::{component::Interactive, InteractiveElement, UiElement},
+        common::{component::Interactive, InteractiveElementEff, UiElement},
         config::{keybinding, Config},
     },
 };
@@ -109,28 +109,30 @@ impl UiElement for BinaryViewer {
 }
 
 type SliceBytes<'a> = &'a [u8];
-impl<'a> InteractiveElement<'a> for BinaryViewer {
+impl<'a> InteractiveElementEff<'a> for BinaryViewer {
+    type Effect = BinaryViewerEffect;
     type Params = (Rc<Config>, Rc<RefCell<Clipboard>>, SliceBytes<'a>);
 
     fn handle_key(
         &mut self,
         (config, clipboard, bytes): Self::Params,
         key: crossterm::event::KeyEvent,
-    ) {
+    ) -> Self::Effect {
         if self.file_input.is_show() {
             if let Some(effect) = self.file_input.on_key(key, config) {
                 match effect {
-                    file_input::FileInputEffect::NewPath(path_buf) => {
+                    file_input::FileInputEffect::NewPath(new_path) => {
                         match &self.file_path {
                             Some(path) => {
-                                let _ = fs::rename(path, &path_buf);
+                                let _ = fs::rename(path, &new_path);
                             }
                             None => {
-                                let _ = fs::write(&path_buf, bytes);
+                                let _ = fs::write(&new_path, bytes);
                             }
                         }
 
-                        self.file_path = Some(path_buf);
+                        self.file_path = Some(new_path.clone());
+                        return BinaryViewerEffect::NewFilePath(new_path);
                     }
                 }
             }
@@ -167,79 +169,11 @@ impl<'a> InteractiveElement<'a> for BinaryViewer {
                 }
             }
         }
+        BinaryViewerEffect::Noop
     }
 }
 
-// pub struct
-
-// impl Interactive for BinaryViewer {
-//     type Effect = ();
-
-//     type Params = (Rc<Config>, Rc<RefCell<Clipboard>>);
-
-//     fn on_key(
-//         &mut self,
-//         key: crossterm::event::KeyEvent,
-//         (config, clipboard): Self::Params,
-//     ) -> Option<Self::Effect> {
-//         if self.file_input.is_show() {
-//             if let Some(effect) = self.file_input.on_key(key, config) {
-//                 match effect {
-//                     file_input::FileInputEffect::NewPath(path_buf) => {
-//                         self.file_path = Some(path_buf);
-//                     }
-//                 }
-//             }
-//         } else {
-//             let consumed = config
-//                 .keymap
-//                 .match_global_action(key)
-//                 .map_or(false, |action| match action {
-//                     keybinding::GlobalKeyAction::MoveDown => {
-//                         self.hexdump.next();
-//                         true
-//                     }
-//                     keybinding::GlobalKeyAction::MoveUp => {
-//                         self.hexdump.previous();
-//                         true
-//                     }
-//                     keybinding::GlobalKeyAction::CopyToClipboard => {
-//                         if let Some(txt) = self.hexdump.line_to_txt() {
-//                             let _ = clipboard.borrow_mut().set_text(txt);
-//                         }
-
-//                         true
-//                     }
-//                     _ => false,
-//                 });
-
-//             if !consumed {
-//                 if let Some(action) = config.keymap.match_response_viewer_action(key) {
-//                     match action {
-//                         // keybinding::ResponseViewerAction::SaveBytes => {
-//                         //     match self.file_path {
-//                         //         Some(ref path) => {
-//                         //             let _ = fs::write(path, []);
-//                         //         }
-//                         //         None => {
-//                         //             self.file_input.hidden();
-//                         //         }
-//                         //     }
-//                         //     // if self.file_path.is_none() {
-//                         //     //     self.show_input = true;
-//                         //     // } else {
-//                         //     //     fs::write(, contents)
-//                         //     //     // TODO: write to path using the file path
-//                         //     // }
-//                         // }
-//                         keybinding::ResponseViewerAction::EditFilePath => {
-//                             self.file_input.show();
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-
-//         None
-//     }
-// }
+pub enum BinaryViewerEffect {
+    NewFilePath(String),
+    Noop,
+}

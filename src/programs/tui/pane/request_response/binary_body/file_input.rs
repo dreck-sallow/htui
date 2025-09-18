@@ -103,34 +103,6 @@ impl Interactive for FileInput {
             self.input.handle_key(key);
         }
 
-        // if !consumed {
-        //     self.input.handle_key(key);
-        //     let txt = self.input.txt().to_string();
-        //     let path = Path::new(&txt);
-
-        //     if let (Some(cache_parent), Some(parent)) = (self.last_path.parent(), path.parent()) {
-        //         if cache_parent != parent {
-        //             self.last_path = path.to_path_buf();
-
-        //             match list_path_options(path) {
-        //                 Ok(list) => self.select_mode_input.set_options(list),
-        //                 Err(_e) => {}
-        //             }
-        //         }
-        //     } else {
-        //         self.last_path = path.to_path_buf();
-        //     }
-
-        //     if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-        //         let name_len = name.chars().count();
-        //         let input_len = txt.chars().count();
-        //         self.select_mode_input
-        //             .set_range_replace((input_len.saturating_sub(name_len), input_len));
-        //     }
-        // } else {
-        //     self.select_mode_input.set_options(Vec::new());
-        // }
-
         None
     }
 }
