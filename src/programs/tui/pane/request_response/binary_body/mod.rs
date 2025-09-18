@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, fs, rc::Rc};
 
 use arboard::Clipboard;
 use file_input::FileInput;
@@ -9,9 +9,12 @@ use ratatui::{
     widgets::Widget,
 };
 
-use crate::programs::tui::{
-    common::{component::Interactive, InteractiveElement, UiElement},
-    config::{keybinding, Config},
+use crate::{
+    app_project::models::ResponseFilePath,
+    programs::tui::{
+        common::{component::Interactive, InteractiveElement, UiElement},
+        config::{keybinding, Config},
+    },
 };
 
 mod file_input;
@@ -19,16 +22,28 @@ mod hexdump;
 
 pub struct BinaryViewer {
     hexdump: HexDump,
-    file_path: Option<PathBuf>,
+    file_path: Option<String>,
     file_input: FileInput,
     _view_area: Rect,
 }
 
 impl BinaryViewer {
-    pub fn new(bytes: &[u8], path: Option<PathBuf>, view_area: Rect) -> Self {
+    pub fn new(bytes: &[u8], file_path: &ResponseFilePath, view_area: Rect) -> Self {
+        let (path, path_str) = match file_path {
+            ResponseFilePath::Temp(temp_path) => {
+                let txt = temp_path.to_str().map(|f| f.to_string()).unwrap();
+                (Some(txt.clone()), txt)
+            }
+            ResponseFilePath::Saved(path_buf) => {
+                let txt = path_buf.to_str().map(|f| f.to_string()).unwrap();
+                (Some(txt.to_string()), txt)
+            }
+            ResponseFilePath::Null => (None, "".to_string()),
+        };
+
         let mut this = Self {
             hexdump: HexDump::new(bytes, Style::default().italic().bold()),
-            file_input: FileInput::new(path.as_ref().map_or("", |p| p.to_str().unwrap())),
+            file_input: FileInput::new(&path_str),
             file_path: path,
             _view_area: view_area,
         };
@@ -61,7 +76,7 @@ impl UiElement for BinaryViewer {
 
         match self.file_path {
             Some(ref path) => {
-                let path_txt = path.to_str().unwrap();
+                let path_txt = path.as_str();
                 buf.set_stringn(
                     left,
                     area.top(),

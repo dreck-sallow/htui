@@ -1,4 +1,4 @@
-use std::{path::PathBuf, rc::Rc};
+use std::rc::Rc;
 
 use ratatui::{
     layout::{Constraint, Margin, Rect},
@@ -85,7 +85,7 @@ impl Interactive for FileInput {
                 keybinding::GlobalKeyAction::SubmitPopup => {
                     let txt = self.input.txt();
                     self.show_input = false;
-                    return Some(FileInputEffect::NewPath(PathBuf::from(txt)));
+                    return Some(FileInputEffect::NewPath(txt.to_string()));
                 }
                 keybinding::GlobalKeyAction::ClosePopup if !self.input.mode().is_write_mode() => {
                     self.show_input = false;
@@ -136,7 +136,7 @@ impl Interactive for FileInput {
 }
 
 pub enum FileInputEffect {
-    NewPath(PathBuf),
+    NewPath(String),
 }
 
 // fn list_path_options(path: &Path) -> std::io::Result<Vec<SelectOption>> {

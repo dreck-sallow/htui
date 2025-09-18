@@ -9,6 +9,7 @@ use serde::{
     ser::SerializeMap,
     Deserialize, Serialize,
 };
+use tempfile::TempDir;
 
 pub fn time_as_id() -> String {
     SystemTime::now()
@@ -388,8 +389,14 @@ pub struct ResponseModel {
     pub status: u16,
     /// Body types, storing bytes from (Bytes struct)
     pub body: Vec<u8>,
-    pub body_file_path: Option<PathBuf>,
+    pub file_path: ResponseFilePath,
     pub headers: Vec<(String, String)>,
+}
+
+pub enum ResponseFilePath {
+    Temp(tempfile::TempPath),
+    Saved(PathBuf),
+    Null,
 }
 
 /// Used for track the request that is currently tracked on async tasks

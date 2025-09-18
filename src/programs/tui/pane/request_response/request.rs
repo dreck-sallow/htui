@@ -10,7 +10,9 @@ use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Response, Url
 use tokio::time::Instant;
 
 use crate::{
-    app_project::models::{self, RequestModel, ResponseModel, SendRequest, SendRequestKey},
+    app_project::models::{
+        self, RequestModel, ResponseFilePath, ResponseModel, SendRequest, SendRequestKey,
+    },
     programs::tui::{event_handler::EventSender, pane::text_editor::TextEditor},
 };
 
@@ -65,11 +67,7 @@ pub fn request_model_to_state(
         }
     }
 
-    let dump_viewer = BinaryViewer::new(
-        &response_model.body,
-        response_model.body_file_path.clone(),
-        view_area,
-    );
+    let dump_viewer = BinaryViewer::new(&response_model.body, &response_model.file_path, view_area);
     response_content.body_viewer = BodyContentView::Binary(dump_viewer);
 }
 
@@ -140,27 +138,18 @@ async fn into_response_model(http_response: Response, duration: Duration) -> Res
 
     let (body_file_path, body_bytes) = {
         const MAX_BYTES: usize = 1024 * 8;
-
         let response_bytes = http_response.bytes().await.unwrap();
 
         if response_bytes.len() > MAX_BYTES {
-            // I need store the bytes into a file
-            // TODO: Store bytes in a file (on Downloads folder)
-            let mut temp_file = tempfile::Builder::new()
-                .disable_cleanup(true)
-                .prefix("my-file")
-                .suffix(".txt")
-                .tempfile()
-                .unwrap();
+            let mut temp_file = tempfile::Builder::new().prefix("file").tempfile().unwrap();
 
             temp_file.write(&response_bytes).unwrap();
             (
-                Some(temp_file.path().to_owned()),
+                ResponseFilePath::Temp(temp_file.into_temp_path()),
                 response_bytes[0..(MAX_BYTES + 1)].to_vec(),
             )
         } else {
-            // Keep in memory the bytes
-            (None, response_bytes.to_vec())
+            (ResponseFilePath::Null, response_bytes.to_vec())
         }
     };
 
@@ -169,7 +158,7 @@ async fn into_response_model(http_response: Response, duration: Duration) -> Res
         status: response_status,
         body: body_bytes,
         headers: key_value_headers.clone(),
-        body_file_path,
+        file_path: body_file_path,
     }
 }
 
