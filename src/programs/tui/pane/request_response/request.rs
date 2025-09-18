@@ -180,8 +180,10 @@ pub fn request_into_builder(req: &RequestModel) -> RequestBuilder {
         .unwrap()
         .request(method, url);
 
-    for (key, value) in req.headers_map() {
-        client_builder = client_builder.header(key, value);
+    for header in req.headers() {
+        if header.enable {
+            client_builder = client_builder.header(&header.key, &header.value);
+        }
     }
 
     client_builder

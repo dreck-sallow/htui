@@ -9,7 +9,6 @@ use serde::{
     ser::SerializeMap,
     Deserialize, Serialize,
 };
-use tempfile::TempDir;
 
 pub fn time_as_id() -> String {
     SystemTime::now()
@@ -119,7 +118,7 @@ pub struct RequestModel {
     id: String,
     name: String,
     url: String,
-    headers: HashMap<String, String>,
+    pub headers: Vec<KeyValueParam>,
     pub params: Vec<KeyValueParam>,
     method: HttpMethod,
     body: BodyContent,
@@ -131,7 +130,7 @@ impl RequestModel {
             id: time_as_id(),
             name,
             url: String::from("https://"),
-            headers: HashMap::default(),
+            headers: Vec::new(),
             params: Vec::new(),
             method: HttpMethod::Get,
             body: BodyContent::Empty,
@@ -154,21 +153,11 @@ impl RequestModel {
         self.url = url;
     }
 
-    pub fn headers_map(&self) -> &HashMap<String, String> {
+    pub fn headers(&self) -> &[KeyValueParam] {
         &self.headers
     }
 
-    pub fn headers(&self) -> Vec<(&str, &str)> {
-        let mut list = Vec::new();
-
-        for (k, v) in &self.headers {
-            list.push((k.as_str(), v.as_str()));
-        }
-
-        list
-    }
-
-    pub fn set_headers(&mut self, headers: HashMap<String, String>) {
+    pub fn set_headers(&mut self, headers: Vec<KeyValueParam>) {
         self.headers = headers;
     }
 
@@ -261,20 +250,6 @@ impl<'de> Deserialize<'de> for HttpMethod {
         deserializer.deserialize_str(HttpMethodVisitor)
     }
 }
-
-// impl Into<&str> for &HttpMethod {
-//     fn into(self) -> &'static str {
-//         match self {
-//             HttpMethod::Options => "OPTIONS",
-//             HttpMethod::Get => "GET",
-//             HttpMethod::Post => "POST",
-//             HttpMethod::Put => "PUT",
-//             HttpMethod::Delete => "DELETE",
-//             HttpMethod::Head => "HEAD",
-//             HttpMethod::Patch => "PATCH",
-//         }
-//     }
-// }
 
 /// Structure only used for parse a str to httpMethod;
 pub struct ParseErrorHttpMethod;

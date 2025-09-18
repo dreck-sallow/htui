@@ -104,7 +104,9 @@ impl TableParamState {
     pub fn remove_param(&mut self, idx: usize) -> Option<KeyValueParam> {
         if self.items.get(idx).is_some() {
             if idx == 0 {
-                self.index_cell = None;
+                if self.items.len() <= 1 {
+                    self.index_cell = None;
+                }
             } else if idx == self.items.len() - 1 {
                 let current_index = self.index_cell.unwrap();
                 self.index_cell = Some((idx - 1, current_index.1));

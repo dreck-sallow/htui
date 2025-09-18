@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 use crossterm::event::KeyEvent;
 use list::{CollectionList, Item};
@@ -122,16 +122,6 @@ impl CollectionsComponent {
                 CollectionAction::EditRequestBody { idx, body },
                 &mut self.state,
             );
-
-            let headers = {
-                let mut map = HashMap::new();
-
-                for key_value in headers {
-                    map.insert(key_value.key, key_value.value);
-                }
-
-                map
-            };
 
             self._history.apply(
                 CollectionAction::EditRequestHeaders { idx, headers },
@@ -422,7 +412,7 @@ enum CollectionAction {
     },
     EditRequestHeaders {
         idx: (usize, usize),
-        headers: HashMap<String, String>,
+        headers: Vec<KeyValueParam>,
     },
     EditRequestParams {
         idx: (usize, usize),
@@ -546,7 +536,7 @@ impl TrackAction for CollectionAction {
             CollectionAction::EditRequestHeaders { idx, headers } => {
                 let idx = idx.to_owned();
                 let request = state.get_request_mut(idx).unwrap();
-                let previous_headers = request.headers_map().clone();
+                let previous_headers = request.headers.clone();
 
                 state.edit_request(idx, |req| {
                     req.set_headers(headers.clone());

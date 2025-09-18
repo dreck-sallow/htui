@@ -16,7 +16,7 @@ use request_response::ResponseViewerComponent;
 use tokio::sync::mpsc;
 
 use crate::app_project::{
-    models::{KeyValueParam, ProjectModel},
+    models::ProjectModel,
     store::{LocalStore, Store},
 };
 
@@ -189,15 +189,9 @@ impl Pane {
             PaneAction::ChangeRequest => {
                 if let Some(req) = self.collections_component.current_request() {
                     self.method_url_component.set_data(req.method(), req.url());
-                    let headers = req
-                        .headers()
-                        .iter()
-                        .map(|(k, v)| KeyValueParam::new(k.to_string(), v.to_string()))
-                        .collect();
-
                     self.request_builder_component.set_state(
                         req.params.clone(),
-                        headers,
+                        req.headers().to_vec(),
                         req.body().clone(),
                     );
 
