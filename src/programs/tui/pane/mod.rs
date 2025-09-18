@@ -147,14 +147,15 @@ impl Pane {
 
         if self.collections_component.current_request().is_some() {
             self.method_url_component.draw(&mut painter, self.focus);
-            self.request_builder_component
-                .draw(&mut painter, self.focus);
+            self.request_builder_component.draw(self.focus, frame);
             self.response_viewer_component.draw(self.focus, frame);
         } else {
             self.placeholder_view.draw(frame);
         }
 
         painter.draw(frame);
+        self.request_builder_component
+            .draw_overlay(self.focus, frame);
         self.response_viewer_component
             .draw_overlay(self.focus, frame);
     }

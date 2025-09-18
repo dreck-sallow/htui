@@ -5,20 +5,20 @@ use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Margin, Rect},
     style::{Style, Stylize},
-    text::Span,
-    widgets::{Block, Clear, Widget},
+    widgets::{Block, Clear},
 };
-use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
     app_project::models::KeyValueParam,
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
-            component::{Drawable, Interactive, WithHistory},
+            component::WithHistory,
+            input::mode_input::ModeInput,
+            InteractiveElement, UiElement,
         },
         config::{keybinding, Config},
-        elements::utils::center_area,
+        elements::{table::TableGrid, utils::center_area},
     },
 };
 
@@ -123,33 +123,21 @@ impl TableParamState {
     }
 }
 
-pub struct TableParams {
-    render_area: Rect,
+pub struct ParamsTable {
     state: TableParamState,
-    input: TextArea<'static>,
-    /// For show the input for editing a field
+    input: ModeInput,
     show_popup: bool,
-    config: Rc<Config>,
+    render_area: Rect,
     _history: ActionHistory<TableParamsAction>,
 }
 
-impl TableParams {
-    pub fn new(config: Rc<Config>) -> Self {
-        let mut input = TextArea::default();
-        input.set_block(
-            Block::bordered()
-                .title("| Edit |")
-                .border_style(Style::default().fg(config.theme.border_focus))
-                .border_type(ratatui::widgets::BorderType::Thick),
-        );
-        input.set_cursor_line_style(Style::default());
-
+impl ParamsTable {
+    pub fn new() -> Self {
         Self {
             render_area: Rect::default(),
             state: TableParamState::new(),
-            input,
+            input: ModeInput::new(""),
             show_popup: false,
-            config,
             _history: ActionHistory::new(),
         }
     }
@@ -169,8 +157,7 @@ impl TableParams {
     }
 
     pub fn clean_lines(&mut self) {
-        self.input.move_cursor(CursorMove::End);
-        self.input.delete_line_by_head();
+        self.input.clear();
     }
 
     pub fn cell_text(&self) -> Option<&str> {
@@ -190,75 +177,85 @@ impl TableParams {
     }
 }
 
-impl Drawable for TableParams {
-    type Params = ();
+impl UiElement for ParamsTable {
+    type Params = Rc<Config>;
 
-    fn set_area(&mut self, _area: Rect) {
-        self.render_area = _area.inner(Margin::new(1, 0));
+    fn set_area(&mut self, area: Rect) {
+        self.render_area = area;
+        self.input.set_area(
+            center_area(
+                self.render_area,
+                Constraint::Length(3),
+                Constraint::Percentage(50),
+            )
+            .inner(Margin::new(1, 1)),
+        );
     }
 
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        _params: Self::Params,
-    ) {
-        painter.render(move |frame| {
-            let items = self
-                .state
-                .items
-                .iter()
-                .map(|itm| {
-                    let apply_label = if itm.enable { "yes" } else { "no" };
-                    [
-                        Span::raw(apply_label),
-                        Span::from(&itm.key),
-                        Span::from(&itm.value),
-                    ]
-                })
-                .collect();
-            let table = TableParamsUi::new(items)
-                .title_style(Style::default().gray().blue())
-                .index_style(Style::default().on_light_blue().dark_gray())
-                .index_cell(self.state.index_cell);
+    fn draw(&self, config: Self::Params, frame: &mut ratatui::Frame) {
+        let rows = self
+            .state
+            .items
+            .iter()
+            .map(|param| {
+                [
+                    (if param.enable { "yes" } else { "no" }).into(),
+                    param.key.as_str().into(),
+                    param.value.as_str().into(),
+                ]
+            })
+            .collect();
 
-            frame.render_widget(table, self.render_area);
-        });
+        let table_grid = TableGrid::new(
+            ["Enabled".blue(), "key".blue(), "Value".blue()],
+            [0.2, 0.4, 0.4],
+        )
+        .with_index(
+            self.state.index_cell,
+            Style::default()
+                .fg(config.theme.selection.fg)
+                .bg(config.theme.selection.bg),
+        )
+        .with_placeholder("No Items".italic().dark_gray())
+        .with_rows(rows);
 
+        frame.render_widget(table_grid, self.render_area);
+    }
+
+    fn draw_overlay(&self, config: Self::Params, frame: &mut ratatui::Frame) {
         if self.show_popup {
-            painter.render_last(|frame| {
-                let area = center_area(
-                    self.render_area,
-                    Constraint::Length(3),
-                    Constraint::Percentage(50),
-                );
+            let area = center_area(
+                self.render_area,
+                Constraint::Length(3),
+                Constraint::Percentage(50),
+            );
+            let block = Block::bordered()
+                .title("| Edit |")
+                .border_style(Style::default().fg(config.theme.border_focus))
+                .border_type(ratatui::widgets::BorderType::Thick);
 
-                frame.render_widget(Clear, area);
-                frame.render_widget(&self.input, area);
-            });
+            frame.render_widget(Clear, area);
+            frame.render_widget(block, area);
+            self.input.draw((), frame);
         }
     }
 }
 
-impl Interactive for TableParams {
-    type Effect = ();
-    type Params = Rc<RefCell<Clipboard>>;
+impl<'params> InteractiveElement<'params> for ParamsTable {
+    type Params = (Rc<Config>, Rc<RefCell<Clipboard>>);
 
-    fn on_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        clipboard: Self::Params,
-    ) -> Option<Self::Effect> {
+    fn handle_key(&mut self, (config, clipboard): Self::Params, key: crossterm::event::KeyEvent) {
         if self.show_popup {
-            let is_consumed = match self.config.keymap.match_global_action(key) {
+            let is_consumed = match config.keymap.match_global_action(key) {
                 Some(action) => match action {
-                    keybinding::GlobalKeyAction::ClosePopup => {
+                    keybinding::GlobalKeyAction::ClosePopup if self.input.mode().is_read_mode() => {
                         self.show_popup = false;
                         self.clean_lines();
                         true
                     }
                     keybinding::GlobalKeyAction::SubmitPopup => {
                         if let Some((row, col)) = self.state.index_cell {
-                            let txt = self.input.lines()[0].to_owned();
+                            let txt = self.input.txt().to_owned();
                             match col {
                                 1 => {
                                     self._history.apply(
@@ -279,6 +276,7 @@ impl Interactive for TableParams {
                         }
 
                         self.show_popup = false;
+                        self.input.mode();
                         self.clean_lines();
                         true
                     }
@@ -288,11 +286,10 @@ impl Interactive for TableParams {
             };
 
             if !is_consumed {
-                self.input.input(Input::from(key));
+                self.input.handle_key(key);
             }
         } else {
-            let is_consumed = self
-                .config
+            let is_consumed = config
                 .keymap
                 .match_global_action(key)
                 .map_or(false, |action| match action {
@@ -322,7 +319,7 @@ impl Interactive for TableParams {
                 });
 
             if !is_consumed {
-                if let Some(action) = self.config.keymap.match_table_action(key) {
+                if let Some(action) = config.keymap.match_table_action(key) {
                     match action {
                         keybinding::TableKeyAction::New => {
                             self._history.apply(
@@ -350,13 +347,13 @@ impl Interactive for TableParams {
                                         self.clean_lines();
                                         let key_value = self.state.get_item(row).unwrap();
                                         self.show_popup = true;
-                                        self.input.insert_str(&key_value.key);
+                                        self.input.replace(&key_value.key);
                                     }
                                     2 => {
                                         self.clean_lines();
                                         let key_value = self.state.get_item(row).unwrap();
                                         self.show_popup = true;
-                                        self.input.insert_str(&key_value.value);
+                                        self.input.replace(&key_value.value);
                                     }
                                     _ => {}
                                 }
@@ -366,7 +363,6 @@ impl Interactive for TableParams {
                 }
             }
         }
-        None
     }
 }
 
@@ -422,176 +418,12 @@ impl TrackAction for TableParamsAction {
     }
 }
 
-impl WithHistory for TableParams {
+impl WithHistory for ParamsTable {
     fn undo(&mut self) {
         self._history.undo(&mut self.state);
     }
 
     fn redo(&mut self) {
         self._history.redo(&mut self.state);
-    }
-}
-
-/// Internal table for ui
-pub struct TableParamsUi<'text> {
-    header: [&'static str; 3],
-    key_values: Vec<[Span<'text>; 3]>,
-    title_style: Style,
-    index_style: Style,
-    index_cell: Option<(usize, usize)>,
-}
-
-impl<'text> TableParamsUi<'text> {
-    pub fn new(items: Vec<[Span<'text>; 3]>) -> Self {
-        let items_len = items.len();
-        Self {
-            header: ["Enable", "Key", "Value"],
-            key_values: items,
-            title_style: Style::default(),
-            index_style: Style::default(),
-            index_cell: if items_len > 0 { Some((0, 0)) } else { None },
-        }
-    }
-
-    pub fn title_style(mut self, style: Style) -> Self {
-        self.title_style = style;
-        self
-    }
-
-    pub fn index_style(mut self, style: Style) -> Self {
-        self.index_style = style;
-        self
-    }
-
-    pub fn index_cell(mut self, index: Option<(usize, usize)>) -> Self {
-        self.index_cell = index;
-        self
-    }
-}
-
-impl Widget for TableParamsUi<'_> {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
-        if area.is_empty() {
-            return;
-        }
-
-        let header_area = Rect { height: 1, ..area };
-        let content_area = Rect {
-            y: area.y + 1,
-            ..area
-        };
-
-        let colum_widths = {
-            let missing_width = (area.width - 2) - 6;
-            let key_width = ((missing_width as f32) * 0.4) as u16;
-
-            [6, key_width, missing_width - key_width]
-        };
-        // Draw the header (titles)
-
-        let mut left = header_area.left();
-        for (i, title) in self.header.iter().enumerate() {
-            let width = colum_widths[i];
-            buf.set_stringn(
-                left,
-                header_area.top(),
-                title,
-                width as usize,
-                self.title_style,
-            );
-
-            left += width + 1;
-        }
-
-        // If no items, render a placeholder
-
-        if self.key_values.is_empty() {
-            let msg = "No items";
-            buf.set_stringn(
-                content_area.left(),
-                content_area.top(),
-                msg,
-                msg.len(),
-                Style::default().gray().italic(),
-            );
-        } else {
-            // Draw the list table content
-            // get the visible page
-            let (page_start, page_end) = {
-                let in_page = |start_i: usize| {
-                    let height = content_area.height;
-                    let mut acc_height = 0;
-
-                    let mut end_i = start_i;
-
-                    for _ in &self.key_values[start_i..] {
-                        // Handle multilines?
-                        acc_height += 1;
-
-                        if acc_height > height {
-                            break;
-                        }
-
-                        end_i += 1;
-                    }
-
-                    (start_i, end_i)
-                };
-
-                match self.index_cell {
-                    Some((row_i, _)) => loop {
-                        let idx = in_page(0);
-                        if row_i >= idx.0 && row_i <= idx.1 {
-                            break idx;
-                        }
-                    },
-                    None => in_page(0),
-                }
-            };
-
-            let mut top = content_area.top();
-            let mut left = content_area.left();
-
-            let check_idx = |n: (usize, usize)| {
-                if let Some(idx) = self.index_cell {
-                    let from_start_idx = idx.0 - page_start;
-                    n == (from_start_idx, idx.1)
-                } else {
-                    false
-                }
-            };
-
-            for (row, key_value) in self.key_values[page_start..page_end].iter().enumerate() {
-                for (col, text) in key_value.iter().enumerate() {
-                    let width = colum_widths[col];
-                    if text.width() == 0 {
-                        // render a placeholder!
-                        buf.set_string(left, top, "-", Style::default().italic().dark_gray());
-                    } else {
-                        buf.set_span(left, top, text, width);
-                    }
-
-                    if check_idx((row, col)) {
-                        buf.set_style(
-                            Rect {
-                                x: left,
-                                y: top,
-                                width,
-                                height: 1, // TODO: change for multiline
-                            },
-                            self.index_style,
-                        );
-                    }
-
-                    left += width + 1;
-                }
-
-                top += 1;
-                left = content_area.left();
-            }
-        }
     }
 }

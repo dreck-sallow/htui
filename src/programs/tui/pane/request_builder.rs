@@ -3,7 +3,10 @@ use std::{cell::RefCell, io::Stdout, rc::Rc};
 use crate::{
     app_project::models::{BodyContent, KeyValueParam},
     programs::tui::{
-        common::component::{Drawable, Interactive, WithHistory},
+        common::{
+            component::{Interactive, WithHistory},
+            InteractiveElement, UiElement,
+        },
         config::{keybinding, Config},
         event_handler::{AppMessage, Events},
     },
@@ -18,7 +21,7 @@ use ratatui::{
 };
 
 use super::{
-    action::PaneAction, body_editor::BodyEditorComponent, params_table::TableParams, ElementFocus,
+    action::PaneAction, body_editor::BodyEditorComponent, params_table::ParamsTable, ElementFocus,
 };
 
 #[derive(Clone, Copy)]
@@ -52,8 +55,8 @@ pub struct RequestEditorComponent {
     tab: Tab,
     header_area: Rect,
     render_area: Rect,
-    params_table: TableParams,
-    headers_table: TableParams,
+    params_table: ParamsTable,
+    headers_table: ParamsTable,
     body_editor_component: BodyEditorComponent,
     config: Rc<Config>,
     clipboard: Rc<RefCell<Clipboard>>,
@@ -65,8 +68,8 @@ impl RequestEditorComponent {
             tab: Tab::Params,
             header_area: Rect::default(),
             render_area: Rect::default(),
-            params_table: TableParams::new(Rc::clone(&config)),
-            headers_table: TableParams::new(Rc::clone(&config)),
+            params_table: ParamsTable::new(),
+            headers_table: ParamsTable::new(),
             body_editor_component: BodyEditorComponent::new(Rc::clone(&config)),
             config,
             clipboard,
@@ -121,69 +124,8 @@ impl RequestEditorComponent {
     }
 }
 
-impl Drawable for RequestEditorComponent {
+impl UiElement for RequestEditorComponent {
     type Params = ElementFocus;
-
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        params: Self::Params,
-    ) {
-        painter.render(move |frame| {
-            let border_style = if params == ElementFocus::RequestBuilder {
-                Style::default().fg(self.config.theme.border_focus)
-            } else {
-                Style::default().fg(self.config.theme.border)
-            };
-
-            let border_type = if params == ElementFocus::RequestBuilder {
-                BorderType::Thick
-            } else {
-                BorderType::Plain
-            };
-
-            let block = Block::bordered()
-                .border_style(border_style)
-                .border_type(border_type);
-            frame.render_widget(block, self.render_area);
-
-            let tabs = Tabs::new([
-                format!(
-                    " {} ({})",
-                    Tab::Params.as_ref().fg(self.config.theme.tab),
-                    self.params_table.len_items()
-                ),
-                format!(
-                    " {} ({})",
-                    Tab::Headers.as_ref().fg(self.config.theme.tab),
-                    self.headers_table.len_items()
-                ),
-                format!(" {} ", Tab::Body.as_ref().fg(self.config.theme.tab)),
-            ])
-            .select(self.tab.as_idx())
-            .block(
-                Block::new()
-                    .borders(Borders::BOTTOM)
-                    .border_style(border_style)
-                    .border_type(border_type),
-            )
-            .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
-
-            frame.render_widget(tabs, self.header_area);
-        });
-
-        match self.tab {
-            Tab::Headers => {
-                self.headers_table.draw(painter, ());
-            }
-            Tab::Body => {
-                self.body_editor_component.draw(painter, ());
-            }
-            Tab::Params => {
-                self.params_table.draw(painter, ());
-            }
-        }
-    }
 
     fn set_area(&mut self, area: Rect) {
         let main_areas = Layout::vertical([Constraint::Length(2), Constraint::Fill(50)])
@@ -194,6 +136,73 @@ impl Drawable for RequestEditorComponent {
         self.params_table.set_area(main_areas[1]);
         self.headers_table.set_area(main_areas[1]);
         self.body_editor_component.set_area(main_areas[1]);
+    }
+
+    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+        let border_style = if params == ElementFocus::RequestBuilder {
+            Style::default().fg(self.config.theme.border_focus)
+        } else {
+            Style::default().fg(self.config.theme.border)
+        };
+
+        let border_type = if params == ElementFocus::RequestBuilder {
+            BorderType::Thick
+        } else {
+            BorderType::Plain
+        };
+
+        let block = Block::bordered()
+            .border_style(border_style)
+            .border_type(border_type);
+        frame.render_widget(block, self.render_area);
+
+        let tabs = Tabs::new([
+            format!(
+                " {} ({})",
+                Tab::Params.as_ref().fg(self.config.theme.tab),
+                self.params_table.len_items()
+            ),
+            format!(
+                " {} ({})",
+                Tab::Headers.as_ref().fg(self.config.theme.tab),
+                self.headers_table.len_items()
+            ),
+            format!(" {} ", Tab::Body.as_ref().fg(self.config.theme.tab)),
+        ])
+        .select(self.tab.as_idx())
+        .block(
+            Block::new()
+                .borders(Borders::BOTTOM)
+                .border_style(border_style)
+                .border_type(border_type),
+        )
+        .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
+
+        frame.render_widget(tabs, self.header_area);
+
+        match self.tab {
+            Tab::Headers => {
+                self.headers_table.draw(Rc::clone(&self.config), frame);
+            }
+            Tab::Body => {
+                self.body_editor_component.draw((), frame);
+            }
+            Tab::Params => {
+                self.params_table.draw(Rc::clone(&self.config), frame);
+            }
+        }
+    }
+
+    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+        match self.tab {
+            Tab::Headers => self
+                .headers_table
+                .draw_overlay(Rc::clone(&self.config), frame),
+            Tab::Body => self.body_editor_component.draw_overlay((), frame),
+            Tab::Params => self
+                .params_table
+                .draw_overlay(Rc::clone(&self.config), frame),
+        }
     }
 }
 
@@ -230,13 +239,15 @@ impl Interactive for RequestEditorComponent {
 
         match self.tab {
             Tab::Headers => {
-                self.headers_table.on_key(key, Rc::clone(&self.clipboard));
+                self.headers_table
+                    .handle_key((Rc::clone(&self.config), Rc::clone(&self.clipboard)), key);
             }
             Tab::Body => {
                 self.body_editor_component.on_key(key, params);
             }
             Tab::Params => {
-                self.params_table.on_key(key, Rc::clone(&self.clipboard));
+                self.params_table
+                    .handle_key((Rc::clone(&self.config), Rc::clone(&self.clipboard)), key);
             }
         }
         None

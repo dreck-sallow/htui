@@ -22,10 +22,11 @@ use crate::{
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
-            component::{Drawable, Interactive, WithHistory},
+            component::{Interactive, WithHistory},
+            UiElement,
         },
         config::{keybinding, Config},
-        elements::dropdown::OverlayDropdown,
+        elements::{dropdown::OverlayDropdown, utils::center_area},
         event_handler::{AppMessage, Events},
     },
 };
@@ -107,88 +108,76 @@ impl BodyEditorComponent {
     }
 }
 
-impl Drawable for BodyEditorComponent {
+impl UiElement for BodyEditorComponent {
     type Params = ();
 
-    fn set_area(&mut self, _area: Rect) {
-        self.render_area = _area;
+    fn set_area(&mut self, area: Rect) {
+        self.render_area = area;
     }
 
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        _params: Self::Params,
-    ) {
-        painter.render(|frame| {
-            let [header_area, content_area] =
-                Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
-                    .areas(self.render_area);
+    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+        let [header_area, content_area] =
+            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(self.render_area);
 
-            let title = Span::from(format!(" Type: {} ", self.body_content.as_tag())).italic();
-            let body_type = Span::from("\u{25bc} ");
+        let title = Span::from(format!(" Type: {} ", self.body_content.as_tag())).italic();
+        let body_type = Span::from("\u{25bc} ");
 
-            let [title_area, body_type_area] = Layout::horizontal([
-                Constraint::Length(title.width() as u16),
-                Constraint::Length(body_type.width() as u16),
-            ])
-            .flex(ratatui::layout::Flex::SpaceBetween)
-            .areas(header_area);
+        let [title_area, body_type_area] = Layout::horizontal([
+            Constraint::Length(title.width() as u16),
+            Constraint::Length(body_type.width() as u16),
+        ])
+        .flex(ratatui::layout::Flex::SpaceBetween)
+        .areas(header_area);
 
-            frame.render_widget(title, title_area);
-            frame.render_widget(body_type, body_type_area);
-            frame.buffer_mut().set_style(
-                header_area,
-                Style::default().fg(self.config.theme.dropdown.fg).bg(self
-                    .config
-                    .theme
-                    .dropdown
-                    .bg),
-            );
+        frame.render_widget(title, title_area);
+        frame.render_widget(body_type, body_type_area);
+        frame.buffer_mut().set_style(
+            header_area,
+            Style::default()
+                .fg(self.config.theme.dropdown.fg)
+                .bg(self.config.theme.dropdown.bg),
+        );
 
-            match &self.body_content {
-                BodyContent::Empty => {
-                    let text = Span::from("No body").italic();
-                    let [inner_area] = Layout::vertical([Constraint::Length(1)])
-                        .flex(ratatui::layout::Flex::Center)
-                        .areas(content_area);
-                    let [inner_area] =
-                        Layout::horizontal([Constraint::Length(text.width() as u16)])
-                            .flex(ratatui::layout::Flex::Center)
-                            .areas(inner_area);
+        match &self.body_content {
+            BodyContent::Empty => {
+                let text = Span::from("No body").italic();
+                let inner_area = center_area(
+                    content_area,
+                    Constraint::Length(1),
+                    Constraint::Length(text.width() as u16),
+                );
 
-                    frame.render_widget(text, inner_area);
-                }
-                BodyContent::File(path_buf) => {
-                    let text = Span::from(path_buf.as_os_str().to_str().unwrap()).italic();
-                    let [inner_area] = Layout::vertical([Constraint::Length(1)])
-                        .flex(ratatui::layout::Flex::Center)
-                        .areas(content_area);
-                    let [inner_area] =
-                        Layout::horizontal([Constraint::Length(text.width() as u16)])
-                            .flex(ratatui::layout::Flex::Center)
-                            .areas(inner_area);
-
-                    frame.render_widget(text, inner_area);
-                }
-                BodyContent::Form(_hash_map) => {
-                    frame.render_widget(&self.text_editor, content_area);
-                }
-                BodyContent::Text(_) => {
-                    frame.render_widget(&self.text_editor, content_area);
-                }
+                frame.render_widget(text, inner_area);
             }
-        });
+            BodyContent::File(path_buf) => {
+                let text = Span::from(path_buf.as_os_str().to_str().unwrap()).italic();
 
+                let inner_area = center_area(
+                    content_area,
+                    Constraint::Length(1),
+                    Constraint::Length(text.width() as u16),
+                );
+
+                frame.render_widget(text, inner_area);
+            }
+            BodyContent::Form(_hash_map) => {
+                frame.render_widget(&self.text_editor, content_area);
+            }
+            BodyContent::Text(_) => {
+                frame.render_widget(&self.text_editor, content_area);
+            }
+        }
+    }
+
+    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
         if self.show_dropdown {
-            painter.render_last(|frame| {
-                let area = Rect {
-                    y: self.render_area.top() + 1,
-                    height: 3,
-                    ..self.render_area
-                };
+            let area = Rect {
+                y: self.render_area.top() + 1,
+                height: 3,
+                ..self.render_area
+            };
 
-                frame.render_widget(&self.dropdown, area);
-            });
+            frame.render_widget(&self.dropdown, area);
         }
     }
 }
@@ -319,23 +308,3 @@ impl WithHistory for BodyEditorComponent {
         self._history.redo(&mut self.body_content);
     }
 }
-
-// pub fn edit_text_on_editor(text: &str) -> String {
-//     disable_raw_mode().unwrap();
-//     stdout().execute(LeaveAlternateScreen).unwrap();
-
-//     // Start the editing
-//     let mut file = NamedTempFile::new().unwrap();
-//     file.write_all(text.as_bytes()).unwrap();
-
-//     let file_path = file.into_temp_path();
-
-//     Command::new(var("EDITOR").unwrap())
-//         .args([&file_path])
-//         .status()
-//         .expect("Error executing editor");
-//     // file_path.close();
-//     enable_raw_mode().unwrap();
-//     stdout().execute(EnterAlternateScreen).unwrap();
-//     fs::read_to_string(file_path).unwrap()
-// }

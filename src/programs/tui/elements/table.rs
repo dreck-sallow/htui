@@ -32,7 +32,6 @@ impl<'text, 'placeholder, const N: usize> TableGrid<'text, 'placeholder, N> {
     }
 
     pub fn with_index(mut self, idx: Option<(usize, usize)>, style: Style) -> Self {
-        // self.index_cell = Some(idx);
         self.index_cell = idx;
         self.index_style = style;
         self
@@ -67,7 +66,12 @@ impl<const N: usize> Widget for TableGrid<'_, '_, N> {
         }
 
         if self.rows.is_empty() {
-            buf.set_span(area.left(), area.top(), &self.placeholder_empty, area.width);
+            buf.set_span(
+                area.left(),
+                area.top() + 1,
+                &self.placeholder_empty,
+                area.width,
+            );
         } else {
             // draw content rows
             let (index_start, index_end) = {
