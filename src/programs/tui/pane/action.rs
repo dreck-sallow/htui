@@ -11,4 +11,5 @@ pub enum PaneAction {
 
     /// Action used for save the project to local
     SaveLocal,
+    Noop,
 }

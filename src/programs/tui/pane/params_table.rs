@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::rc::Rc;
 
 use arboard::Clipboard;
 use crossterm::event::KeyCode;
@@ -244,7 +244,7 @@ impl UiElement for ParamsTable {
 }
 
 impl<'params> InteractiveElement<'params> for ParamsTable {
-    type Params = (Rc<Config>, Rc<RefCell<Clipboard>>);
+    type Params = (&'params Config, &'params mut Clipboard);
 
     fn handle_key(&mut self, (config, clipboard): Self::Params, key: crossterm::event::KeyEvent) {
         if self.show_popup {
@@ -313,7 +313,7 @@ impl<'params> InteractiveElement<'params> for ParamsTable {
                     }
                     keybinding::GlobalKeyAction::CopyToClipboard => {
                         if let Some(txt) = self.cell_text() {
-                            clipboard.borrow_mut().set_text(txt).unwrap();
+                            clipboard.set_text(txt).unwrap();
                         }
                         true
                     }

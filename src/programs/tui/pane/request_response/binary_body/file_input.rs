@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::programs::tui::{
-    common::{component::Interactive, input::mode_input::ModeInput, UiElement},
+    common::{input::mode_input::ModeInput, InteractiveElementEff, UiElement},
     config::{keybinding, Config},
     elements::utils::center_area,
 };
@@ -70,16 +70,16 @@ impl UiElement for FileInput {
     }
 }
 
-impl Interactive for FileInput {
-    type Effect = FileInputEffect;
+impl<'params> InteractiveElementEff<'params> for FileInput {
+    type Effect = Option<FileInputEffect>;
 
-    type Params = Rc<Config>;
+    type Params = &'params Config;
 
-    fn on_key(
+    fn handle_key(
         &mut self,
-        key: crossterm::event::KeyEvent,
         config: Self::Params,
-    ) -> Option<Self::Effect> {
+        key: crossterm::event::KeyEvent,
+    ) -> Self::Effect {
         let consumed = match config.keymap.match_global_action(key) {
             Some(action) => match action {
                 keybinding::GlobalKeyAction::SubmitPopup => {
@@ -102,7 +102,6 @@ impl Interactive for FileInput {
         if !consumed {
             self.input.handle_key(key);
         }
-
         None
     }
 }

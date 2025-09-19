@@ -15,8 +15,8 @@ use crate::{
     },
     programs::tui::{
         common::{
-            component::{Drawable, Interactive},
             list_utils::{next, prev},
+            InteractiveElementEff, UiElement,
         },
         config::{keybinding, Config},
         elements::utils::center_area,
@@ -85,85 +85,80 @@ impl SearchProjects {
     }
 }
 
-impl Drawable for SearchProjects {
+impl UiElement for SearchProjects {
     type Params = ();
 
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        _params: Self::Params,
-    ) {
-        painter.render_last(|frame| {
-            // height = borders(Top | Bottom) + input + line + max_items
-            // let height = 2 + 1 + 1 + 8;
-            let height = {
-                let content_size = if self.filtereds.is_empty() {
-                    1 // placeholder
+    fn set_area(&mut self, _area: Rect) {}
+
+    fn draw(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+        let height = {
+            let content_size = if self.filtereds.is_empty() {
+                1 // placeholder
+            } else {
+                8.min(self.filtereds.len())
+            };
+
+            2 + content_size
+        };
+        let area = center_area(
+            frame.area(),
+            Constraint::Length(height as u16),
+            Constraint::Percentage(30),
+        );
+
+        let block = Block::bordered()
+            .title("| Search Project |")
+            .title_alignment(ratatui::layout::Alignment::Center)
+            .border_style(self.config.theme.border_focus)
+            .border_type(ratatui::widgets::BorderType::Thick);
+
+        let mut inner_area = block.inner(area);
+
+        frame.render_widget(Clear, area);
+
+        frame.render_widget(block, area);
+
+        if self.filtereds.is_empty() {
+            frame.render_widget(Span::from("No projects to select").italic(), inner_area);
+        } else {
+            for (idx, itm) in self.list_page(inner_area.height).iter().enumerate() {
+                // TODO: reuse the inner_area
+                let item_area = Rect {
+                    height: 1,
+                    ..inner_area
+                };
+                frame.render_widget(itm, item_area);
+
+                let style = if self.selected.map(|i| i == idx).unwrap_or(false) {
+                    Style::default()
+                        .fg(self.config.theme.dropdown_highlight.fg)
+                        .bg(self.config.theme.dropdown_highlight.bg)
                 } else {
-                    8.min(self.filtereds.len())
+                    Style::default().fg(self.config.theme.dropdown.fg).bg(self
+                        .config
+                        .theme
+                        .dropdown
+                        .bg)
                 };
 
-                2 + content_size
-            };
-            let area = center_area(
-                frame.area(),
-                Constraint::Length(height as u16),
-                Constraint::Percentage(30),
-            );
+                frame.buffer_mut().set_style(item_area, style);
 
-            let block = Block::bordered()
-                .title("| Search Project |")
-                .title_alignment(ratatui::layout::Alignment::Center)
-                .border_style(self.config.theme.border_focus)
-                .border_type(ratatui::widgets::BorderType::Thick);
-
-            let mut inner_area = block.inner(area);
-
-            frame.render_widget(Clear, area);
-
-            frame.render_widget(block, area);
-
-            if self.filtereds.is_empty() {
-                frame.render_widget(Span::from("No projects to select").italic(), inner_area);
-            } else {
-                for (idx, itm) in self.list_page(inner_area.height).iter().enumerate() {
-                    // TODO: reuse the inner_area
-                    let item_area = Rect {
-                        height: 1,
-                        ..inner_area
-                    };
-                    frame.render_widget(itm, item_area);
-
-                    let style = if self.selected.map(|i| i == idx).unwrap_or(false) {
-                        Style::default()
-                            .fg(self.config.theme.dropdown_highlight.fg)
-                            .bg(self.config.theme.dropdown_highlight.bg)
-                    } else {
-                        Style::default().fg(self.config.theme.dropdown.fg).bg(self
-                            .config
-                            .theme
-                            .dropdown
-                            .bg)
-                    };
-
-                    frame.buffer_mut().set_style(item_area, style);
-
-                    inner_area.y += 1;
-                }
+                inner_area.y += 1;
             }
-        });
+        }
     }
 }
 
-impl Interactive for SearchProjects {
-    type Effect = SearchProjectsEffect;
+impl<'p> InteractiveElementEff<'p> for SearchProjects {
+    type Effect = Option<SearchProjectsEffect>;
+
     type Params = ();
 
-    fn on_key(
+    fn handle_key(
         &mut self,
-        key: crossterm::event::KeyEvent,
         _params: Self::Params,
-    ) -> Option<Self::Effect> {
+        key: crossterm::event::KeyEvent,
+    ) -> Self::Effect {
         if let Some(action) = self.config.keymap.match_global_action(key) {
             match action {
                 keybinding::GlobalKeyAction::MoveDown => {

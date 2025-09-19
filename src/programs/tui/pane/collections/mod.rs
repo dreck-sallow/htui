@@ -18,7 +18,8 @@ use crate::{
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
-            component::{Drawable, Interactive, WithHistory},
+            component::WithHistory,
+            InteractiveElementEff, UiElement,
         },
         config::{
             keybinding::{CollectionsKeyAction, GlobalKeyAction},
@@ -131,98 +132,86 @@ impl CollectionsComponent {
     }
 }
 
-impl Drawable for CollectionsComponent {
+impl UiElement for CollectionsComponent {
     type Params = ElementFocus;
-
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        focus: Self::Params,
-    ) {
-        painter.render(move |frame| {
-            let is_focus = focus == ElementFocus::Collections;
-            let items: Vec<Item<'_>> = self
-                .state
-                .collections()
-                .iter()
-                .enumerate()
-                .map(|(_i, coll)| {
-                    let mut itm = Item::new(coll.name());
-
-                    for (_sub_i, req) in coll.requests().iter().enumerate() {
-                        // let name = match state.is_sending_request(SendRequestId(i, sub_i)) {
-                        //     true => format!("pending {}", req.name()),
-                        //     false => req.name().to_string(),
-                        // };
-                        itm.add_child(Item::new(req.name()));
-                    }
-
-                    itm
-                })
-                .collect();
-
-            let collections = CollectionList::default()
-                .set_items(items)
-                .set_block(
-                    Block::bordered()
-                        .title(format!(
-                            " Collections ({}) ",
-                            self.state.collections().len()
-                        ))
-                        .border_type(if is_focus {
-                            BorderType::Thick
-                        } else {
-                            BorderType::Plain
-                        })
-                        .border_style(
-                            Style::default().fg(is_focus
-                                .then_some(self.config.theme.border_focus)
-                                .unwrap_or(self.config.theme.border)),
-                        ),
-                )
-                .set_openeds(self.state.openeds().clone())
-                .set_idx(self.state.idx())
-                .set_highlight_style(
-                    Style::default().fg(self.config.theme.selection.fg).bg(self
-                        .config
-                        .theme
-                        .selection
-                        .bg),
-                );
-
-            frame.render_widget(collections, self.render_area);
-        });
-
-        if self.show_popup {
-            painter.render_last(|frame| {
-                let area = {
-                    let [area] = Layout::vertical([Constraint::Length(3)])
-                        .flex(ratatui::layout::Flex::Center)
-                        .areas(frame.area());
-
-                    let [area] = Layout::horizontal([Constraint::Percentage(40)])
-                        .flex(ratatui::layout::Flex::Center)
-                        .areas(area);
-
-                    area
-                };
-
-                frame.render_widget(Clear, area);
-                self.menu.draw(frame, area);
-            });
-        }
-    }
 
     fn set_area(&mut self, area: Rect) {
         self.render_area = area;
     }
+
+    fn draw(&self, focus: Self::Params, frame: &mut ratatui::Frame) {
+        let is_focus = focus == ElementFocus::Collections;
+        let items: Vec<Item<'_>> = self
+            .state
+            .collections()
+            .iter()
+            .enumerate()
+            .map(|(_i, coll)| {
+                let mut itm = Item::new(coll.name());
+                for (_sub_i, req) in coll.requests().iter().enumerate() {
+                    itm.add_child(Item::new(req.name()));
+                }
+                itm
+            })
+            .collect();
+
+        let collections = CollectionList::default()
+            .set_items(items)
+            .set_block(
+                Block::bordered()
+                    .title(format!(
+                        " Collections ({}) ",
+                        self.state.collections().len()
+                    ))
+                    .border_type(if is_focus {
+                        BorderType::Thick
+                    } else {
+                        BorderType::Plain
+                    })
+                    .border_style(
+                        Style::default().fg(is_focus
+                            .then_some(self.config.theme.border_focus)
+                            .unwrap_or(self.config.theme.border)),
+                    ),
+            )
+            .set_openeds(self.state.openeds().clone())
+            .set_idx(self.state.idx())
+            .set_highlight_style(
+                Style::default().fg(self.config.theme.selection.fg).bg(self
+                    .config
+                    .theme
+                    .selection
+                    .bg),
+            );
+
+        frame.render_widget(collections, self.render_area);
+    }
+
+    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+        if self.show_popup {
+            let area = {
+                let [area] = Layout::vertical([Constraint::Length(3)])
+                    .flex(ratatui::layout::Flex::Center)
+                    .areas(frame.area());
+
+                let [area] = Layout::horizontal([Constraint::Percentage(40)])
+                    .flex(ratatui::layout::Flex::Center)
+                    .areas(area);
+
+                area
+            };
+
+            frame.render_widget(Clear, area);
+            self.menu.draw(frame, area);
+        }
+    }
 }
 
-impl Interactive for CollectionsComponent {
+impl<'params> InteractiveElementEff<'params> for CollectionsComponent {
     type Effect = PaneAction;
     type Params = ();
 
-    fn on_key(&mut self, key: KeyEvent, _params: Self::Params) -> Option<Self::Effect> {
+    fn handle_key(&mut self, _params: Self::Params, key: KeyEvent) -> Self::Effect {
         if self.show_popup {
             if let Some(key_action) = self.config.keymap.match_global_action(key) {
                 match key_action {
@@ -278,7 +267,7 @@ impl Interactive for CollectionsComponent {
                 self.menu.handle_input(Input::from(key));
             }
         } else {
-            let mut pane_action = None;
+            let mut pane_action = PaneAction::Noop;
 
             let is_consumed_action =
                 self.config
@@ -287,10 +276,10 @@ impl Interactive for CollectionsComponent {
                     .map_or(false, |key_action| {
                         match key_action {
                             GlobalKeyAction::NextFocus => {
-                                pane_action = Some(PaneAction::NextFocus);
+                                pane_action = PaneAction::NextFocus;
                             }
                             GlobalKeyAction::PreviousFocus => {
-                                pane_action = Some(PaneAction::PreviousFocus);
+                                pane_action = PaneAction::PreviousFocus;
                             }
                             GlobalKeyAction::MoveDown => {
                                 self.state.next();
@@ -347,8 +336,7 @@ impl Interactive for CollectionsComponent {
                                     CollectionAction::SelectRequestIdx(Some((i, sub_i))),
                                     &mut self.state,
                                 );
-                                // return Some(CollectionEffect::ChangeCurrentRequest);
-                                return Some(PaneAction::ChangeRequest);
+                                return PaneAction::ChangeRequest;
                             }
                         }
                         CollectionsKeyAction::CreateCollection => {
@@ -368,7 +356,7 @@ impl Interactive for CollectionsComponent {
             return pane_action;
         }
 
-        None
+        PaneAction::Noop
     }
 }
 
@@ -588,9 +576,3 @@ impl WithHistory for CollectionsComponent {
         self._history.redo(&mut self.state);
     }
 }
-
-// pub enum CollectionEffect {
-//     NextFocus,
-//     PreviousFocus,
-//     ChangeCurrentRequest,
-// }

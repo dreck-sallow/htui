@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     collections::HashMap,
     io::{stdout, Stdout},
     rc::Rc,
@@ -22,8 +21,8 @@ use crate::{
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
-            component::{Interactive, WithHistory},
-            UiElement,
+            component::WithHistory,
+            InteractiveElement, UiElement,
         },
         config::{keybinding, Config},
         elements::{dropdown::OverlayDropdown, utils::center_area},
@@ -115,7 +114,7 @@ impl UiElement for BodyEditorComponent {
         self.render_area = area;
     }
 
-    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
         let [header_area, content_area] =
             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(self.render_area);
 
@@ -182,18 +181,13 @@ impl UiElement for BodyEditorComponent {
     }
 }
 
-impl Interactive for BodyEditorComponent {
-    type Effect = ();
+impl<'params> InteractiveElement<'params> for BodyEditorComponent {
     type Params = (
-        Rc<RefCell<Events<AppMessage>>>,
-        Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+        &'params mut Events<AppMessage>,
+        &'params mut Terminal<CrosstermBackend<Stdout>>,
     );
 
-    fn on_key(
-        &mut self,
-        key: crossterm::event::KeyEvent,
-        (events, terminal): Self::Params,
-    ) -> Option<Self::Effect> {
+    fn handle_key(&mut self, (events, terminal): Self::Params, key: crossterm::event::KeyEvent) {
         if self.show_dropdown {
             if let Some(key) = self.config.keymap.match_global_action(key) {
                 match key {
@@ -244,10 +238,9 @@ impl Interactive for BodyEditorComponent {
                     Some(action) => match action {
                         keybinding::RequestBuilderKeyAction::OpenDropdown => {
                             self.show_dropdown = true;
-                            // self.dropdown.select(BodyTypeV2::Empty);
                         }
                         keybinding::RequestBuilderKeyAction::OpenEditor => {
-                            events.borrow_mut().stop();
+                            events.stop();
                             disable_raw_mode().unwrap();
                             stdout().execute(LeaveAlternateScreen).unwrap();
 
@@ -255,8 +248,8 @@ impl Interactive for BodyEditorComponent {
 
                             enable_raw_mode().unwrap();
                             stdout().execute(EnterAlternateScreen).unwrap();
-                            let _ = terminal.borrow_mut().clear();
-                            events.borrow_mut().run();
+                            let _ = terminal.clear();
+                            events.run();
                         }
                     },
                     None => {
@@ -273,7 +266,6 @@ impl Interactive for BodyEditorComponent {
                 }
             }
         }
-        None
     }
 }
 

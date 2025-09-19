@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet, io::Stdout, rc::Rc};
+use std::{collections::HashSet, io::Stdout, rc::Rc};
 
 use arboard::Clipboard;
 use crossterm::event::KeyEvent;
@@ -17,8 +17,8 @@ use crate::app_project::models::ProjectModel;
 use super::{
     app_components::SearchProjects,
     common::{
-        component::{Drawable, Interactive, Painter},
         list_utils::{next, prev},
+        InteractiveElementEff, UiElement,
     },
     config::{keybinding, Config},
     elements::utils::center_area,
@@ -36,7 +36,6 @@ pub struct App {
     show_search_projects: bool,
     show_project_name_input: bool,
     pane_area: Rect,
-    clipboard: Rc<RefCell<Clipboard>>,
 }
 
 impl App {
@@ -44,14 +43,13 @@ impl App {
         project: ProjectModel,
         config: Rc<Config>,
         sender: mpsc::Sender<AppMessage>,
-        clipboard: Rc<RefCell<Clipboard>>,
     ) -> Self {
-        let mut this = Self::new(Rc::clone(&config), Rc::clone(&clipboard));
-        this.add_project(project, sender, clipboard);
+        let mut this = Self::new(Rc::clone(&config));
+        this.add_project(project, sender);
         this
     }
 
-    fn new(config: Rc<Config>, clipboard: Rc<RefCell<Clipboard>>) -> Self {
+    fn new(config: Rc<Config>) -> Self {
         Self {
             panes: Vec::new(),
             selected: None,
@@ -62,17 +60,11 @@ impl App {
             project_name_input: input_element(),
             show_project_name_input: false,
             config,
-            clipboard,
         }
     }
 
-    fn add_project(
-        &mut self,
-        project: ProjectModel,
-        sender: mpsc::Sender<AppMessage>,
-        clipboard: Rc<RefCell<Clipboard>>,
-    ) {
-        let mut pane = Pane::from_project(project, Rc::clone(&self.config), sender, clipboard);
+    fn add_project(&mut self, project: ProjectModel, sender: mpsc::Sender<AppMessage>) {
+        let mut pane = Pane::from_project(project, Rc::clone(&self.config), sender);
         pane.set_render_area(self.pane_area);
         self.panes.push(pane);
         if self.selected.is_none() {
@@ -117,9 +109,9 @@ impl App {
         }
 
         if self.show_search_projects {
-            let mut painter = Painter::new();
-            self.search_projects.draw(&mut painter, ());
-            painter.draw(frame);
+            // let mut painter = Painter::new();
+            self.search_projects.draw((), frame);
+            // painter.draw(frame);
         } else if self.show_project_name_input {
             let area = center_area(
                 frame.area(),
@@ -133,18 +125,15 @@ impl App {
     pub fn handle_key(
         &mut self,
         key: KeyEvent,
-        events: Rc<RefCell<Events<AppMessage>>>,
-        terminal: Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+        events: &mut Events<AppMessage>,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+        clipboard: &mut Clipboard,
     ) {
         if self.show_search_projects {
-            if let Some(effect) = self.search_projects.on_key(key, ()) {
+            if let Some(effect) = self.search_projects.handle_key((), key) {
                 match effect {
                     super::app_components::SearchProjectsEffect::Submit(project) => {
-                        self.add_project(
-                            project,
-                            events.borrow().sender(),
-                            Rc::clone(&self.clipboard),
-                        );
+                        self.add_project(project, events.sender());
                         self.selected = next(self.selected, self.panes.len());
                         self.show_search_projects = false;
                     }
@@ -222,7 +211,7 @@ impl App {
                 },
                 None => {
                     if let Some(pane) = self.current_pane_mut() {
-                        pane.handle_key(key, events, terminal);
+                        pane.handle_key(key, events, terminal, clipboard);
                     }
                 }
             }

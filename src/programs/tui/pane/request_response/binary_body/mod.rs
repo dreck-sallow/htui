@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fs, rc::Rc};
+use std::{fs, rc::Rc};
 
 use arboard::Clipboard;
 use file_input::FileInput;
@@ -12,7 +12,7 @@ use ratatui::{
 use crate::{
     app_project::models::ResponseFilePath,
     programs::tui::{
-        common::{component::Interactive, InteractiveElementEff, UiElement},
+        common::{InteractiveElementEff, UiElement},
         config::{keybinding, Config},
     },
 };
@@ -109,9 +109,9 @@ impl UiElement for BinaryViewer {
 }
 
 type SliceBytes<'a> = &'a [u8];
-impl<'a> InteractiveElementEff<'a> for BinaryViewer {
+impl<'params> InteractiveElementEff<'params> for BinaryViewer {
     type Effect = BinaryViewerEffect;
-    type Params = (Rc<Config>, Rc<RefCell<Clipboard>>, SliceBytes<'a>);
+    type Params = (&'params Config, &'params mut Clipboard, SliceBytes<'params>);
 
     fn handle_key(
         &mut self,
@@ -119,7 +119,7 @@ impl<'a> InteractiveElementEff<'a> for BinaryViewer {
         key: crossterm::event::KeyEvent,
     ) -> Self::Effect {
         if self.file_input.is_show() {
-            if let Some(effect) = self.file_input.on_key(key, config) {
+            if let Some(effect) = self.file_input.handle_key(config, key) {
                 match effect {
                     file_input::FileInputEffect::NewPath(new_path) => {
                         match &self.file_path {
@@ -151,7 +151,7 @@ impl<'a> InteractiveElementEff<'a> for BinaryViewer {
                     }
                     keybinding::GlobalKeyAction::CopyToClipboard => {
                         if let Some(txt) = self.hexdump.line_to_txt() {
-                            let _ = clipboard.borrow_mut().set_text(txt);
+                            let _ = clipboard.set_text(txt);
                         }
 
                         true

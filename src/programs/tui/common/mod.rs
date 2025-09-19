@@ -55,6 +55,10 @@ pub trait InteractiveElement<'params> {
     type Params: 'params;
 
     fn handle_key(&mut self, params: Self::Params, key: KeyEvent);
+
+    fn is_editing(&self) -> bool {
+        false
+    }
 }
 
 pub trait InteractiveElementEff<'params> {
@@ -62,4 +66,8 @@ pub trait InteractiveElementEff<'params> {
     type Params: 'params;
 
     fn handle_key(&mut self, params: Self::Params, key: KeyEvent) -> Self::Effect;
+
+    fn is_editing(&self) -> bool {
+        false
+    }
 }

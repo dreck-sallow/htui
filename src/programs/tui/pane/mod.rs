@@ -1,4 +1,4 @@
-use std::{cell::RefCell, io::Stdout, rc::Rc};
+use std::{io::Stdout, rc::Rc};
 
 use action::PaneAction;
 use arboard::Clipboard;
@@ -21,10 +21,7 @@ use crate::app_project::{
 };
 
 use super::{
-    common::{
-        component::{Drawable, Interactive, Painter, WithHistory},
-        UiElement,
-    },
+    common::{component::WithHistory, InteractiveElementEff, UiElement},
     config::{keybinding, Config},
     event_handler::{AppMessage, Events},
 };
@@ -85,7 +82,7 @@ impl Pane {
         project: ProjectModel,
         config: Rc<Config>,
         sender: mpsc::Sender<AppMessage>,
-        clipboard: Rc<RefCell<Clipboard>>,
+        // clipboard: Rc<RefCell<Clipboard>>,
     ) -> Self {
         Self {
             project_id: project.id().to_string(),
@@ -96,11 +93,8 @@ impl Pane {
                 Rc::clone(&config),
             ),
             method_url_component: MethodUrlBarComponent::new(Rc::clone(&config)),
-            request_builder_component: RequestEditorComponent::new(
-                Rc::clone(&config),
-                Rc::clone(&clipboard),
-            ),
-            response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config), clipboard),
+            request_builder_component: RequestEditorComponent::new(Rc::clone(&config)),
+            response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config)),
             placeholder_view: PlaceholderView::new(),
             config,
             sender: sender,
@@ -142,18 +136,16 @@ impl Pane {
     }
 
     pub fn draw(&self, frame: &mut Frame) {
-        let mut painter = Painter::new();
-        self.collections_component.draw(&mut painter, self.focus);
+        self.collections_component.draw(self.focus, frame);
 
         if self.collections_component.current_request().is_some() {
-            self.method_url_component.draw(&mut painter, self.focus);
+            self.method_url_component.draw(self.focus, frame);
             self.request_builder_component.draw(self.focus, frame);
             self.response_viewer_component.draw(self.focus, frame);
         } else {
             self.placeholder_view.draw(frame);
         }
 
-        painter.draw(frame);
         self.request_builder_component
             .draw_overlay(self.focus, frame);
         self.response_viewer_component
@@ -239,6 +231,7 @@ impl Pane {
                 let store = LocalStore::new();
                 let _ = store.save_project(model);
             }
+            PaneAction::Noop => {}
         }
     }
 
@@ -273,8 +266,11 @@ impl Pane {
     pub fn handle_key(
         &mut self,
         key: KeyEvent,
-        events: Rc<RefCell<Events<AppMessage>>>,
-        terminal: Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+        // events: Rc<RefCell<Events<AppMessage>>>,
+        // terminal: Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+        events: &mut Events<AppMessage>,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+        clipboard: &mut Clipboard,
     ) {
         // TODO: handle the undo of creation
         // CONTEXT: when I create a request and exeute it, and after, make an undo
@@ -283,32 +279,26 @@ impl Pane {
         if !self.handle_pane_action(key) {
             match self.focus {
                 ElementFocus::Collections => {
-                    if let Some(effect) = self.collections_component.on_key(key, ()) {
-                        self.handle_action(effect);
-                    }
+                    let effect = self.collections_component.handle_key((), key);
+                    self.handle_action(effect);
                 }
                 ElementFocus::MethodUrlBar => {
-                    if let Some(effect) = self.method_url_component.on_key(key, ()) {
-                        self.handle_action(effect);
-                        self.handle_action(PaneAction::SetUrlAndMethod);
-                    }
+                    let effect = self.method_url_component.handle_key((), key);
+                    self.handle_action(effect);
+                    self.handle_action(PaneAction::SetUrlAndMethod);
                 }
                 ElementFocus::RequestBuilder => {
-                    if let Some(effect) = self
+                    let effect = self
                         .request_builder_component
-                        .on_key(key, (events, terminal))
-                    {
-                        self.handle_action(effect);
-                        self.handle_action(PaneAction::SetHeadersAndBody);
-                    }
+                        .handle_key((events, terminal, clipboard), key);
+                    self.handle_action(effect);
+                    self.handle_action(PaneAction::SetHeadersAndBody);
                 }
                 ElementFocus::ResponseViewer => {
-                    if let Some(effect) = self
+                    let effect = self
                         .response_viewer_component
-                        .on_key(key, (events, terminal))
-                    {
-                        self.handle_action(effect);
-                    }
+                        .handle_key((&self.config, events, terminal, clipboard), key);
+                    self.handle_action(effect);
                 }
             }
         }

@@ -13,7 +13,7 @@ use crate::{
     app_project::models::HttpMethod, programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
-            component::{Drawable, Interactive, WithHistory},
+            component::{ WithHistory}, InteractiveElementEff, UiElement,
         },
         config::Config,
         elements::{dropdown::OverlayDropdown, utils::expand, Separator},
@@ -75,7 +75,7 @@ impl MethodUrlBarComponent {
     }
 
     pub fn set_data(&mut self, method: HttpMethod, url: &str) {
-        self.method = method;
+                self.method = method;
         self.clean_url();
         self.url_input.insert_str(url);
 
@@ -87,20 +87,16 @@ impl MethodUrlBarComponent {
     }
 }
 
-impl Drawable for MethodUrlBarComponent {
+impl UiElement for MethodUrlBarComponent {
     type Params = ElementFocus;
 
-    fn set_area(&mut self, _area: Rect) {
-        self.render_area = _area;
+    fn set_area(&mut self, area: Rect) {
+        self.render_area = area;
+        
     }
 
-    fn draw<'a: 'painter, 'painter>(
-        &'a self,
-        painter: &mut crate::programs::tui::common::component::Painter<'painter>,
-        params: Self::Params,
-    ) {
-        painter.render(move |frame| {
-            let is_focus = params == ElementFocus::MethodUrlBar;
+    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+        let is_focus = params == ElementFocus::MethodUrlBar;
 
             let border_style = Style::default().fg(is_focus
                 .then_some(self.config.theme.border_focus)
@@ -144,37 +140,27 @@ impl Drawable for MethodUrlBarComponent {
             );
 
             frame.render_widget(&self.url_input, url_area);
-            // frame.render_widget(
-            //     Span::from(expand(
-            //         if self.show_dropdown { "--" } else { "Send" },
-            //         " ",
-            //         10,
-            //     ))
-            //     .on_light_green()
-            //     .black(),
-            //     indicator_area,
-            // );
-        });
+    }
 
+    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
         if self.show_dropdown {
-            painter.render_last(|frame| {
-                let area = Rect {
+            let area = Rect {
                     x: self.render_area.left() + 1,
                     y: self.render_area.bottom() - 1,
                     width: 10,
                     height: METHODS.len() as u16,
                 };
                 frame.render_widget(&self.dropdown, area);
-            });
-        }
+        }        
     }
 }
 
-impl Interactive for MethodUrlBarComponent {
+impl<'params> InteractiveElementEff<'params> for MethodUrlBarComponent {
     type Effect = PaneAction;
+
     type Params = ();
 
-    fn on_key(&mut self, key: KeyEvent, _params: Self::Params) -> Option<Self::Effect> {
+    fn handle_key(&mut self, _params: Self::Params, key: KeyEvent) -> Self::Effect {
         if self.show_dropdown {
             if let Some(action) = self.config.keymap.match_global_action(key) {
                 match action {
@@ -203,10 +189,10 @@ impl Interactive for MethodUrlBarComponent {
             let is_key_consumed = match self.config.keymap.match_global_action(key) {
                 Some(action) => match action {
                     crate::programs::tui::config::keybinding::GlobalKeyAction::NextFocus => {
-                        return Some(PaneAction::NextFocus);
+                        return PaneAction::NextFocus;
                     }
                     crate::programs::tui::config::keybinding::GlobalKeyAction::PreviousFocus => {
-                        return Some(PaneAction::PreviousFocus);
+                        return PaneAction::PreviousFocus;
                     }
                     _ => false,
                 },
@@ -230,7 +216,7 @@ impl Interactive for MethodUrlBarComponent {
             }
         }
 
-        None
+        PaneAction::Noop
     }
 }
 

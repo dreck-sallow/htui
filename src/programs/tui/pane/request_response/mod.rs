@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     io::{stdout, Stdout},
     path::PathBuf,
     rc::Rc,
@@ -30,7 +29,7 @@ use crate::{
         self, RequestModel, ResponseFilePath, ResponseModel, SendRequest, SendRequestKey,
     },
     programs::tui::{
-        common::{component::Interactive, InteractiveElementEff, UiElement},
+        common::{InteractiveElementEff, UiElement},
         config::{keybinding, Config},
         elements::Separator,
         event_handler::{AppMessage, EventSender, Events},
@@ -79,9 +78,7 @@ pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
     response_content: Arc<RwLock<ResponseContent>>,
-    clipboard: Rc<RefCell<Clipboard>>,
     config: Rc<Config>,
-
     status_bar_area: Rect,
     render_area: Rect,
     header_area: Rect,
@@ -89,7 +86,7 @@ pub struct ResponseViewerComponent {
 }
 
 impl ResponseViewerComponent {
-    pub fn new(config: Rc<Config>, clipboard: Rc<RefCell<Clipboard>>) -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         Self {
             state: RequestResponseState::new(),
             tab: Tab::Response,
@@ -99,7 +96,6 @@ impl ResponseViewerComponent {
                 request_key: None,
             })),
             config,
-            clipboard,
             status_bar_area: Rect::default(),
             render_area: Rect::default(),
             header_area: Rect::default(),
@@ -370,24 +366,25 @@ impl UiElement for ResponseViewerComponent {
     }
 }
 
-impl Interactive for ResponseViewerComponent {
+impl<'params> InteractiveElementEff<'params> for ResponseViewerComponent {
     type Effect = PaneAction;
+
     type Params = (
-        Rc<RefCell<Events<AppMessage>>>,
-        Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+        &'params Config,
+        &'params mut Events<AppMessage>,
+        &'params mut Terminal<CrosstermBackend<Stdout>>,
+        &'params mut Clipboard,
     );
 
-    fn on_key(
+    fn handle_key(
         &mut self,
+        (config, events, terminal, clipboard): Self::Params,
         key: crossterm::event::KeyEvent,
-        (events, terminal): Self::Params,
-    ) -> Option<Self::Effect> {
+    ) -> Self::Effect {
         let is_consumed = match self.config.keymap.match_global_action(key) {
             Some(action) => match action {
-                keybinding::GlobalKeyAction::NextFocus => return Some(PaneAction::NextFocus),
-                keybinding::GlobalKeyAction::PreviousFocus => {
-                    return Some(PaneAction::PreviousFocus)
-                }
+                keybinding::GlobalKeyAction::NextFocus => return PaneAction::NextFocus,
+                keybinding::GlobalKeyAction::PreviousFocus => return PaneAction::PreviousFocus,
                 keybinding::GlobalKeyAction::NextTab => {
                     if Tab::Response == self.tab {
                         self.tab = Tab::Headers
@@ -426,7 +423,7 @@ impl Interactive for ResponseViewerComponent {
                             }
                             keybinding::GlobalKeyAction::CopyToClipboard => {
                                 if let Some(txt) = headers_editor.cell_txt() {
-                                    self.clipboard.borrow_mut().set_text(txt).unwrap();
+                                    clipboard.set_text(txt).unwrap();
                                 }
                             }
                             _ => {}
@@ -442,7 +439,7 @@ impl Interactive for ResponseViewerComponent {
                             match self.config.keymap.match_request_builder_action(key) {
                                 Some(action) => match action {
                                     keybinding::RequestBuilderKeyAction::OpenEditor => {
-                                        events.borrow_mut().stop();
+                                        events.stop();
                                         disable_raw_mode().unwrap();
                                         stdout().execute(LeaveAlternateScreen).unwrap();
 
@@ -450,8 +447,8 @@ impl Interactive for ResponseViewerComponent {
 
                                         enable_raw_mode().unwrap();
                                         stdout().execute(EnterAlternateScreen).unwrap();
-                                        let _ = terminal.borrow_mut().clear();
-                                        events.borrow_mut().run();
+                                        let _ = terminal.clear();
+                                        events.run();
                                     }
                                     _ => editor.handle_key(key),
                                 },
@@ -467,14 +464,7 @@ impl Interactive for ResponseViewerComponent {
                                 SendRequest::Finish(response_model) => &response_model.body,
                             };
 
-                            match binary_viewer.handle_key(
-                                (
-                                    Rc::clone(&self.config),
-                                    Rc::clone(&self.clipboard),
-                                    slice_bytes,
-                                ),
-                                key,
-                            ) {
+                            match binary_viewer.handle_key((config, clipboard, slice_bytes), key) {
                                 binary_body::BinaryViewerEffect::NewFilePath(path) => {
                                     match &mut *request_model {
                                         SendRequest::Pending => {}
@@ -492,7 +482,6 @@ impl Interactive for ResponseViewerComponent {
                 }
             }
         }
-
-        None
+        PaneAction::Noop
     }
 }

@@ -1,12 +1,9 @@
-use std::{cell::RefCell, io::Stdout, rc::Rc};
+use std::{io::Stdout, rc::Rc};
 
 use crate::{
     app_project::models::{BodyContent, KeyValueParam},
     programs::tui::{
-        common::{
-            component::{Interactive, WithHistory},
-            InteractiveElement, UiElement,
-        },
+        common::{component::WithHistory, InteractiveElement, InteractiveElementEff, UiElement},
         config::{keybinding, Config},
         event_handler::{AppMessage, Events},
     },
@@ -59,11 +56,10 @@ pub struct RequestEditorComponent {
     headers_table: ParamsTable,
     body_editor_component: BodyEditorComponent,
     config: Rc<Config>,
-    clipboard: Rc<RefCell<Clipboard>>,
 }
 
 impl RequestEditorComponent {
-    pub fn new(config: Rc<Config>, clipboard: Rc<RefCell<Clipboard>>) -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         Self {
             tab: Tab::Params,
             header_area: Rect::default(),
@@ -72,7 +68,6 @@ impl RequestEditorComponent {
             headers_table: ParamsTable::new(),
             body_editor_component: BodyEditorComponent::new(Rc::clone(&config)),
             config,
-            clipboard,
         }
     }
 
@@ -206,18 +201,20 @@ impl UiElement for RequestEditorComponent {
     }
 }
 
-impl Interactive for RequestEditorComponent {
+impl<'params> InteractiveElementEff<'params> for RequestEditorComponent {
     type Effect = PaneAction;
+
     type Params = (
-        Rc<RefCell<Events<AppMessage>>>,
-        Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
+        &'params mut Events<AppMessage>,
+        &'params mut Terminal<CrosstermBackend<Stdout>>,
+        &'params mut Clipboard,
     );
 
-    fn on_key(
+    fn handle_key(
         &mut self,
+        (events, terminal, clipboard): Self::Params,
         key: crossterm::event::KeyEvent,
-        params: Self::Params,
-    ) -> Option<Self::Effect> {
+    ) -> Self::Effect {
         if let Some(action) = self.config.keymap.match_global_action(key) {
             match action {
                 keybinding::GlobalKeyAction::NextTab => {
@@ -227,10 +224,10 @@ impl Interactive for RequestEditorComponent {
                     self.change_tab(false);
                 }
                 keybinding::GlobalKeyAction::NextFocus => {
-                    return Some(PaneAction::NextFocus);
+                    return PaneAction::NextFocus;
                 }
                 keybinding::GlobalKeyAction::PreviousFocus => {
-                    return Some(PaneAction::PreviousFocus);
+                    return PaneAction::PreviousFocus;
                 }
 
                 _ => {}
@@ -240,17 +237,18 @@ impl Interactive for RequestEditorComponent {
         match self.tab {
             Tab::Headers => {
                 self.headers_table
-                    .handle_key((Rc::clone(&self.config), Rc::clone(&self.clipboard)), key);
+                    .handle_key((&self.config, clipboard), key);
             }
             Tab::Body => {
-                self.body_editor_component.on_key(key, params);
+                self.body_editor_component
+                    .handle_key((events, terminal), key);
             }
             Tab::Params => {
-                self.params_table
-                    .handle_key((Rc::clone(&self.config), Rc::clone(&self.clipboard)), key);
+                self.params_table.handle_key((&self.config, clipboard), key);
             }
         }
-        None
+
+        PaneAction::Noop
     }
 }
 
