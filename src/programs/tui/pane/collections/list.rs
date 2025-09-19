@@ -164,10 +164,12 @@ impl Widget for CollectionList<'_, '_> {
                         // We have only 1 collection, then check the children
                         match (start.1, end.1) {
                             (None, None) => (true, &[], 0),
-                            (None, Some(end_children)) => (true, &self.items[0..end_children], 0),
+                            (None, Some(end_children)) => {
+                                (true, &collection.children[0..(end_children + 1)], 0)
+                            }
                             (Some(start_children), Some(end_children)) => (
                                 false,
-                                &self.items[start_children..end_children],
+                                &collection.children[start_children..(end_children + 1)],
                                 start_children,
                             ),
                             (Some(_), None) => {
@@ -185,8 +187,10 @@ impl Widget for CollectionList<'_, '_> {
                     } else if (start.0 + collection_loop_i) == end.0 {
                         (
                             true,
-                            &self.items[end.0].children
-                                [0..end.1.unwrap_or(self.items[end.0].children.len())],
+                            &self.items[end.0].children[0..end
+                                .1
+                                .map(|i| i + 1)
+                                .unwrap_or(self.items[end.0].children.len())],
                             0,
                         )
                     } else {

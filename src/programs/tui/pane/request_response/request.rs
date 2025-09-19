@@ -7,6 +7,7 @@ use std::{
 use encoding_rs::{Encoding, UTF_8};
 use ratatui::layout::Rect;
 use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Response, Url};
+use serde_json::{json, Value};
 use tokio::time::Instant;
 
 use crate::{
@@ -183,6 +184,15 @@ pub fn request_into_builder(req: &RequestModel) -> RequestBuilder {
     for header in req.headers() {
         if header.enable {
             client_builder = client_builder.header(&header.key, &header.value);
+        }
+    }
+
+    match req.body() {
+        models::BodyContent::Empty => {}
+        models::BodyContent::File(_path_buf) => {}
+        models::BodyContent::Form(_hash_map) => {}
+        models::BodyContent::Text(text) => {
+            client_builder = client_builder.body(text.to_string());
         }
     }
 

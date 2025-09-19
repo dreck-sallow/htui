@@ -100,10 +100,24 @@ impl BodyEditorComponent {
     pub fn set_state(&mut self, body_content: BodyContent) {
         self._history.clean();
         self.body_content = body_content;
+        match &self.body_content {
+            BodyContent::Empty => {}
+            BodyContent::File(_) => {}
+            BodyContent::Form(_) => {}
+            BodyContent::Text(txt) => {
+                self.text_editor.clean_lines();
+                self.text_editor.insert_str(txt);
+            }
+        }
     }
 
     pub fn get_data(&self) -> BodyContent {
-        self.body_content.clone()
+        match &self.body_content {
+            BodyContent::Empty => BodyContent::Empty,
+            BodyContent::File(path_buf) => BodyContent::File(path_buf.clone()),
+            BodyContent::Form(hash_map) => BodyContent::Form(hash_map.clone()),
+            BodyContent::Text(_) => BodyContent::Text(self.text_editor.lines().join("\n")),
+        }
     }
 }
 

@@ -31,7 +31,7 @@ impl PlaceholderView {
         frame.render_widget(Span::from("HTUI - Terminal HTTP Client"), header_area);
         frame.render_widget(Span::from("No request selected."), desc_area);
         frame.render_widget(
-            Span::from("[n] New Request - [c] New Collection"),
+            Span::from("[r] New Request - [c] New Collection"),
             shortcuts_area,
         );
     }

@@ -82,7 +82,6 @@ impl Pane {
         project: ProjectModel,
         config: Rc<Config>,
         sender: mpsc::Sender<AppMessage>,
-        // clipboard: Rc<RefCell<Clipboard>>,
     ) -> Self {
         Self {
             project_id: project.id().to_string(),
@@ -146,6 +145,8 @@ impl Pane {
             self.placeholder_view.draw(frame);
         }
 
+        self.collections_component.draw_overlay(self.focus, frame);
+        self.method_url_component.draw_overlay(self.focus, frame);
         self.request_builder_component
             .draw_overlay(self.focus, frame);
         self.response_viewer_component
