@@ -203,6 +203,14 @@ impl Pane {
                 // TODO: cancel the background http request
             }
             PaneAction::ExecuteRequest => {
+                let (method, url) = self.method_url_component.get_data();
+                self.collections_component
+                    .set_data_from_method_url(method, url);
+
+                let (params, headers, body) = self.request_builder_component.get_data();
+                self.collections_component
+                    .set_data_from_request_editor(params, headers, body);
+
                 if let Some(req) = self.collections_component.current_request() {
                     self.response_viewer_component.execute_req(
                         self.collections_component.current_request_key().unwrap(),
