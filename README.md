@@ -86,7 +86,7 @@ File example:
   # Select previous project
   previous_project = "Alt+Shift+H"
   # Open a input for enter new project name
-  rename_project => "Alt+Shift+R"
+  rename_project = "Alt+Shift+R"
 
 
   [keymap.table]
@@ -116,7 +116,7 @@ File example:
 
   [keymap.request_builder]
   # Opent the Body type selector 
-  open_dropdown => "Shift+O"
+  open_dropdown = "Shift+O"
 ```
 
 ## Data Storage
@@ -126,11 +126,16 @@ The program manage these two json file as storage:
 
 
 ## ROADMAP
+  - [ ] Open file selector for (download, select file to upload)
+  - [ ] Improve the sending functionality for the request
+  - [ ] Create a input/text own editor component
+  - [*] Allow user select the path where save the bynary response (save file)
+  - [-] Add copy to clipboard
   - [ ] Improve the UI
     - [ ] HTTP method colors (collections sidebar)
     - [ ] Scroll bar
     - [ ] Overlay messages (logs)
-    - [ ] Open external editors for data editing
+    - [x] Open external editors for data editing
   - [ ] Command footer bar, for show available key actions per layout section
   - [ ] Environment variables
   - [ ] Authentication, Cookies and Query request editing support
