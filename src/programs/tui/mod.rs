@@ -1,4 +1,4 @@
-use std::{io, rc::Rc};
+use std::io;
 
 use app::App;
 use arboard::Clipboard;
@@ -53,7 +53,7 @@ pub async fn run_tui(project_name: Option<String>) -> TuiResult<()> {
 
     let mut clipboard = Clipboard::new().unwrap();
 
-    let mut app = App::new_from_project(project, Rc::new(config), events.sender());
+    let mut app = App::new_from_project(project, config, events.sender());
     app.viewport_area(Rect {
         x: 0,
         y: 0,

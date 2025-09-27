@@ -1,6 +1,6 @@
-use std::rc::Rc;
-
-use crate::programs::tui::{common::UiElement, config::Config, pane::text_editor::TextEditor};
+use crate::programs::tui::{
+    common::UiComposedElement, config::Config, pane::text_editor::TextEditor,
+};
 use ratatui::{layout::Rect, style::Stylize, text::Span};
 
 use super::binary_body::BinaryViewer;
@@ -21,17 +21,17 @@ impl BodyContentView {
     }
 }
 
-impl UiElement for BodyContentView {
-    type Params = Rc<Config>;
+impl<'params> UiComposedElement<'params> for BodyContentView {
+    type Params = &'params Config;
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, viewport_area: Rect) {
         match self {
             BodyContentView::Text { .. } => {}
             BodyContentView::Binary(binary_viewer) => {
-                binary_viewer.set_area(area);
+                binary_viewer.set_area(area, viewport_area);
             }
             BodyContentView::Empty(body_empty_view) => {
-                body_empty_view.set_area(area);
+                body_empty_view.set_area(area, viewport_area);
             }
         }
     }
@@ -52,15 +52,11 @@ impl UiElement for BodyContentView {
 
     fn draw_overlay(&self, params: Self::Params, frame: &mut ratatui::Frame) {
         match self {
-            BodyContentView::Text { .. } => {
-                // frame.render_widget(editor, *area);
-            }
+            BodyContentView::Text { .. } => {}
             BodyContentView::Binary(binary_viewer) => {
                 binary_viewer.draw_overlay(params, frame);
             }
-            BodyContentView::Empty(view) => {
-                // view.draw((), frame);
-            }
+            BodyContentView::Empty(_view) => {}
         }
     }
 }
@@ -69,10 +65,10 @@ pub struct BodyEmptyView {
     area: Rect,
 }
 
-impl UiElement for BodyEmptyView {
+impl<'params> UiComposedElement<'params> for BodyEmptyView {
     type Params = ();
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         self.area = area;
     }
 

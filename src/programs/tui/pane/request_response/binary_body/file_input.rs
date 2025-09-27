@@ -1,13 +1,11 @@
-use std::rc::Rc;
-
 use ratatui::{
-    layout::{Constraint, Margin, Rect},
+    layout::{Constraint, Rect},
     style::Style,
     widgets::{Block, Clear},
 };
 
 use crate::programs::tui::{
-    common::{input::mode_input::ModeInput, InteractiveElementEff, UiElement},
+    common::{input::mode_input::ModeInput, Interactive, UiComposedElement, UiElementV2},
     config::{keybinding, Config},
     elements::utils::center_area,
 };
@@ -32,27 +30,18 @@ impl FileInput {
     pub fn show(&mut self) {
         self.show_input = true;
     }
-
-    pub fn hidden(&mut self) {
-        self.show_input = false;
-    }
 }
 
-impl UiElement for FileInput {
-    type Params = (Rc<Config>, Rect);
+impl<'params> UiComposedElement<'params> for FileInput {
+    type Params = (&'params Config, Rect);
 
-    fn set_area(&mut self, area: ratatui::prelude::Rect) {
-        self.input.set_area(
-            center_area(area, Constraint::Length(3), Constraint::Percentage(50))
-                .inner(Margin::new(1, 1)),
-        );
-        // self.select_mode_input.set_area(
-        //     center_area(area, Constraint::Length(3), Constraint::Percentage(50))
-        //         .inner(Margin::new(1, 1)),
-        // );
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
+        self.input.set_visual_width(area.width.saturating_sub(2));
     }
 
-    fn draw(&self, _params: Self::Params, _frame: &mut ratatui::Frame) {}
+    fn draw(&self, _params: Self::Params, _frame: &mut ratatui::Frame) {
+        unimplemented!()
+    }
 
     fn draw_overlay(&self, (config, area): Self::Params, frame: &mut ratatui::Frame) {
         if self.show_input {
@@ -64,13 +53,15 @@ impl UiElement for FileInput {
                 .border_type(ratatui::widgets::BorderType::Thick)
                 .border_style(Style::default().fg(config.theme.border_focus));
 
+            let inner_width = block.inner(center_area);
+
             frame.render_widget(block, center_area);
-            self.input.draw((), frame);
+            self.input.draw(inner_width, frame);
         }
     }
 }
 
-impl<'params> InteractiveElementEff<'params> for FileInput {
+impl<'params> Interactive<'params> for FileInput {
     type Effect = Option<FileInputEffect>;
 
     type Params = &'params Config;

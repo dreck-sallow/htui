@@ -1,10 +1,4 @@
-use crossterm::event::KeyCode;
-use ratatui::{
-    layout::Rect,
-    style::{Style, Stylize},
-};
-
-use crate::programs::tui::common::{list_utils, InteractiveElement, UiElement};
+use ratatui::layout::Rect;
 
 use super::mode_input::{InputMode, ModeInput};
 
@@ -130,104 +124,104 @@ impl SelectModeInput {
     }
 }
 
-impl UiElement for SelectModeInput {
-    type Params = ();
+// impl UiElement for SelectModeInput {
+//     type Params = ();
 
-    fn set_area(&mut self, area: ratatui::prelude::Rect) {
-        self.input.set_area(area);
-        self._render_area = Rect {
-            x: area.left(),
-            y: area.bottom(),
-            width: area.width,
-            // the size of length, add more height if need borders
-            height: 4,
-        };
-    }
+//     fn set_area(&mut self, area: ratatui::prelude::Rect) {
+//         self.input.set_area(area);
+//         self._render_area = Rect {
+//             x: area.left(),
+//             y: area.bottom(),
+//             width: area.width,
+//             // the size of length, add more height if need borders
+//             height: 4,
+//         };
+//     }
 
-    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
-        self.input.draw(params, frame);
-    }
+//     fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+//         self.input.draw(params, frame);
+//     }
 
-    fn draw_overlay(&self, params: Self::Params, frame: &mut ratatui::Frame) {
-        self.input.draw(params, frame);
+//     fn draw_overlay(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+//         self.input.draw(params, frame);
 
-        if self.input.mode().is_write_mode() && !self.options.is_empty() {
-            let height = self._render_area.height as usize;
+//         if self.input.mode().is_write_mode() && !self.options.is_empty() {
+//             let height = self._render_area.height as usize;
 
-            let (start_range, end_range) = {
-                let start_idx = self
-                    .selected_option
-                    .map_or(0, |i| i.saturating_sub(i % height));
+//             let (start_range, end_range) = {
+//                 let start_idx = self
+//                     .selected_option
+//                     .map_or(0, |i| i.saturating_sub(i % height));
 
-                let end_idx = start_idx + height;
+//                 let end_idx = start_idx + height;
 
-                (
-                    start_idx,
-                    if end_idx < self.matching_options.len() {
-                        end_idx
-                    } else {
-                        self.matching_options.len()
-                    },
-                )
-            };
+//                 (
+//                     start_idx,
+//                     if end_idx < self.matching_options.len() {
+//                         end_idx
+//                     } else {
+//                         self.matching_options.len()
+//                     },
+//                 )
+//             };
 
-            let buf = frame.buffer_mut();
-            let mut area = self._render_area;
+//             let buf = frame.buffer_mut();
+//             let mut area = self._render_area;
 
-            if end_range > 0 {
-                for opt_idx in &self.matching_options[start_range..end_range] {
-                    let option = &self.options[*opt_idx];
-                    for x in area.left()..area.right() {
-                        buf[(x, area.top())].reset();
-                    }
-                    buf.set_stringn(
-                        area.left(),
-                        area.top(),
-                        &option.label,
-                        area.width as usize,
-                        Style::default(),
-                    );
-                    area.y += 1;
-                }
-            }
+//             if end_range > 0 {
+//                 for opt_idx in &self.matching_options[start_range..end_range] {
+//                     let option = &self.options[*opt_idx];
+//                     for x in area.left()..area.right() {
+//                         buf[(x, area.top())].reset();
+//                     }
+//                     buf.set_stringn(
+//                         area.left(),
+//                         area.top(),
+//                         &option.label,
+//                         area.width as usize,
+//                         Style::default(),
+//                     );
+//                     area.y += 1;
+//                 }
+//             }
 
-            // draw the selected option
-            if let Some(idx) = self.selected_option {
-                let in_range_idx = idx.saturating_sub(start_range);
-                buf.set_style(
-                    Rect {
-                        y: self._render_area.top() + in_range_idx as u16,
-                        height: 1,
-                        ..self._render_area // x: area,
-                                            // width: todo!(),
-                    },
-                    Style::default().red(),
-                );
-            }
-        }
-    }
-}
+//             // draw the selected option
+//             if let Some(idx) = self.selected_option {
+//                 let in_range_idx = idx.saturating_sub(start_range);
+//                 buf.set_style(
+//                     Rect {
+//                         y: self._render_area.top() + in_range_idx as u16,
+//                         height: 1,
+//                         ..self._render_area // x: area,
+//                                             // width: todo!(),
+//                     },
+//                     Style::default().red(),
+//                 );
+//             }
+//         }
+//     }
+// }
 
-impl InteractiveElement<'_> for SelectModeInput {
-    type Params = ();
+// impl InteractiveElement<'_> for SelectModeInput {
+//     type Params = ();
 
-    fn handle_key(&mut self, _params: Self::Params, key: crossterm::event::KeyEvent) {
-        match key.code {
-            KeyCode::Enter => {
-                // select and append
-                // Here I need applied the selection into the input
-                // I need take the last keyword and replace
-                // Or replace the entire string
-            }
-            KeyCode::Tab => {
-                self.selected_option = list_utils::next(self.selected_option, self.options.len());
-            }
-            KeyCode::BackTab => {
-                self.selected_option = list_utils::prev(self.selected_option);
-            }
-            _ => {
-                self.input.handle_key(key);
-            }
-        }
-    }
-}
+//     fn handle_key(&mut self, _params: Self::Params, key: crossterm::event::KeyEvent) {
+//         match key.code {
+//             KeyCode::Enter => {
+//                 // select and append
+//                 // Here I need applied the selection into the input
+//                 // I need take the last keyword and replace
+//                 // Or replace the entire string
+//             }
+//             KeyCode::Tab => {
+//                 self.selected_option = list_utils::next(self.selected_option, self.options.len());
+//             }
+//             KeyCode::BackTab => {
+//                 self.selected_option = list_utils::prev(self.selected_option);
+//             }
+//             _ => {
+//                 self.input.handle_key(key);
+//             }
+//         }
+//     }
+// }

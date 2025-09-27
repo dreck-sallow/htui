@@ -1,4 +1,4 @@
-use std::{io::Stdout, rc::Rc};
+use std::io::Stdout;
 
 use action::PaneAction;
 use arboard::Clipboard;
@@ -21,7 +21,7 @@ use crate::app_project::{
 };
 
 use super::{
-    common::{component::WithHistory, InteractiveElementEff, UiElement},
+    common::{component::WithHistory, Interactive, UiComposedElement},
     config::{keybinding, Config},
     event_handler::{AppMessage, Events},
 };
@@ -73,29 +73,26 @@ pub struct Pane {
     response_viewer_component: ResponseViewerComponent,
     placeholder_view: PlaceholderView,
     focus: ElementFocus,
-    config: Rc<Config>,
+    // config: Rc<Config>,
     sender: mpsc::Sender<AppMessage>,
 }
 
 impl Pane {
     pub fn from_project(
         project: ProjectModel,
-        config: Rc<Config>,
+        config: &Config,
         sender: mpsc::Sender<AppMessage>,
     ) -> Self {
         Self {
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
             focus: ElementFocus::Collections,
-            collections_component: CollectionsComponent::new(
-                project.collections,
-                Rc::clone(&config),
-            ),
-            method_url_component: MethodUrlBarComponent::new(Rc::clone(&config)),
-            request_builder_component: RequestEditorComponent::new(Rc::clone(&config)),
-            response_viewer_component: ResponseViewerComponent::new(Rc::clone(&config)),
+            collections_component: CollectionsComponent::new(project.collections),
+            method_url_component: MethodUrlBarComponent::new(config),
+            request_builder_component: RequestEditorComponent::new(config),
+            response_viewer_component: ResponseViewerComponent::new(),
             placeholder_view: PlaceholderView::new(),
-            config,
+            // config,
             sender: sender,
         }
     }
@@ -109,48 +106,6 @@ impl Pane {
 
     pub fn id(&self) -> String {
         self.project_id.clone()
-    }
-
-    pub fn set_render_area(&mut self, area: Rect) {
-        let (collections_area, placeholder_area, content_areas) = {
-            let [collections_area, content_area] =
-                Layout::horizontal([Constraint::Percentage(25), Constraint::Fill(1)])
-                    .spacing(1)
-                    .areas(area);
-
-            let right_areas = Layout::vertical([
-                Constraint::Length(3),
-                Constraint::Fill(1),
-                Constraint::Fill(1),
-            ])
-            .split(content_area);
-
-            (collections_area, content_area, right_areas)
-        };
-        self.collections_component.set_area(collections_area);
-        self.method_url_component.set_area(content_areas[0]);
-        self.request_builder_component.set_area(content_areas[1]);
-        self.response_viewer_component.set_area(content_areas[2]);
-        self.placeholder_view.set_render_area(placeholder_area);
-    }
-
-    pub fn draw(&self, frame: &mut Frame) {
-        self.collections_component.draw(self.focus, frame);
-
-        if self.collections_component.current_request().is_some() {
-            self.method_url_component.draw(self.focus, frame);
-            self.request_builder_component.draw(self.focus, frame);
-            self.response_viewer_component.draw(self.focus, frame);
-        } else {
-            self.placeholder_view.draw(frame);
-        }
-
-        self.collections_component.draw_overlay(self.focus, frame);
-        self.method_url_component.draw_overlay(self.focus, frame);
-        self.request_builder_component
-            .draw_overlay(self.focus, frame);
-        self.response_viewer_component
-            .draw_overlay(self.focus, frame);
     }
 
     pub fn get_with_history_component(&mut self) -> Option<Box<&mut dyn WithHistory>> {
@@ -236,8 +191,8 @@ impl Pane {
         }
     }
 
-    fn handle_pane_action(&mut self, key: KeyEvent) -> bool {
-        if let Some(key_action) = self.config.keymap.match_global_action(key) {
+    fn handle_pane_action(&mut self, config: &Config, key: KeyEvent) -> bool {
+        if let Some(key_action) = config.keymap.match_global_action(key) {
             match key_action {
                 keybinding::GlobalKeyAction::Undo => {
                     if let Some(component) = self.get_with_history_component() {
@@ -263,45 +218,109 @@ impl Pane {
 
         false
     }
+}
 
-    pub fn handle_key(
+impl<'params> UiComposedElement<'params> for Pane {
+    type Params = &'params Config;
+
+    fn set_area(&mut self, area: Rect, viewport_area: Rect) {
+        let (collections_area, placeholder_area, content_areas) = {
+            let [collections_area, content_area] =
+                Layout::horizontal([Constraint::Percentage(25), Constraint::Fill(1)])
+                    .spacing(1)
+                    .areas(area);
+
+            let right_areas = Layout::vertical([
+                Constraint::Length(3),
+                Constraint::Fill(1),
+                Constraint::Fill(1),
+            ])
+            .split(content_area);
+
+            (collections_area, content_area, right_areas)
+        };
+        self.collections_component
+            .set_area(collections_area, viewport_area);
+        self.method_url_component
+            .set_area(content_areas[0], viewport_area);
+        self.request_builder_component
+            .set_area(content_areas[1], viewport_area);
+        self.response_viewer_component
+            .set_area(content_areas[2], viewport_area);
+        self.placeholder_view.set_render_area(placeholder_area);
+    }
+
+    fn draw(&self, config: Self::Params, frame: &mut Frame) {
+        self.collections_component.draw((self.focus, config), frame);
+
+        if self.collections_component.current_request().is_some() {
+            self.method_url_component.draw((self.focus, config), frame);
+            self.request_builder_component
+                .draw((self.focus, config), frame);
+            self.response_viewer_component
+                .draw((self.focus, config), frame);
+        } else {
+            self.placeholder_view.draw(frame);
+        }
+
+        self.collections_component
+            .draw_overlay((self.focus, config), frame);
+        self.method_url_component
+            .draw_overlay((self.focus, config), frame);
+        self.request_builder_component
+            .draw_overlay((self.focus, config), frame);
+        self.response_viewer_component
+            .draw_overlay((self.focus, config), frame);
+    }
+}
+
+impl<'params> Interactive<'params> for Pane {
+    type Effect = ();
+    type Params = (
+        &'params Config,
+        &'params mut Events<AppMessage>,
+        &'params mut Terminal<CrosstermBackend<Stdout>>,
+        &'params mut Clipboard,
+    );
+
+    fn handle_key(
         &mut self,
+        (config, events, terminal, clipboard): Self::Params,
         key: KeyEvent,
-        // events: Rc<RefCell<Events<AppMessage>>>,
-        // terminal: Rc<RefCell<Terminal<CrosstermBackend<Stdout>>>>,
-        events: &mut Events<AppMessage>,
-        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-        clipboard: &mut Clipboard,
-    ) {
+    ) -> Self::Effect {
         // TODO: handle the undo of creation
         // CONTEXT: when I create a request and exeute it, and after, make an undo
         // the system delete the request, but the background task is still running
 
-        if !self.handle_pane_action(key) {
+        if !self.handle_pane_action(config, key) {
             match self.focus {
                 ElementFocus::Collections => {
-                    let effect = self.collections_component.handle_key((), key);
+                    let effect = self.collections_component.handle_key(config, key);
                     self.handle_action(effect);
                 }
                 ElementFocus::MethodUrlBar => {
-                    let effect = self.method_url_component.handle_key((), key);
+                    let effect = self.method_url_component.handle_key(config, key);
                     self.handle_action(effect);
                     self.handle_action(PaneAction::SetUrlAndMethod);
                 }
                 ElementFocus::RequestBuilder => {
                     let effect = self
                         .request_builder_component
-                        .handle_key((events, terminal, clipboard), key);
+                        .handle_key((config, events, terminal, clipboard), key);
                     self.handle_action(effect);
                     self.handle_action(PaneAction::SetHeadersAndBody);
                 }
                 ElementFocus::ResponseViewer => {
                     let effect = self
                         .response_viewer_component
-                        .handle_key((&self.config, events, terminal, clipboard), key);
+                        .handle_key((config, events, terminal, clipboard), key);
                     self.handle_action(effect);
                 }
             }
         }
+    }
+
+    fn is_input_focus(&self) -> bool {
+        false
     }
 }

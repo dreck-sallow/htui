@@ -1,4 +1,4 @@
-use std::{fs, rc::Rc};
+use std::fs;
 
 use arboard::Clipboard;
 use file_input::FileInput;
@@ -12,7 +12,7 @@ use ratatui::{
 use crate::{
     app_project::models::ResponseFilePath,
     programs::tui::{
-        common::{InteractiveElementEff, UiElement},
+        common::{Interactive, UiComposedElement},
         config::{keybinding, Config},
     },
 };
@@ -48,17 +48,17 @@ impl BinaryViewer {
             _view_area: view_area,
         };
 
-        this.set_area(view_area);
+        this.set_area(view_area, Rect::default());
         this
     }
 }
 
-impl UiElement for BinaryViewer {
-    type Params = Rc<Config>;
+impl<'params> UiComposedElement<'params> for BinaryViewer {
+    type Params = &'params Config;
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         self._view_area = area;
-        self.file_input.set_area(area);
+        self.file_input.set_area(area, _viewport_area);
     }
 
     fn draw(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
@@ -109,9 +109,15 @@ impl UiElement for BinaryViewer {
 }
 
 type SliceBytes<'a> = &'a [u8];
-impl<'params> InteractiveElementEff<'params> for BinaryViewer {
+
+impl<'params> Interactive<'params> for BinaryViewer {
     type Effect = BinaryViewerEffect;
+
     type Params = (&'params Config, &'params mut Clipboard, SliceBytes<'params>);
+
+    fn is_visible_overlay(&self) -> bool {
+        self.file_input.is_show()
+    }
 
     fn handle_key(
         &mut self,

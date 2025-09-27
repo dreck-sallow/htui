@@ -38,36 +38,35 @@ pub mod list_utils {
     }
 }
 
-pub trait UiElement {
-    type Params;
-
-    /// Set the render visual area into the element
-    fn set_area(&mut self, area: Rect);
-
-    /// Draw the elements in the frame
-    fn draw(&self, params: Self::Params, frame: &mut Frame);
-
-    /// Last rendering, used for show overlays
-    fn draw_overlay(&self, _params: Self::Params, _frame: &mut Frame) {}
-}
-
-pub trait InteractiveElement<'params> {
+pub trait UiComposedElement<'params> {
     type Params: 'params;
 
-    fn handle_key(&mut self, params: Self::Params, key: KeyEvent);
+    fn set_area(&mut self, area: Rect, viewport_area: Rect);
 
-    fn is_editing(&self) -> bool {
-        false
+    fn draw(&self, params: Self::Params, frame: &mut Frame);
+
+    fn draw_overlay(&self, _params: Self::Params, _frame: &mut Frame) {
+        unimplemented!()
     }
 }
 
-pub trait InteractiveElementEff<'params> {
+pub trait UiElementV2<'params> {
+    type Params: 'params;
+
+    fn draw(&self, params: Self::Params, frame: &mut Frame);
+}
+
+pub trait Interactive<'params> {
     type Effect;
     type Params: 'params;
 
     fn handle_key(&mut self, params: Self::Params, key: KeyEvent) -> Self::Effect;
 
-    fn is_editing(&self) -> bool {
+    fn is_input_focus(&self) -> bool {
+        false
+    }
+
+    fn is_visible_overlay(&self) -> bool {
         false
     }
 }

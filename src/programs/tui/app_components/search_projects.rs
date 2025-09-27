@@ -1,4 +1,4 @@
-use std::{collections::HashSet, ops::Not, rc::Rc};
+use std::{collections::HashSet, ops::Not};
 
 use ratatui::{
     layout::{Constraint, Rect},
@@ -16,7 +16,7 @@ use crate::{
     programs::tui::{
         common::{
             list_utils::{next, prev},
-            InteractiveElementEff, UiElement,
+            Interactive, UiComposedElement,
         },
         config::{keybinding, Config},
         elements::utils::center_area,
@@ -28,23 +28,16 @@ pub struct SearchProjects {
     list: Vec<StoreProjectItem>,
     selected: Option<usize>,
     filtereds: Vec<usize>,
-    /// List of ProjectId, for no show to user
-    // search_input: TextArea<'static>,
-    config: Rc<Config>,
+    // config: Rc<Config>,
 }
 
 impl SearchProjects {
-    pub fn new(config: Rc<Config>) -> Self {
-        // let mut input = TextArea::new(vec![]);
-        // input.set_cursor_line_style(Style::default());
-
+    pub fn new() -> Self {
         Self {
             store: LocalStore::new(),
             list: Vec::new(),
             selected: None,
             filtereds: Vec::new(),
-            // search_input: input,
-            config,
         }
     }
 
@@ -85,12 +78,12 @@ impl SearchProjects {
     }
 }
 
-impl UiElement for SearchProjects {
-    type Params = ();
+impl<'params> UiComposedElement<'params> for SearchProjects {
+    type Params = &'params Config;
 
-    fn set_area(&mut self, _area: Rect) {}
+    fn set_area(&mut self, _area: Rect, _viewport_area: Rect) {}
 
-    fn draw(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw(&self, config: Self::Params, frame: &mut ratatui::Frame) {
         let height = {
             let content_size = if self.filtereds.is_empty() {
                 1 // placeholder
@@ -109,7 +102,7 @@ impl UiElement for SearchProjects {
         let block = Block::bordered()
             .title("| Search Project |")
             .title_alignment(ratatui::layout::Alignment::Center)
-            .border_style(self.config.theme.border_focus)
+            .border_style(config.theme.border_focus)
             .border_type(ratatui::widgets::BorderType::Thick);
 
         let mut inner_area = block.inner(area);
@@ -131,14 +124,12 @@ impl UiElement for SearchProjects {
 
                 let style = if self.selected.map(|i| i == idx).unwrap_or(false) {
                     Style::default()
-                        .fg(self.config.theme.dropdown_highlight.fg)
-                        .bg(self.config.theme.dropdown_highlight.bg)
+                        .fg(config.theme.dropdown_highlight.fg)
+                        .bg(config.theme.dropdown_highlight.bg)
                 } else {
-                    Style::default().fg(self.config.theme.dropdown.fg).bg(self
-                        .config
-                        .theme
-                        .dropdown
-                        .bg)
+                    Style::default()
+                        .fg(config.theme.dropdown.fg)
+                        .bg(config.theme.dropdown.bg)
                 };
 
                 frame.buffer_mut().set_style(item_area, style);
@@ -149,17 +140,17 @@ impl UiElement for SearchProjects {
     }
 }
 
-impl<'p> InteractiveElementEff<'p> for SearchProjects {
+impl<'params> Interactive<'params> for SearchProjects {
     type Effect = Option<SearchProjectsEffect>;
 
-    type Params = ();
+    type Params = &'params Config;
 
     fn handle_key(
         &mut self,
-        _params: Self::Params,
+        config: Self::Params,
         key: crossterm::event::KeyEvent,
     ) -> Self::Effect {
-        if let Some(action) = self.config.keymap.match_global_action(key) {
+        if let Some(action) = config.keymap.match_global_action(key) {
             match action {
                 keybinding::GlobalKeyAction::MoveDown => {
                     self.selected = next(self.selected, self.filtereds.len());

@@ -1,19 +1,15 @@
-use std::rc::Rc;
-
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
     text::Span,
     widgets::{Block, BorderType},
 };
-use tui_textarea::{CursorMove, Input, TextArea};
 
 use crate::{
     app_project::models::HttpMethod, programs::tui::{
         common::{
-            action_history::{ActionHistory, History, TrackAction},
-            component::{ WithHistory}, InteractiveElementEff, UiElement,
+            action_history::{ActionHistory, History, TrackAction}, component::WithHistory, input::mode_input::ModeInput, Interactive, UiComposedElement, UiElementV2
         },
         config::Config,
         elements::{dropdown::OverlayDropdown, utils::expand, Separator},
@@ -35,23 +31,19 @@ const METHODS: [HttpMethod; 7] = [
 pub struct MethodUrlBarComponent {
     render_area: Rect,
     method: HttpMethod,
-    url_input: TextArea<'static>,
+    url_input: ModeInput,
     dropdown: OverlayDropdown<HttpMethod>,
     show_dropdown: bool,
-    config: Rc<Config>,
+    // config: Rc<Config>,
     _history: ActionHistory<MethodUrlAction>,
 }
 
 impl MethodUrlBarComponent {
-    pub fn new(config: Rc<Config>) -> Self {
-        let mut url_input = TextArea::default();
-        url_input.set_cursor_line_style(Style::default());
-        url_input.set_placeholder_text("https://");
-
+    pub fn new(config: &Config) -> Self {
         Self {
             render_area: Rect::default(),
             method: HttpMethod::Get,
-            url_input,
+            url_input: ModeInput::new("https://"),
             dropdown: OverlayDropdown::with_items(HttpMethod::Get, METHODS)
                 .with_highlight_style(
                     Style::default()
@@ -63,44 +55,51 @@ impl MethodUrlBarComponent {
                         .fg(config.theme.dropdown.fg)
                         .bg(config.theme.dropdown.bg),
                 ),
-            config,
+            // config,
             show_dropdown: false,
             _history: ActionHistory::new(),
         }
     }
 
-    fn clean_url(&mut self) {
-        self.url_input.move_cursor(CursorMove::End);
-        self.url_input.delete_line_by_head();
-    }
-
     pub fn set_data(&mut self, method: HttpMethod, url: &str) {
-                self.method = method;
-        self.clean_url();
-        self.url_input.insert_str(url);
-
+        self.method = method;
+        self.url_input.replace(url);
         self._history.clean();
     }
 
     pub fn get_data(&self) -> (HttpMethod, String) {
-        (self.method, self.url_input.lines()[0].to_string())
+        (self.method, self.url_input.txt().to_string())
+    }
+
+
+    fn areas(area: Rect) -> [Rect;5] {
+        Layout::horizontal([
+            Constraint::Length(11),
+            Constraint::Length(1),
+            Constraint::Min(10),
+            Constraint::Length(1),
+            Constraint::Length(10),
+        ])
+        .areas(area)
     }
 }
 
-impl UiElement for MethodUrlBarComponent {
-    type Params = ElementFocus;
 
-    fn set_area(&mut self, area: Rect) {
+impl<'params> UiComposedElement<'params> for MethodUrlBarComponent {
+    type Params = (ElementFocus, &'params Config);
+
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         self.render_area = area;
-        
+        let [_,_,url_area,_,_] = Self::areas(area.inner(Margin::new(1, 1)));
+        self.url_input.set_visual_width(url_area.width);
     }
 
-    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
-        let is_focus = params == ElementFocus::MethodUrlBar;
+    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
+        let is_focus = focus == ElementFocus::MethodUrlBar;
 
             let border_style = Style::default().fg(is_focus
-                .then_some(self.config.theme.border_focus)
-                .unwrap_or(self.config.theme.border));
+                .then_some(config.theme.border_focus)
+                .unwrap_or(config.theme.border));
 
             let line_block = Block::bordered()
                 .border_type(if is_focus {
@@ -113,15 +112,7 @@ impl UiElement for MethodUrlBarComponent {
             let area = line_block.inner(self.render_area);
             frame.render_widget(line_block, self.render_area);
 
-            let [method_area, left_separator_area, url_area, right_reparator_area, _indicator_area] =
-                Layout::horizontal([
-                    Constraint::Length(11),
-                    Constraint::Length(1),
-                    Constraint::Min(10),
-                    Constraint::Length(1),
-                    Constraint::Length(10),
-                ])
-                .areas(area);
+            let [method_area, left_separator_area, url_area, right_reparator_area, _indicator_area] = Self::areas(area);
 
             frame.render_widget(
                 Separator::default().style(border_style),
@@ -134,12 +125,14 @@ impl UiElement for MethodUrlBarComponent {
 
             frame.render_widget(
                 Span::from(expand(self.method.as_ref(), " ", 10))
-                    .fg(self.config.theme.dropdown.fg)
-                    .bg(self.config.theme.dropdown.bg),
+                    .fg(config.theme.dropdown.fg)
+                    .bg(config.theme.dropdown.bg),
                 method_area,
             );
 
-            frame.render_widget(&self.url_input, url_area);
+            self.url_input.draw(url_area, frame);
+
+            // frame.render_widget(&self.url_input, url_area);
     }
 
     fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
@@ -155,14 +148,22 @@ impl UiElement for MethodUrlBarComponent {
     }
 }
 
-impl<'params> InteractiveElementEff<'params> for MethodUrlBarComponent {
+impl<'params> Interactive<'params> for MethodUrlBarComponent {
     type Effect = PaneAction;
 
-    type Params = ();
+    type Params = &'params Config;
 
-    fn handle_key(&mut self, _params: Self::Params, key: KeyEvent) -> Self::Effect {
+    fn is_input_focus(&self) -> bool {
+        !self.show_dropdown
+    }
+
+    fn is_visible_overlay(&self) -> bool {
+        self.show_dropdown
+    }
+
+    fn handle_key(&mut self, config: Self::Params, key: KeyEvent) -> Self::Effect {
         if self.show_dropdown {
-            if let Some(action) = self.config.keymap.match_global_action(key) {
+            if let Some(action) = config.keymap.match_global_action(key) {
                 match action {
                     crate::programs::tui::config::keybinding::GlobalKeyAction::ClosePopup => {
                         self.show_dropdown = false;
@@ -186,7 +187,7 @@ impl<'params> InteractiveElementEff<'params> for MethodUrlBarComponent {
                 }                
             }
         } else {
-            let is_key_consumed = match self.config.keymap.match_global_action(key) {
+            let is_key_consumed = match config.keymap.match_global_action(key) {
                 Some(action) => match action {
                     crate::programs::tui::config::keybinding::GlobalKeyAction::NextFocus => {
                         return PaneAction::NextFocus;
@@ -200,7 +201,7 @@ impl<'params> InteractiveElementEff<'params> for MethodUrlBarComponent {
             };
 
             if !is_key_consumed {
-                match self.config.keymap.match_method_url_action(key) {
+                match config.keymap.match_method_url_action(key) {
                     Some(action) => match action {
                         crate::programs::tui::config::keybinding::MethodUrlKeyAction::OpenDropdown => {
                             self.show_dropdown = true;                            
@@ -209,7 +210,8 @@ impl<'params> InteractiveElementEff<'params> for MethodUrlBarComponent {
                     None => {
                         // Avoid new line on enter
                         if key.code != KeyCode::Enter {
-                            self.url_input.input(Input::from(key));
+                            self.url_input.handle_key(key);
+                            // self.url_input.input(Input::from(key));
                         }
                     }
                 }

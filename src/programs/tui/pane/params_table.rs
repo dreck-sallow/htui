@@ -1,9 +1,7 @@
-use std::rc::Rc;
-
 use arboard::Clipboard;
 use crossterm::event::KeyCode;
 use ratatui::{
-    layout::{Constraint, Margin, Rect},
+    layout::{Constraint, Rect},
     style::{Style, Stylize},
     widgets::{Block, Clear},
 };
@@ -15,7 +13,7 @@ use crate::{
             action_history::{ActionHistory, History, TrackAction},
             component::WithHistory,
             input::mode_input::ModeInput,
-            InteractiveElement, UiElement,
+            Interactive, UiComposedElement, UiElementV2,
         },
         config::{keybinding, Config},
         elements::{table::TableGrid, utils::center_area},
@@ -179,19 +177,12 @@ impl ParamsTable {
     }
 }
 
-impl UiElement for ParamsTable {
-    type Params = Rc<Config>;
+impl<'params> UiComposedElement<'params> for ParamsTable {
+    type Params = &'params Config;
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         self.render_area = area;
-        self.input.set_area(
-            center_area(
-                self.render_area,
-                Constraint::Length(3),
-                Constraint::Percentage(50),
-            )
-            .inner(Margin::new(1, 1)),
-        );
+        self.input.set_visual_width(area.width.saturating_sub(2));
     }
 
     fn draw(&self, config: Self::Params, frame: &mut ratatui::Frame) {
@@ -236,17 +227,28 @@ impl UiElement for ParamsTable {
                 .border_style(Style::default().fg(config.theme.border_focus))
                 .border_type(ratatui::widgets::BorderType::Thick);
 
+            let inner_area = block.inner(area);
+
             frame.render_widget(Clear, area);
             frame.render_widget(block, area);
-            self.input.draw((), frame);
+            self.input.draw(inner_area, frame);
         }
     }
 }
 
-impl<'params> InteractiveElement<'params> for ParamsTable {
+impl<'params> Interactive<'params> for ParamsTable {
+    type Effect = ();
     type Params = (&'params Config, &'params mut Clipboard);
 
-    fn handle_key(&mut self, (config, clipboard): Self::Params, key: crossterm::event::KeyEvent) {
+    fn is_visible_overlay(&self) -> bool {
+        self.show_popup
+    }
+
+    fn handle_key(
+        &mut self,
+        (config, clipboard): Self::Params,
+        key: crossterm::event::KeyEvent,
+    ) -> Self::Effect {
         if self.show_popup {
             let is_consumed = match config.keymap.match_global_action(key) {
                 Some(action) => match action {

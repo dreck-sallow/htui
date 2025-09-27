@@ -11,7 +11,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::programs::tui::common::UiElement;
+use crate::programs::tui::common::UiElementV2;
 
 use super::input::{EditHandler, Input};
 
@@ -52,7 +52,7 @@ pub struct ModeInput {
     input: Input,
     // suggestion: Option<String>,
     scroll_offset: usize,
-    _render_area: Rect,
+    _visual_width: u16, // _render_area: Rect,
 }
 
 impl ModeInput {
@@ -61,9 +61,13 @@ impl ModeInput {
             mode: InputMode::default(),
             input: Input::from(input),
             scroll_offset: 0,
-            // suggestion: None,
-            _render_area: Rect::default(),
+            _visual_width: 0, // suggestion: None,
+                              // _render_area: Rect::default(),
         }
+    }
+
+    pub fn set_visual_width(&mut self, width: u16) {
+        self._visual_width = width;
     }
 
     // pub fn new_empty() -> Self {
@@ -102,7 +106,8 @@ impl ModeInput {
         self.mode = edit_handler.mode;
 
         // Compute the scroll_offset
-        let right_end = self.scroll_offset + (self._render_area.width.saturating_sub(2) as usize);
+        // let right_end = self.scroll_offset + (self._render_area.width.saturating_sub(2) as usize);
+        let right_end = self.scroll_offset + (self._visual_width.saturating_sub(2) as usize);
 
         if right_end < (self.input.cursor().saturating_sub(1)) {
             self.scroll_offset = self.scroll_offset + (self.input.cursor() - right_end);
@@ -113,15 +118,10 @@ impl ModeInput {
     }
 }
 
-impl UiElement for ModeInput {
-    type Params = ();
+impl<'params> UiElementV2<'params> for ModeInput {
+    type Params = Rect;
 
-    fn set_area(&mut self, area: Rect) {
-        self._render_area = area;
-    }
-
-    fn draw(&self, _params: Self::Params, frame: &mut Frame) {
-        let mut area = self._render_area;
+    fn draw(&self, mut area: Self::Params, frame: &mut Frame) {
         if area.is_empty() {
             return;
         }
@@ -179,6 +179,137 @@ impl UiElement for ModeInput {
         let _ = execute!(stdout(), cursor_style);
     }
 }
+
+// impl<'params> UiComposedElement<'params> for ModeInput {
+//     type Params = (Rect);
+
+//     fn set_area(&mut self, _area: Rect, _viewport_area: Rect) {}
+
+//     fn draw(&self, mut area: Self::Params, frame: &mut Frame) {
+//         if area.is_empty() {
+//             return;
+//         }
+
+//         let left = area.left();
+//         for ch in self
+//             .input
+//             .txt()
+//             .chars()
+//             .skip(self.scroll_offset)
+//             .take(area.width as usize)
+//         {
+//             area.x = frame
+//                 .buffer_mut()
+//                 .set_stringn(area.left(), area.top(), ch.to_string(), 1, Style::default())
+//                 .0;
+//         }
+
+//         let cursor_in_range = self.input.cursor() - self.scroll_offset;
+//         frame.set_cursor_position(Position::new(left + cursor_in_range as u16, area.top()));
+//         let cursor_style = if self.mode.is_write_mode() {
+//             SetCursorStyle::BlinkingBar
+//         } else {
+//             SetCursorStyle::BlinkingBlock
+//         };
+
+//         if let Some((start, end)) = self.input.selection_range() {
+//             let start_left = start.saturating_sub(self.scroll_offset) as u16;
+//             let end_right = (end.min(self.scroll_offset + area.width as usize))
+//                 .saturating_sub(self.scroll_offset) as u16;
+
+//             frame.buffer_mut().set_style(
+//                 Rect {
+//                     x: left + start_left,
+//                     width: end_right.saturating_sub(start_left),
+//                     ..area
+//                 },
+//                 Style::default().red(),
+//             );
+//         }
+
+//         // if self.mode.is_write_mode() {
+//         //     // draw the suggestion
+//         //     if let Some(ref suggest) = self.suggestion {
+//         //         frame.buffer_mut().set_string(
+//         //             area.left(),
+//         //             area.top(),
+//         //             suggest,
+//         //             Style::default().dark_gray(),
+//         //         );
+//         //     }
+//         // }
+
+//         // TODO: is this hacky?
+//         let _ = execute!(stdout(), cursor_style);
+//     }
+// }
+
+// impl UiElement for ModeInput {
+//     type Params = ();
+
+//     fn set_area(&mut self, area: Rect) {
+//         self._render_area = area;
+//     }
+
+//     fn draw(&self, _params: Self::Params, frame: &mut Frame) {
+//         let mut area = self._render_area;
+//         if area.is_empty() {
+//             return;
+//         }
+
+//         let left = area.left();
+//         for ch in self
+//             .input
+//             .txt()
+//             .chars()
+//             .skip(self.scroll_offset)
+//             .take(area.width as usize)
+//         {
+//             area.x = frame
+//                 .buffer_mut()
+//                 .set_stringn(area.left(), area.top(), ch.to_string(), 1, Style::default())
+//                 .0;
+//         }
+
+//         let cursor_in_range = self.input.cursor() - self.scroll_offset;
+//         frame.set_cursor_position(Position::new(left + cursor_in_range as u16, area.top()));
+//         let cursor_style = if self.mode.is_write_mode() {
+//             SetCursorStyle::BlinkingBar
+//         } else {
+//             SetCursorStyle::BlinkingBlock
+//         };
+
+//         if let Some((start, end)) = self.input.selection_range() {
+//             let start_left = start.saturating_sub(self.scroll_offset) as u16;
+//             let end_right = (end.min(self.scroll_offset + area.width as usize))
+//                 .saturating_sub(self.scroll_offset) as u16;
+
+//             frame.buffer_mut().set_style(
+//                 Rect {
+//                     x: left + start_left,
+//                     width: end_right.saturating_sub(start_left),
+//                     ..area
+//                 },
+//                 Style::default().red(),
+//             );
+//         }
+
+//         // if self.mode.is_write_mode() {
+//         //     // draw the suggestion
+//         //     if let Some(ref suggest) = self.suggestion {
+//         //         frame.buffer_mut().set_string(
+//         //             area.left(),
+//         //             area.top(),
+//         //             suggest,
+//         //             Style::default().dark_gray(),
+//         //         );
+//         //     }
+//         // }
+
+//         // TODO: is this hacky?
+//         let _ = execute!(stdout(), cursor_style);
+//     }
+// }
 
 // pub struct RangeStyle {
 //     range: (usize, usize),

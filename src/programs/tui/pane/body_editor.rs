@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     io::{stdout, Stdout},
-    rc::Rc,
 };
 
 use crossterm::{
@@ -22,7 +21,7 @@ use crate::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
             component::WithHistory,
-            InteractiveElement, UiElement,
+            Interactive, UiComposedElement,
         },
         config::{keybinding, Config},
         elements::{dropdown::OverlayDropdown, utils::center_area},
@@ -55,12 +54,11 @@ pub struct BodyEditorComponent {
     text_editor: TextEditor,
     dropdown: OverlayDropdown<BodyTypeV2>,
     show_dropdown: bool,
-    config: Rc<Config>,
     _history: ActionHistory<BodyEditorAction>,
 }
 
 impl BodyEditorComponent {
-    pub fn new(config: Rc<Config>) -> Self {
+    pub fn new(config: &Config) -> Self {
         Self {
             body_content: BodyContent::Empty,
             render_area: Rect::default(),
@@ -84,7 +82,6 @@ impl BodyEditorComponent {
                     .bg(config.theme.dropdown_highlight.bg),
             ),
             show_dropdown: false,
-            config,
             _history: ActionHistory::new(),
         }
     }
@@ -121,14 +118,14 @@ impl BodyEditorComponent {
     }
 }
 
-impl UiElement for BodyEditorComponent {
-    type Params = ();
+impl<'params> UiComposedElement<'params> for BodyEditorComponent {
+    type Params = &'params Config;
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         self.render_area = area;
     }
 
-    fn draw(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw(&self, config: Self::Params, frame: &mut ratatui::Frame) {
         let [header_area, content_area] =
             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(self.render_area);
 
@@ -147,8 +144,8 @@ impl UiElement for BodyEditorComponent {
         frame.buffer_mut().set_style(
             header_area,
             Style::default()
-                .fg(self.config.theme.dropdown.fg)
-                .bg(self.config.theme.dropdown.bg),
+                .fg(config.theme.dropdown.fg)
+                .bg(config.theme.dropdown.bg),
         );
 
         match &self.body_content {
@@ -195,15 +192,26 @@ impl UiElement for BodyEditorComponent {
     }
 }
 
-impl<'params> InteractiveElement<'params> for BodyEditorComponent {
+impl<'params> Interactive<'params> for BodyEditorComponent {
+    type Effect = ();
+
     type Params = (
+        &'params Config,
         &'params mut Events<AppMessage>,
         &'params mut Terminal<CrosstermBackend<Stdout>>,
     );
 
-    fn handle_key(&mut self, (events, terminal): Self::Params, key: crossterm::event::KeyEvent) {
+    fn is_visible_overlay(&self) -> bool {
+        self.show_dropdown
+    }
+
+    fn handle_key(
+        &mut self,
+        (config, events, terminal): Self::Params,
+        key: crossterm::event::KeyEvent,
+    ) -> Self::Effect {
         if self.show_dropdown {
-            if let Some(key) = self.config.keymap.match_global_action(key) {
+            if let Some(key) = config.keymap.match_global_action(key) {
                 match key {
                     keybinding::GlobalKeyAction::MoveDown => {
                         self.dropdown.next();
@@ -248,7 +256,7 @@ impl<'params> InteractiveElement<'params> for BodyEditorComponent {
             if self.text_editor.mode().is_write_mode() {
                 self.text_editor.handle_key(key);
             } else {
-                match self.config.keymap.match_request_builder_action(key) {
+                match config.keymap.match_request_builder_action(key) {
                     Some(action) => match action {
                         keybinding::RequestBuilderKeyAction::OpenDropdown => {
                             self.show_dropdown = true;

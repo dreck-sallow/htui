@@ -1,9 +1,9 @@
-use std::{io::Stdout, rc::Rc};
+use std::io::Stdout;
 
 use crate::{
     app_project::models::{BodyContent, KeyValueParam},
     programs::tui::{
-        common::{component::WithHistory, InteractiveElement, InteractiveElementEff, UiElement},
+        common::{component::WithHistory, Interactive, UiComposedElement},
         config::{keybinding, Config},
         event_handler::{AppMessage, Events},
     },
@@ -55,19 +55,17 @@ pub struct RequestEditorComponent {
     params_table: ParamsTable,
     headers_table: ParamsTable,
     body_editor_component: BodyEditorComponent,
-    config: Rc<Config>,
 }
 
 impl RequestEditorComponent {
-    pub fn new(config: Rc<Config>) -> Self {
+    pub fn new(config: &Config) -> Self {
         Self {
             tab: Tab::Params,
             header_area: Rect::default(),
             render_area: Rect::default(),
             params_table: ParamsTable::new(),
             headers_table: ParamsTable::new(),
-            body_editor_component: BodyEditorComponent::new(Rc::clone(&config)),
-            config,
+            body_editor_component: BodyEditorComponent::new(&config),
         }
     }
 
@@ -119,28 +117,29 @@ impl RequestEditorComponent {
     }
 }
 
-impl UiElement for RequestEditorComponent {
-    type Params = ElementFocus;
+impl<'params> UiComposedElement<'params> for RequestEditorComponent {
+    type Params = (ElementFocus, &'params Config);
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         let main_areas = Layout::vertical([Constraint::Length(2), Constraint::Fill(50)])
             .split(area.inner(Margin::new(1, 1)));
 
         self.render_area = area;
         self.header_area = main_areas[0];
-        self.params_table.set_area(main_areas[1]);
-        self.headers_table.set_area(main_areas[1]);
-        self.body_editor_component.set_area(main_areas[1]);
+        self.params_table.set_area(main_areas[1], _viewport_area);
+        self.headers_table.set_area(main_areas[1], _viewport_area);
+        self.body_editor_component
+            .set_area(main_areas[1], _viewport_area);
     }
 
-    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
-        let border_style = if params == ElementFocus::RequestBuilder {
-            Style::default().fg(self.config.theme.border_focus)
+    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
+        let border_style = if focus == ElementFocus::RequestBuilder {
+            Style::default().fg(config.theme.border_focus)
         } else {
-            Style::default().fg(self.config.theme.border)
+            Style::default().fg(config.theme.border)
         };
 
-        let border_type = if params == ElementFocus::RequestBuilder {
+        let border_type = if focus == ElementFocus::RequestBuilder {
             BorderType::Thick
         } else {
             BorderType::Plain
@@ -154,15 +153,15 @@ impl UiElement for RequestEditorComponent {
         let tabs = Tabs::new([
             format!(
                 " {} ({})",
-                Tab::Params.as_ref().fg(self.config.theme.tab),
+                Tab::Params.as_ref().fg(config.theme.tab),
                 self.params_table.len_items()
             ),
             format!(
                 " {} ({})",
-                Tab::Headers.as_ref().fg(self.config.theme.tab),
+                Tab::Headers.as_ref().fg(config.theme.tab),
                 self.headers_table.len_items()
             ),
-            format!(" {} ", Tab::Body.as_ref().fg(self.config.theme.tab)),
+            format!(" {} ", Tab::Body.as_ref().fg(config.theme.tab)),
         ])
         .select(self.tab.as_idx())
         .block(
@@ -171,51 +170,56 @@ impl UiElement for RequestEditorComponent {
                 .border_style(border_style)
                 .border_type(border_type),
         )
-        .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
+        .highlight_style(Style::default().fg(config.theme.tab_highlight));
 
         frame.render_widget(tabs, self.header_area);
 
         match self.tab {
             Tab::Headers => {
-                self.headers_table.draw(Rc::clone(&self.config), frame);
+                self.headers_table.draw(config, frame);
             }
             Tab::Body => {
-                self.body_editor_component.draw((), frame);
+                self.body_editor_component.draw(config, frame);
             }
             Tab::Params => {
-                self.params_table.draw(Rc::clone(&self.config), frame);
+                self.params_table.draw(config, frame);
             }
         }
     }
 
-    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw_overlay(&self, (_, config): Self::Params, frame: &mut ratatui::Frame) {
         match self.tab {
-            Tab::Headers => self
-                .headers_table
-                .draw_overlay(Rc::clone(&self.config), frame),
-            Tab::Body => self.body_editor_component.draw_overlay((), frame),
-            Tab::Params => self
-                .params_table
-                .draw_overlay(Rc::clone(&self.config), frame),
+            Tab::Headers => self.headers_table.draw_overlay(config, frame),
+            Tab::Body => self.body_editor_component.draw_overlay(config, frame),
+            Tab::Params => self.params_table.draw_overlay(config, frame),
         }
     }
 }
 
-impl<'params> InteractiveElementEff<'params> for RequestEditorComponent {
+impl<'params> Interactive<'params> for RequestEditorComponent {
     type Effect = PaneAction;
 
     type Params = (
+        &'params Config,
         &'params mut Events<AppMessage>,
         &'params mut Terminal<CrosstermBackend<Stdout>>,
         &'params mut Clipboard,
     );
 
+    fn is_visible_overlay(&self) -> bool {
+        match self.tab {
+            Tab::Headers => self.headers_table.is_visible_overlay(),
+            Tab::Body => self.body_editor_component.is_visible_overlay(),
+            Tab::Params => self.params_table.is_visible_overlay(),
+        }
+    }
+
     fn handle_key(
         &mut self,
-        (events, terminal, clipboard): Self::Params,
+        (config, events, terminal, clipboard): Self::Params,
         key: crossterm::event::KeyEvent,
     ) -> Self::Effect {
-        if let Some(action) = self.config.keymap.match_global_action(key) {
+        if let Some(action) = config.keymap.match_global_action(key) {
             match action {
                 keybinding::GlobalKeyAction::NextTab => {
                     self.change_tab(true);
@@ -236,15 +240,14 @@ impl<'params> InteractiveElementEff<'params> for RequestEditorComponent {
 
         match self.tab {
             Tab::Headers => {
-                self.headers_table
-                    .handle_key((&self.config, clipboard), key);
+                self.headers_table.handle_key((config, clipboard), key);
             }
             Tab::Body => {
                 self.body_editor_component
-                    .handle_key((events, terminal), key);
+                    .handle_key((config, events, terminal), key);
             }
             Tab::Params => {
-                self.params_table.handle_key((&self.config, clipboard), key);
+                self.params_table.handle_key((config, clipboard), key);
             }
         }
 

@@ -7,7 +7,6 @@ use std::{
 use encoding_rs::{Encoding, UTF_8};
 use ratatui::layout::Rect;
 use reqwest::{header::CONTENT_TYPE, ClientBuilder, RequestBuilder, Response, Url};
-use serde_json::{json, Value};
 use tokio::time::Instant;
 
 use crate::{

@@ -1,14 +1,11 @@
-use std::rc::Rc;
-
 use crossterm::event::KeyEvent;
 use list::{CollectionList, Item};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Style,
-    widgets::{Block, BorderType, Clear},
+    widgets::{Block, BorderType},
 };
 use state::{CollectionsState, MutableList};
-use tui_textarea::Input;
 use upsert_item::{UpsertItemPopup, UpsertMethod};
 
 use crate::{
@@ -19,7 +16,7 @@ use crate::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
             component::WithHistory,
-            InteractiveElementEff, UiElement,
+            Interactive, UiComposedElement,
         },
         config::{
             keybinding::{CollectionsKeyAction, GlobalKeyAction},
@@ -38,19 +35,17 @@ pub struct CollectionsComponent {
     render_area: Rect,
     state: CollectionsState,
     menu: UpsertItemPopup,
-    config: Rc<Config>,
     show_popup: bool,
     _history: ActionHistory<CollectionAction>,
 }
 
 impl CollectionsComponent {
-    pub fn new(collections: Vec<CollectionsModel>, config: Rc<Config>) -> Self {
+    pub fn new(collections: Vec<CollectionsModel>) -> Self {
         Self {
             state: CollectionsState::from_list(collections),
             render_area: Rect::default(),
-            menu: UpsertItemPopup::new(Rc::clone(&config)),
+            menu: UpsertItemPopup::new(),
             show_popup: false,
-            config,
             _history: ActionHistory::new(),
         }
     }
@@ -132,14 +127,28 @@ impl CollectionsComponent {
     }
 }
 
-impl UiElement for CollectionsComponent {
-    type Params = ElementFocus;
+impl<'params> UiComposedElement<'params> for CollectionsComponent {
+    type Params = (ElementFocus, &'params Config);
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, viewport_area: Rect) {
         self.render_area = area;
+
+        let menu_area = {
+            let [area] = Layout::vertical([Constraint::Length(3)])
+                .flex(ratatui::layout::Flex::Center)
+                .areas(viewport_area);
+
+            let [area] = Layout::horizontal([Constraint::Percentage(40)])
+                .flex(ratatui::layout::Flex::Center)
+                .areas(area);
+
+            area
+        };
+
+        self.menu.set_area(menu_area, viewport_area);
     }
 
-    fn draw(&self, focus: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
         let is_focus = focus == ElementFocus::Collections;
         let items: Vec<Item<'_>> = self
             .state
@@ -170,50 +179,40 @@ impl UiElement for CollectionsComponent {
                     })
                     .border_style(
                         Style::default().fg(is_focus
-                            .then_some(self.config.theme.border_focus)
-                            .unwrap_or(self.config.theme.border)),
+                            .then_some(config.theme.border_focus)
+                            .unwrap_or(config.theme.border)),
                     ),
             )
             .set_openeds(self.state.openeds().clone())
             .set_idx(self.state.idx())
             .set_highlight_style(
-                Style::default().fg(self.config.theme.selection.fg).bg(self
-                    .config
-                    .theme
-                    .selection
-                    .bg),
+                Style::default()
+                    .fg(config.theme.selection.fg)
+                    .bg(config.theme.selection.bg),
             );
 
         frame.render_widget(collections, self.render_area);
     }
 
-    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw_overlay(&self, (_, config): Self::Params, frame: &mut ratatui::Frame) {
         if self.show_popup {
-            let area = {
-                let [area] = Layout::vertical([Constraint::Length(3)])
-                    .flex(ratatui::layout::Flex::Center)
-                    .areas(frame.area());
-
-                let [area] = Layout::horizontal([Constraint::Percentage(40)])
-                    .flex(ratatui::layout::Flex::Center)
-                    .areas(area);
-
-                area
-            };
-
-            frame.render_widget(Clear, area);
-            self.menu.draw(frame, area);
+            self.menu.draw(config, frame);
         }
     }
 }
 
-impl<'params> InteractiveElementEff<'params> for CollectionsComponent {
+impl<'params> Interactive<'params> for CollectionsComponent {
     type Effect = PaneAction;
-    type Params = ();
 
-    fn handle_key(&mut self, _params: Self::Params, key: KeyEvent) -> Self::Effect {
+    type Params = &'params Config;
+
+    fn is_visible_overlay(&self) -> bool {
+        self.show_popup
+    }
+
+    fn handle_key(&mut self, config: Self::Params, key: KeyEvent) -> Self::Effect {
         if self.show_popup {
-            if let Some(key_action) = self.config.keymap.match_global_action(key) {
+            if let Some(key_action) = config.keymap.match_global_action(key) {
                 match key_action {
                     GlobalKeyAction::ClosePopup => {
                         self.show_popup = false;
@@ -260,17 +259,19 @@ impl<'params> InteractiveElementEff<'params> for CollectionsComponent {
                         self.show_popup = false;
                     }
                     _ => {
-                        self.menu.handle_input(Input::from(key));
+                        self.menu.handle_key((), key);
+                        // self.menu.handle_input(Input::from(key));
                     }
                 }
             } else {
-                self.menu.handle_input(Input::from(key));
+                self.menu.handle_key((), key);
+                // self.menu.handle_input(Input::from(key));
             }
         } else {
             let mut pane_action = PaneAction::Noop;
 
             let is_consumed_action =
-                self.config
+                config
                     .keymap
                     .match_global_action(key)
                     .map_or(false, |key_action| {
@@ -299,7 +300,7 @@ impl<'params> InteractiveElementEff<'params> for CollectionsComponent {
                     });
 
             if !is_consumed_action {
-                if let Some(key_action) = self.config.keymap.match_collections_action(key) {
+                if let Some(key_action) = config.keymap.match_collections_action(key) {
                     match key_action {
                         CollectionsKeyAction::Delete => match self.state.idx() {
                             state::Idx::None => {}
@@ -359,6 +360,161 @@ impl<'params> InteractiveElementEff<'params> for CollectionsComponent {
         PaneAction::Noop
     }
 }
+
+// impl<'params> InteractiveElementEff<'params> for CollectionsComponent {
+//     type Effect = PaneAction;
+//     type Params = &'params Config;
+
+//     fn handle_key(&mut self, config: Self::Params, key: KeyEvent) -> Self::Effect {
+//         if self.show_popup {
+//             if let Some(key_action) = config.keymap.match_global_action(key) {
+//                 match key_action {
+//                     GlobalKeyAction::ClosePopup => {
+//                         self.show_popup = false;
+//                     }
+//                     GlobalKeyAction::SubmitPopup => {
+//                         let text = self.menu.text();
+
+//                         match self.menu.method_type() {
+//                             UpsertMethod::CreateRequest => {
+//                                 self._history.apply(
+//                                     CollectionAction::CreateRequest {
+//                                         coll_idx: self.state.idx().parent_idx(),
+//                                         name: text,
+//                                     },
+//                                     &mut self.state,
+//                                 );
+//                             }
+//                             UpsertMethod::CreateCollection => {
+//                                 self._history.apply(
+//                                     CollectionAction::CreateCollection(text),
+//                                     &mut self.state,
+//                                 );
+//                             }
+//                             UpsertMethod::EditRequest => {
+//                                 self._history.apply(
+//                                     CollectionAction::EditRequestName {
+//                                         idx: self.state.idx().child_idx(),
+//                                         name: text,
+//                                     },
+//                                     &mut self.state,
+//                                 );
+//                             }
+//                             UpsertMethod::EditCollection => {
+//                                 self._history.apply(
+//                                     CollectionAction::EditCollectionName {
+//                                         idx: self.state.idx().parent_idx(),
+//                                         new_name: text,
+//                                     },
+//                                     &mut self.state,
+//                                 );
+//                             }
+//                         }
+
+//                         self.show_popup = false;
+//                     }
+//                     _ => {
+//                         self.menu.handle_key((), key);
+//                         // self.menu.handle_input(Input::from(key));
+//                     }
+//                 }
+//             } else {
+//                 self.menu.handle_key((), key);
+//                 // self.menu.handle_input(Input::from(key));
+//             }
+//         } else {
+//             let mut pane_action = PaneAction::Noop;
+
+//             let is_consumed_action =
+//                 config
+//                     .keymap
+//                     .match_global_action(key)
+//                     .map_or(false, |key_action| {
+//                         match key_action {
+//                             GlobalKeyAction::NextFocus => {
+//                                 pane_action = PaneAction::NextFocus;
+//                             }
+//                             GlobalKeyAction::PreviousFocus => {
+//                                 pane_action = PaneAction::PreviousFocus;
+//                             }
+//                             GlobalKeyAction::MoveDown => {
+//                                 self.state.next();
+//                             }
+//                             GlobalKeyAction::MoveUp => {
+//                                 self.state.prev();
+//                             }
+//                             GlobalKeyAction::MoveLeft => {
+//                                 self.state.close_collection(true);
+//                             }
+//                             GlobalKeyAction::MoveRight => {
+//                                 self.state.open_collection(true);
+//                             }
+//                             _ => return false,
+//                         }
+//                         true
+//                     });
+
+//             if !is_consumed_action {
+//                 if let Some(key_action) = config.keymap.match_collections_action(key) {
+//                     match key_action {
+//                         CollectionsKeyAction::Delete => match self.state.idx() {
+//                             state::Idx::None => {}
+//                             state::Idx::Parent(i) => {
+//                                 self._history.apply(
+//                                     CollectionAction::DeleteCollection { idx: i },
+//                                     &mut self.state,
+//                                 );
+//                             }
+//                             state::Idx::Child(i, sub_i) => {
+//                                 self._history.apply(
+//                                     CollectionAction::DeleteRequest((i, sub_i)),
+//                                     &mut self.state,
+//                                 );
+//                             }
+//                         },
+//                         CollectionsKeyAction::Edit => match self.state.idx() {
+//                             state::Idx::None => {}
+//                             state::Idx::Parent(i) => {
+//                                 let collection = self.state.collections().get(i).unwrap();
+//                                 self.menu
+//                                     .set_state(UpsertMethod::EditCollection, &collection.name);
+//                                 self.show_popup = true;
+//                             }
+//                             state::Idx::Child(_, _) => {
+//                                 let name = self.state.current_request().unwrap().name();
+//                                 self.menu.set_state(UpsertMethod::EditRequest, name);
+//                                 self.show_popup = true;
+//                             }
+//                         },
+//                         CollectionsKeyAction::SelectRequest => {
+//                             if let state::Idx::Child(i, sub_i) = self.state.idx() {
+//                                 self._history.apply(
+//                                     CollectionAction::SelectRequestIdx(Some((i, sub_i))),
+//                                     &mut self.state,
+//                                 );
+//                                 return PaneAction::ChangeRequest;
+//                             }
+//                         }
+//                         CollectionsKeyAction::CreateCollection => {
+//                             self.show_popup = true;
+//                             self.menu.set_state(UpsertMethod::CreateCollection, "");
+//                         }
+//                         CollectionsKeyAction::CreateRequest => {
+//                             if !self.state.idx().is_none() {
+//                                 self.show_popup = true;
+//                                 self.menu.set_state(UpsertMethod::CreateRequest, "");
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+
+//             return pane_action;
+//         }
+
+//         PaneAction::Noop
+//     }
+// }
 
 enum CollectionAction {
     SelectRequestIdx(Option<(usize, usize)>),

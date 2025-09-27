@@ -1,7 +1,6 @@
 use std::{
     io::{stdout, Stdout},
     path::PathBuf,
-    rc::Rc,
     sync::{Arc, RwLock},
 };
 
@@ -29,7 +28,7 @@ use crate::{
         self, RequestModel, ResponseFilePath, ResponseModel, SendRequest, SendRequestKey,
     },
     programs::tui::{
-        common::{InteractiveElementEff, UiElement},
+        common::{Interactive, UiComposedElement},
         config::{keybinding, Config},
         elements::Separator,
         event_handler::{AppMessage, EventSender, Events},
@@ -78,7 +77,7 @@ pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
     response_content: Arc<RwLock<ResponseContent>>,
-    config: Rc<Config>,
+    // config: Rc<Config>,
     status_bar_area: Rect,
     render_area: Rect,
     header_area: Rect,
@@ -86,7 +85,7 @@ pub struct ResponseViewerComponent {
 }
 
 impl ResponseViewerComponent {
-    pub fn new(config: Rc<Config>) -> Self {
+    pub fn new() -> Self {
         Self {
             state: RequestResponseState::new(),
             tab: Tab::Response,
@@ -95,7 +94,7 @@ impl ResponseViewerComponent {
                 body_viewer: BodyContentView::empty(Rect::default()),
                 request_key: None,
             })),
-            config,
+            // config,
             status_bar_area: Rect::default(),
             render_area: Rect::default(),
             header_area: Rect::default(),
@@ -191,10 +190,10 @@ impl ResponseViewerComponent {
     }
 }
 
-impl UiElement for ResponseViewerComponent {
-    type Params = ElementFocus;
+impl<'params> UiComposedElement<'params> for ResponseViewerComponent {
+    type Params = (ElementFocus, &'params Config);
 
-    fn set_area(&mut self, area: Rect) {
+    fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         let main_areas = Layout::vertical([
             Constraint::Length(2),
             Constraint::Length(2),
@@ -210,10 +209,10 @@ impl UiElement for ResponseViewerComponent {
             .write()
             .unwrap()
             .body_viewer
-            .set_area(main_areas[2]);
+            .set_area(main_areas[2], _viewport_area);
     }
 
-    fn draw(&self, params: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
         match self
             .response_content
             .read()
@@ -261,11 +260,11 @@ impl UiElement for ResponseViewerComponent {
                     // Draw the status line
                     let status_line = self.status_line_ui(response);
 
-                    let is_focus = params == ElementFocus::ResponseViewer;
+                    let is_focus = focus == ElementFocus::ResponseViewer;
                     let border_style = Style::default().fg(if is_focus {
-                        self.config.theme.border_focus
+                        config.theme.border_focus
                     } else {
-                        self.config.theme.border
+                        config.theme.border
                     });
 
                     let border_type = if is_focus {
@@ -315,7 +314,7 @@ impl UiElement for ResponseViewerComponent {
                                 .border_type(border_type)
                                 .border_style(border_style),
                         )
-                        .highlight_style(Style::default().fg(self.config.theme.tab_highlight));
+                        .highlight_style(Style::default().fg(config.theme.tab_highlight));
 
                     frame.render_widget(tabs, self.header_area);
 
@@ -323,13 +322,13 @@ impl UiElement for ResponseViewerComponent {
                         Tab::Headers => {
                             let response_content = Arc::clone(&self.response_content);
                             let locked = response_content.read().unwrap();
-                            let table_ui = locked.headers_table.table_ui(&self.config.theme);
+                            let table_ui = locked.headers_table.table_ui(&config.theme);
                             frame.render_widget(table_ui, self.content_area);
                         }
                         Tab::Response => {
                             // FIXME: use the same painter from the draw tree call (because on overlays cannot work in nested painters)
                             let locked = self.response_content.read().unwrap();
-                            locked.body_viewer.draw(Rc::clone(&self.config), frame);
+                            locked.body_viewer.draw(config, frame);
                         }
                     }
                 }
@@ -337,7 +336,7 @@ impl UiElement for ResponseViewerComponent {
         }
     }
 
-    fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {
+    fn draw_overlay(&self, (_, config): Self::Params, frame: &mut ratatui::Frame) {
         if let Some(send_request_response) = self
             .response_content
             .read()
@@ -351,14 +350,12 @@ impl UiElement for ResponseViewerComponent {
                 models::SendRequest::Finish(_) => match self.tab {
                     Tab::Headers => {
                         let locked = self.response_content.read().unwrap();
-                        let table_ui = locked.headers_table.table_ui(&self.config.theme);
+                        let table_ui = locked.headers_table.table_ui(&config.theme);
                         frame.render_widget(table_ui, self.content_area);
                     }
                     Tab::Response => {
                         let locked = self.response_content.read().unwrap();
-                        locked
-                            .body_viewer
-                            .draw_overlay(Rc::clone(&self.config), frame);
+                        locked.body_viewer.draw_overlay(config, frame);
                     }
                 },
             }
@@ -366,7 +363,7 @@ impl UiElement for ResponseViewerComponent {
     }
 }
 
-impl<'params> InteractiveElementEff<'params> for ResponseViewerComponent {
+impl<'params> Interactive<'params> for ResponseViewerComponent {
     type Effect = PaneAction;
 
     type Params = (
@@ -381,7 +378,7 @@ impl<'params> InteractiveElementEff<'params> for ResponseViewerComponent {
         (config, events, terminal, clipboard): Self::Params,
         key: crossterm::event::KeyEvent,
     ) -> Self::Effect {
-        let is_consumed = match self.config.keymap.match_global_action(key) {
+        let is_consumed = match config.keymap.match_global_action(key) {
             Some(action) => match action {
                 keybinding::GlobalKeyAction::NextFocus => return PaneAction::NextFocus,
                 keybinding::GlobalKeyAction::PreviousFocus => return PaneAction::PreviousFocus,
@@ -407,7 +404,7 @@ impl<'params> InteractiveElementEff<'params> for ResponseViewerComponent {
                 Tab::Headers => {
                     let mut response_content = self.response_content.write().unwrap();
                     let headers_editor = &mut response_content.headers_table;
-                    if let Some(key) = self.config.keymap.match_global_action(key) {
+                    if let Some(key) = config.keymap.match_global_action(key) {
                         match key {
                             keybinding::GlobalKeyAction::MoveDown => {
                                 headers_editor.move_row_idx(true)
@@ -436,7 +433,7 @@ impl<'params> InteractiveElementEff<'params> for ResponseViewerComponent {
                     let body_viewer = &mut response_content.body_viewer;
                     match body_viewer {
                         BodyContentView::Text { editor, .. } => {
-                            match self.config.keymap.match_request_builder_action(key) {
+                            match config.keymap.match_request_builder_action(key) {
                                 Some(action) => match action {
                                     keybinding::RequestBuilderKeyAction::OpenEditor => {
                                         events.stop();
