@@ -77,7 +77,6 @@ pub struct ResponseViewerComponent {
     state: RequestResponseState,
     tab: Tab,
     response_content: Arc<RwLock<ResponseContent>>,
-    // config: Rc<Config>,
     status_bar_area: Rect,
     render_area: Rect,
     header_area: Rect,
@@ -94,7 +93,6 @@ impl ResponseViewerComponent {
                 body_viewer: BodyContentView::empty(Rect::default()),
                 request_key: None,
             })),
-            // config,
             status_bar_area: Rect::default(),
             render_area: Rect::default(),
             header_area: Rect::default(),
@@ -378,10 +376,22 @@ impl<'params> Interactive<'params> for ResponseViewerComponent {
         (config, events, terminal, clipboard): Self::Params,
         key: crossterm::event::KeyEvent,
     ) -> Self::Effect {
+        let block_navigation = match &self.response_content.read().unwrap().body_viewer {
+            BodyContentView::Text { .. } => false,
+            BodyContentView::Binary(binary_viewer) => {
+                binary_viewer.is_visible_overlay() | binary_viewer.is_input_focus()
+            }
+            BodyContentView::Empty(_) => false,
+        };
+
         let is_consumed = match config.keymap.match_global_action(key) {
             Some(action) => match action {
-                keybinding::GlobalKeyAction::NextFocus => return PaneAction::NextFocus,
-                keybinding::GlobalKeyAction::PreviousFocus => return PaneAction::PreviousFocus,
+                keybinding::GlobalKeyAction::NextFocus if !block_navigation => {
+                    return PaneAction::NextFocus
+                }
+                keybinding::GlobalKeyAction::PreviousFocus if !block_navigation => {
+                    return PaneAction::PreviousFocus
+                }
                 keybinding::GlobalKeyAction::NextTab => {
                     if Tab::Response == self.tab {
                         self.tab = Tab::Headers

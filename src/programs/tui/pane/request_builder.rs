@@ -220,6 +220,19 @@ impl<'params> Interactive<'params> for RequestEditorComponent {
         key: crossterm::event::KeyEvent,
     ) -> Self::Effect {
         if let Some(action) = config.keymap.match_global_action(key) {
+            let block_focus_nav = match self.tab {
+                Tab::Headers => {
+                    self.headers_table.is_visible_overlay() | self.headers_table.is_editing()
+                }
+                Tab::Body => {
+                    self.body_editor_component.is_visible_overlay()
+                        | self.body_editor_component.is_input_focus()
+                }
+                Tab::Params => {
+                    self.params_table.is_visible_overlay() | self.params_table.is_input_focus()
+                }
+            };
+
             match action {
                 keybinding::GlobalKeyAction::NextTab => {
                     self.change_tab(true);
@@ -227,10 +240,10 @@ impl<'params> Interactive<'params> for RequestEditorComponent {
                 keybinding::GlobalKeyAction::PreviousTab => {
                     self.change_tab(false);
                 }
-                keybinding::GlobalKeyAction::NextFocus => {
+                keybinding::GlobalKeyAction::NextFocus if !block_focus_nav => {
                     return PaneAction::NextFocus;
                 }
-                keybinding::GlobalKeyAction::PreviousFocus => {
+                keybinding::GlobalKeyAction::PreviousFocus if !block_focus_nav => {
                     return PaneAction::PreviousFocus;
                 }
 

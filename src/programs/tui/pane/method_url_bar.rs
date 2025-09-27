@@ -34,7 +34,6 @@ pub struct MethodUrlBarComponent {
     url_input: ModeInput,
     dropdown: OverlayDropdown<HttpMethod>,
     show_dropdown: bool,
-    // config: Rc<Config>,
     _history: ActionHistory<MethodUrlAction>,
 }
 
@@ -55,7 +54,6 @@ impl MethodUrlBarComponent {
                         .fg(config.theme.dropdown.fg)
                         .bg(config.theme.dropdown.bg),
                 ),
-            // config,
             show_dropdown: false,
             _history: ActionHistory::new(),
         }
@@ -189,10 +187,10 @@ impl<'params> Interactive<'params> for MethodUrlBarComponent {
         } else {
             let is_key_consumed = match config.keymap.match_global_action(key) {
                 Some(action) => match action {
-                    crate::programs::tui::config::keybinding::GlobalKeyAction::NextFocus => {
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::NextFocus if !self.url_input.mode().is_write_mode() => {
                         return PaneAction::NextFocus;
                     }
-                    crate::programs::tui::config::keybinding::GlobalKeyAction::PreviousFocus => {
+                    crate::programs::tui::config::keybinding::GlobalKeyAction::PreviousFocus if !self.url_input.mode().is_write_mode() => {
                         return PaneAction::PreviousFocus;
                     }
                     _ => false,
