@@ -142,6 +142,10 @@ impl ParamsTable {
         }
     }
 
+    pub fn render_area(&self) -> Rect {
+        self.render_area
+    }
+
     pub fn len_items(&self) -> usize {
         self.state.items.len()
     }

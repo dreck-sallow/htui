@@ -9,6 +9,8 @@ use crate::{
     },
 };
 use arboard::Clipboard;
+use body_editor::BodyEditor;
+use params_table::ParamsTable;
 use ratatui::{
     layout::{Constraint, Layout, Margin, Rect},
     prelude::CrosstermBackend,
@@ -17,9 +19,13 @@ use ratatui::{
     Terminal,
 };
 
-use super::{
-    action::PaneAction, body_editor::BodyEditorComponent, params_table::ParamsTable, ElementFocus,
-};
+use super::{action::PaneAction, ElementFocus};
+
+mod body_binary;
+mod body_editor;
+mod body_form;
+mod body_text;
+mod params_table;
 
 #[derive(Clone, Copy)]
 pub enum Tab {
@@ -54,7 +60,7 @@ pub struct RequestEditorComponent {
     render_area: Rect,
     params_table: ParamsTable,
     headers_table: ParamsTable,
-    body_editor_component: BodyEditorComponent,
+    body_editor: BodyEditor,
 }
 
 impl RequestEditorComponent {
@@ -65,7 +71,7 @@ impl RequestEditorComponent {
             render_area: Rect::default(),
             params_table: ParamsTable::new(),
             headers_table: ParamsTable::new(),
-            body_editor_component: BodyEditorComponent::new(&config),
+            body_editor: BodyEditor::new(config),
         }
     }
 
@@ -77,14 +83,14 @@ impl RequestEditorComponent {
     ) {
         self.params_table.set_state(params);
         self.headers_table.set_state(headers);
-        self.body_editor_component.set_state(body);
+        self.body_editor.set_state(body);
     }
 
     pub fn get_data(&mut self) -> (Vec<KeyValueParam>, Vec<KeyValueParam>, BodyContent) {
         (
             self.params_table.get_data(),
             self.headers_table.get_data(),
-            self.body_editor_component.get_data(),
+            self.body_editor.get_data(),
         )
     }
 
@@ -100,7 +106,7 @@ impl RequestEditorComponent {
                 }
             }
             Tab::Body => {
-                if !self.body_editor_component.is_editing() {
+                if !self.body_editor.is_input_focus() {
                     if !is_next {
                         self.tab = Tab::Headers;
                     }
@@ -128,8 +134,7 @@ impl<'params> UiComposedElement<'params> for RequestEditorComponent {
         self.header_area = main_areas[0];
         self.params_table.set_area(main_areas[1], _viewport_area);
         self.headers_table.set_area(main_areas[1], _viewport_area);
-        self.body_editor_component
-            .set_area(main_areas[1], _viewport_area);
+        self.body_editor.set_area(main_areas[1], _viewport_area);
     }
 
     fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
@@ -179,7 +184,8 @@ impl<'params> UiComposedElement<'params> for RequestEditorComponent {
                 self.headers_table.draw(config, frame);
             }
             Tab::Body => {
-                self.body_editor_component.draw(config, frame);
+                // self.body_editor_component.draw(config, frame);
+                self.body_editor.draw(config, frame);
             }
             Tab::Params => {
                 self.params_table.draw(config, frame);
@@ -190,7 +196,7 @@ impl<'params> UiComposedElement<'params> for RequestEditorComponent {
     fn draw_overlay(&self, (_, config): Self::Params, frame: &mut ratatui::Frame) {
         match self.tab {
             Tab::Headers => self.headers_table.draw_overlay(config, frame),
-            Tab::Body => self.body_editor_component.draw_overlay(config, frame),
+            Tab::Body => self.body_editor.draw_overlay(config, frame),
             Tab::Params => self.params_table.draw_overlay(config, frame),
         }
     }
@@ -209,7 +215,7 @@ impl<'params> Interactive<'params> for RequestEditorComponent {
     fn is_visible_overlay(&self) -> bool {
         match self.tab {
             Tab::Headers => self.headers_table.is_visible_overlay(),
-            Tab::Body => self.body_editor_component.is_visible_overlay(),
+            Tab::Body => self.body_editor.is_visible_overlay(),
             Tab::Params => self.params_table.is_visible_overlay(),
         }
     }
@@ -225,8 +231,7 @@ impl<'params> Interactive<'params> for RequestEditorComponent {
                     self.headers_table.is_visible_overlay() | self.headers_table.is_editing()
                 }
                 Tab::Body => {
-                    self.body_editor_component.is_visible_overlay()
-                        | self.body_editor_component.is_input_focus()
+                    self.body_editor.is_visible_overlay() | self.body_editor.is_input_focus()
                 }
                 Tab::Params => {
                     self.params_table.is_visible_overlay() | self.params_table.is_input_focus()
@@ -256,8 +261,8 @@ impl<'params> Interactive<'params> for RequestEditorComponent {
                 self.headers_table.handle_key((config, clipboard), key);
             }
             Tab::Body => {
-                self.body_editor_component
-                    .handle_key((config, events, terminal), key);
+                self.body_editor
+                    .handle_key((config, events, terminal, clipboard), key);
             }
             Tab::Params => {
                 self.params_table.handle_key((config, clipboard), key);
@@ -272,7 +277,7 @@ impl WithHistory for RequestEditorComponent {
     fn undo(&mut self) {
         match self.tab {
             Tab::Headers => self.headers_table.undo(),
-            Tab::Body => self.body_editor_component.undo(),
+            Tab::Body => self.body_editor.undo(),
             Tab::Params => self.params_table.undo(),
         }
     }
@@ -280,7 +285,7 @@ impl WithHistory for RequestEditorComponent {
     fn redo(&mut self) {
         match self.tab {
             Tab::Headers => self.headers_table.redo(),
-            Tab::Body => self.body_editor_component.redo(),
+            Tab::Body => self.body_editor.redo(),
             Tab::Params => self.params_table.redo(),
         }
     }

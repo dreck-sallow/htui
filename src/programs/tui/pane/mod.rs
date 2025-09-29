@@ -27,10 +27,8 @@ use super::{
 };
 
 mod action;
-mod body_editor;
 mod collections;
 mod method_url_bar;
-mod params_table;
 mod placeholder;
 mod request_builder;
 mod request_response;
