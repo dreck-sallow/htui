@@ -155,6 +155,7 @@ impl BodyEditor {
             BodyEditorAction::SetBody(body_content.clone()),
             &mut self.editor,
         );
+        self._history.clean();
     }
 
     pub fn get_data(&self) -> BodyContent {
