@@ -1,9 +1,17 @@
-use ratatui::layout::Rect;
+use std::io::{stdout, Stdout};
+
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use ratatui::{layout::Rect, prelude::CrosstermBackend, Terminal};
 
 use crate::{
     app_project::models::BodyContent,
     programs::tui::{
         common::{Interactive, UiComposedElement},
+        config::{keybinding, Config},
+        event_handler::{AppMessage, Events},
         pane::text_editor::TextEditor,
     },
 };
@@ -49,7 +57,12 @@ impl<'params> UiComposedElement<'params> for BodyTextEditor {
 
 impl<'params> Interactive<'params> for BodyTextEditor {
     type Effect = ();
-    type Params = ();
+    type Params = (
+        &'params Config,
+        &'params mut Events<AppMessage>,
+        &'params mut Terminal<CrosstermBackend<Stdout>>,
+        // &'params mut Clipboard,
+    );
 
     fn is_input_focus(&self) -> bool {
         self.editor.mode().is_write_mode()
@@ -57,9 +70,33 @@ impl<'params> Interactive<'params> for BodyTextEditor {
 
     fn handle_key(
         &mut self,
-        _params: Self::Params,
+        (config, events, terminal): Self::Params,
         key: crossterm::event::KeyEvent,
     ) -> Self::Effect {
-        self.editor.handle_key(key);
+        let mut consumed = false;
+        if let Some(action) = config.keymap.match_request_builder_action(key) {
+            match action {
+                keybinding::RequestBuilderKeyAction::OpenEditor => {
+                    events.stop();
+                    disable_raw_mode().unwrap();
+                    stdout().execute(LeaveAlternateScreen).unwrap();
+
+                    self.editor.open_in_editor();
+
+                    enable_raw_mode().unwrap();
+                    stdout().execute(EnterAlternateScreen).unwrap();
+                    let _ = terminal.clear();
+                    events.run();
+                    consumed = true;
+                }
+                _ => {}
+            }
+
+            return;
+        }
+
+        if !consumed {
+            self.editor.handle_key(key);
+        }
     }
 }

@@ -1,10 +1,6 @@
-use std::io::{stdout, Stdout};
+use std::{collections::HashMap, io::Stdout, path::PathBuf};
 
 use arboard::Clipboard;
-use crossterm::{
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     prelude::CrosstermBackend,
@@ -17,10 +13,9 @@ use crate::{
     app_project::models::{BodyContent, KeyValueParam},
     programs::tui::{
         common::{
-            // action_history::{ActionHistory, History, TrackAction},
+            action_history::{ActionHistory, History, TrackAction},
             component::WithHistory,
-            Interactive,
-            UiComposedElement,
+            Interactive, UiComposedElement,
         },
         config::{keybinding, Config},
         elements::{dropdown::OverlayDropdown, utils::center_area},
@@ -30,40 +25,8 @@ use crate::{
 
 use super::{body_binary::BodyBinaryEditor, body_form::BodyFormEditor, body_text::BodyTextEditor};
 
-// enum BodyEditorAction {
-//     SetBodyType(BodyContent),
-// }
-
-// impl TrackAction for BodyEditorAction {
-//     type State = BodyContent;
-
-//     fn apply(&self, state: &mut Self::State) -> Option<Self>
-//     where
-//         Self: Sized,
-//     {
-//         match self {
-//             BodyEditorAction::SetBodyType(body_content) => {
-//                 let previous_body = state.clone();
-//                 *state = body_content.clone();
-
-//                 Some(BodyEditorAction::SetBodyType(previous_body))
-//             }
-//         }
-//     }
-// }
-
-// impl WithHistory for BodyEditorComponent {
-//     fn undo(&mut self) {
-//         self._history.undo(&mut self.body_content);
-//     }
-
-//     fn redo(&mut self) {
-//         self._history.redo(&mut self.body_content);
-//     }
-// }
-
 pub enum BodyEditorType {
-    None,
+    None { render_area: Rect },
     Binary(BodyBinaryEditor),
     Text(BodyTextEditor),
     Form(BodyFormEditor),
@@ -72,7 +35,7 @@ pub enum BodyEditorType {
 impl BodyEditorType {
     fn as_type(&self) -> BodyType {
         match self {
-            BodyEditorType::None => BodyType::None,
+            BodyEditorType::None { .. } => BodyType::None,
             BodyEditorType::Binary(_) => BodyType::Binary,
             BodyEditorType::Text(_) => BodyType::Text,
             BodyEditorType::Form(_) => BodyType::Form,
@@ -81,10 +44,45 @@ impl BodyEditorType {
 
     fn render_area(&self) -> Rect {
         match self {
-            BodyEditorType::None => Rect::default(),
+            BodyEditorType::None { render_area } => *render_area,
             BodyEditorType::Binary(body_binary_editor) => body_binary_editor.render_area(),
             BodyEditorType::Text(body_text_editor) => body_text_editor.render_area(),
             BodyEditorType::Form(body_form_editor) => body_form_editor.render_area(),
+        }
+    }
+
+    fn from_model(model: &BodyContent, content_area: Rect, viewport_area: Rect) -> BodyEditorType {
+        match model {
+            BodyContent::Empty => BodyEditorType::None {
+                render_area: content_area,
+            },
+            BodyContent::File(path) => {
+                let mut editor = BodyBinaryEditor::new();
+                editor.set_area(content_area, viewport_area);
+                editor.set_data(path.to_owned());
+                BodyEditorType::Binary(editor)
+            }
+            BodyContent::Form(map) => {
+                let mut editor = BodyFormEditor::new();
+                editor.set_area(content_area, viewport_area);
+                editor.set_data(
+                    map.iter()
+                        .map(|(k, v)| KeyValueParam {
+                            enable: true,
+                            key: k.to_string(),
+                            value: v.to_string(),
+                        })
+                        .collect(),
+                );
+
+                BodyEditorType::Form(editor)
+            }
+            BodyContent::Text(txt) => {
+                let mut editor = BodyTextEditor::new();
+                editor.set_area(content_area, viewport_area);
+                editor.set_data(&txt);
+                BodyEditorType::Text(editor)
+            }
         }
     }
 }
@@ -95,6 +93,17 @@ enum BodyType {
     Binary,
     Form,
     Text,
+}
+
+impl BodyType {
+    pub fn into_empty_model(&self) -> BodyContent {
+        match self {
+            BodyType::None => BodyContent::Empty,
+            BodyType::Binary => BodyContent::File(PathBuf::new()),
+            BodyType::Form => BodyContent::Form(HashMap::new()),
+            BodyType::Text => BodyContent::Text(String::new()),
+        }
+    }
 }
 
 impl AsRef<str> for BodyType {
@@ -114,13 +123,15 @@ pub struct BodyEditor {
     show_dropdown: bool,
     dropdown_area: Rect,
     content_area: Rect,
-    // _history: ActionHistory<BodyEditorV2Action>,
+    _history: ActionHistory<BodyEditorAction>,
 }
 
 impl BodyEditor {
     pub fn new(config: &Config) -> Self {
         Self {
-            editor: BodyEditorType::None,
+            editor: BodyEditorType::None {
+                render_area: Rect::default(),
+            },
             dropdown: OverlayDropdown::with_items(
                 BodyType::None,
                 [
@@ -142,46 +153,21 @@ impl BodyEditor {
             ),
             show_dropdown: false,
             dropdown_area: Rect::default(),
-            content_area: Rect::default(), // _history: ActionHistory::new(),
+            content_area: Rect::default(),
+            _history: ActionHistory::new(),
         }
     }
 
     pub fn set_state(&mut self, body_content: BodyContent) {
-        self.editor = match body_content {
-            BodyContent::Empty => BodyEditorType::None,
-            BodyContent::File(path) => {
-                let mut editor = BodyBinaryEditor::new();
-                editor.set_area(self.editor.render_area(), Rect::default());
-                editor.set_data(path);
-                BodyEditorType::Binary(editor)
-            }
-            BodyContent::Form(map) => {
-                let mut editor = BodyFormEditor::new();
-                editor.set_area(self.editor.render_area(), Rect::default());
-                editor.set_data(
-                    map.iter()
-                        .map(|(k, v)| KeyValueParam {
-                            enable: true,
-                            key: k.to_string(),
-                            value: v.to_string(),
-                        })
-                        .collect(),
-                );
-
-                BodyEditorType::Form(editor)
-            }
-            BodyContent::Text(txt) => {
-                let mut editor = BodyTextEditor::new();
-                editor.set_area(self.editor.render_area(), Rect::default());
-                editor.set_data(&txt);
-                BodyEditorType::Text(editor)
-            }
-        };
+        self._history.apply(
+            BodyEditorAction::SetBody(body_content.clone()),
+            &mut self.editor,
+        );
     }
 
     pub fn get_data(&self) -> BodyContent {
         match &self.editor {
-            BodyEditorType::None => BodyContent::Empty,
+            BodyEditorType::None { .. } => BodyContent::Empty,
             BodyEditorType::Binary(body_binary_editor) => body_binary_editor.body_model(),
             BodyEditorType::Text(body_text_editor) => body_text_editor.body_model(),
             BodyEditorType::Form(body_form_editor) => body_form_editor.body_model(),
@@ -200,7 +186,11 @@ impl<'params> UiComposedElement<'params> for BodyEditor {
         self.content_area = content_area;
 
         match &mut self.editor {
-            BodyEditorType::None => {}
+            BodyEditorType::None { .. } => {
+                self.editor = BodyEditorType::None {
+                    render_area: content_area,
+                }
+            }
             BodyEditorType::Binary(body_binary_editor) => {
                 body_binary_editor.set_area(content_area, viewport_area)
             }
@@ -234,7 +224,7 @@ impl<'params> UiComposedElement<'params> for BodyEditor {
         );
 
         match &self.editor {
-            BodyEditorType::None => {}
+            BodyEditorType::None { .. } => {}
             BodyEditorType::Binary(body_binary_editor) => body_binary_editor.draw(config, frame),
             BodyEditorType::Text(body_text_editor) => body_text_editor.draw((), frame),
             BodyEditorType::Form(body_form_editor) => body_form_editor.draw(config, frame),
@@ -252,7 +242,7 @@ impl<'params> UiComposedElement<'params> for BodyEditor {
             frame.render_widget(&self.dropdown, area);
         } else {
             match &self.editor {
-                BodyEditorType::None => {
+                BodyEditorType::None { .. } => {
                     let area = center_area(
                         self.content_area,
                         Constraint::Length(1),
@@ -284,7 +274,7 @@ impl<'params> Interactive<'params> for BodyEditor {
 
     fn is_input_focus(&self) -> bool {
         match &self.editor {
-            BodyEditorType::None => false,
+            BodyEditorType::None { .. } => false,
             BodyEditorType::Binary(body_binary_editor) => body_binary_editor.is_input_focus(),
             BodyEditorType::Text(body_text_editor) => body_text_editor.is_input_focus(),
             BodyEditorType::Form(body_form_editor) => body_form_editor.is_input_focus(),
@@ -297,7 +287,7 @@ impl<'params> Interactive<'params> for BodyEditor {
         }
 
         match &self.editor {
-            BodyEditorType::None => false,
+            BodyEditorType::None { .. } => false,
             BodyEditorType::Binary(body_binary_editor) => body_binary_editor.is_visible_overlay(),
             BodyEditorType::Text(body_text_editor) => body_text_editor.is_visible_overlay(),
             BodyEditorType::Form(body_form_editor) => body_form_editor.is_visible_overlay(),
@@ -324,25 +314,10 @@ impl<'params> Interactive<'params> for BodyEditor {
                     keybinding::GlobalKeyAction::SubmitPopup => {
                         self.show_dropdown = false;
 
-                        // TODO: handle mutation in history & pass the viewport area
-                        self.editor = match self.dropdown.selected() {
-                            BodyType::None => BodyEditorType::None,
-                            BodyType::Binary => {
-                                let mut editor = BodyBinaryEditor::new();
-                                editor.set_area(self.content_area, Rect::default());
-                                BodyEditorType::Binary(editor)
-                            }
-                            BodyType::Form => {
-                                let mut editor = BodyFormEditor::new();
-                                editor.set_area(self.content_area, Rect::default());
-                                BodyEditorType::Form(editor)
-                            }
-                            BodyType::Text => {
-                                let mut editor = BodyTextEditor::new();
-                                editor.set_area(self.content_area, Rect::default());
-                                BodyEditorType::Text(editor)
-                            }
-                        };
+                        self._history.apply(
+                            BodyEditorAction::SetBody(self.dropdown.selected().into_empty_model()),
+                            &mut self.editor,
+                        );
                     }
                     _ => {}
                 }
@@ -353,31 +328,21 @@ impl<'params> Interactive<'params> for BodyEditor {
                     match action {
                         keybinding::RequestBuilderKeyAction::OpenDropdown => {
                             self.show_dropdown = true;
+                            return;
                         }
-                        keybinding::RequestBuilderKeyAction::OpenEditor => {
-                            events.stop();
-                            disable_raw_mode().unwrap();
-                            stdout().execute(LeaveAlternateScreen).unwrap();
-
-                            // self.text_editor.open_in_editor();
-
-                            enable_raw_mode().unwrap();
-                            stdout().execute(EnterAlternateScreen).unwrap();
-                            let _ = terminal.clear();
-                            events.run();
-                        }
+                        _ => {}
                     }
-
-                    return;
                 }
             }
 
             match &mut self.editor {
-                BodyEditorType::None => {}
+                BodyEditorType::None { .. } => {}
                 BodyEditorType::Binary(body_binary_editor) => {
                     body_binary_editor.handle_key(config, key)
                 }
-                BodyEditorType::Text(body_text_editor) => body_text_editor.handle_key((), key),
+                BodyEditorType::Text(body_text_editor) => {
+                    body_text_editor.handle_key((config, events, terminal), key)
+                }
                 BodyEditorType::Form(body_form_editor) => {
                     body_form_editor.handle_key((config, clipboard), key)
                 }
@@ -386,30 +351,41 @@ impl<'params> Interactive<'params> for BodyEditor {
     }
 }
 
-// impl TrackAction for BodyEditor {
-//     type State = BodyContent;
+enum BodyEditorAction {
+    SetBody(BodyContent),
+}
 
-//     fn apply(&self, state: &mut Self::State) -> Option<Self>
-//     where
-//         Self: Sized,
-//     {
-//         // match self {
-//         //     BodyEditorAction::SetBodyType(body_content) => {
-//         //         let previous_body = state.clone();
-//         //         *state = body_content.clone();
+impl TrackAction for BodyEditorAction {
+    type State = BodyEditorType;
 
-//         //         Some(BodyEditorAction::SetBodyType(previous_body))
-//         //     }
-//         // }
-//     }
-// }
+    fn apply(&self, state: &mut Self::State) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        match self {
+            BodyEditorAction::SetBody(body_content) => {
+                let previous_body_content = match state {
+                    BodyEditorType::None { .. } => BodyContent::Empty,
+                    BodyEditorType::Binary(body_binary_editor) => body_binary_editor.body_model(),
+                    BodyEditorType::Text(body_text_editor) => body_text_editor.body_model(),
+                    BodyEditorType::Form(body_form_editor) => body_form_editor.body_model(),
+                };
+
+                *state =
+                    BodyEditorType::from_model(body_content, state.render_area(), Rect::default());
+
+                Some(Self::SetBody(previous_body_content))
+            }
+        }
+    }
+}
 
 impl WithHistory for BodyEditor {
     fn undo(&mut self) {
-        // self._history.undo(&mut self.body_content);
+        self._history.undo(&mut self.editor);
     }
 
     fn redo(&mut self) {
-        // self._history.redo(&mut self.body_content);
+        self._history.redo(&mut self.editor);
     }
 }
