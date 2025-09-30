@@ -224,7 +224,7 @@ impl<'params> UiComposedElement<'params> for Pane {
     fn set_area(&mut self, area: Rect, viewport_area: Rect) {
         let (collections_area, placeholder_area, content_areas) = {
             let [collections_area, content_area] =
-                Layout::horizontal([Constraint::Percentage(25), Constraint::Fill(1)])
+                Layout::horizontal([Constraint::Percentage(23), Constraint::Fill(1)])
                     .spacing(1)
                     .areas(area);
 

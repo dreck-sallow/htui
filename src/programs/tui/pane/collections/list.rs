@@ -4,7 +4,7 @@ use ratatui::{
     layout::Rect,
     style::Style,
     symbols,
-    text::Span,
+    text::Line,
     widgets::{Block, Widget},
 };
 
@@ -12,12 +12,12 @@ use super::state::Idx;
 
 #[derive(Debug)]
 pub struct Item<'a> {
-    label: Span<'a>,
+    label: Line<'a>,
     children: Vec<Item<'a>>,
 }
 
 impl<'a> Item<'a> {
-    pub fn new<Label: Into<Span<'a>>>(label: Label) -> Self {
+    pub fn new<L: Into<Line<'a>>>(label: L) -> Self {
         Self {
             label: label.into(),
             children: Vec::new(),
@@ -151,7 +151,6 @@ impl Widget for CollectionList<'_, '_> {
         };
 
         // Draw the items
-        // let mut top = area.top();
         if let Some((start, end)) = self.get_page_items(area.height as usize) {
             let mut line_area = Rect { height: 1, ..area };
 
@@ -216,7 +215,7 @@ impl Widget for CollectionList<'_, '_> {
                     );
 
                     // Draw the collection label, and add 1 to top area
-                    buf.set_span(x, y, &collection.label, collection.label.width() as u16);
+                    buf.set_line(x, y, &collection.label, collection.label.width() as u16);
                     match self.idx {
                         Idx::Parent(selected_idx) => {
                             if selected_idx == (collection_loop_i + start.0) {
@@ -240,12 +239,12 @@ impl Widget for CollectionList<'_, '_> {
                             line_area.x + 1,
                             line_area.y,
                             border_tree_symbol,
-                            border_tree_symbol.len(),
-                            child.label.style,
+                            border_tree_symbol.chars().count(),
+                            Style::default(),
                         );
                         x += 1;
 
-                        buf.set_span(x, y, &child.label, child.label.width() as u16);
+                        buf.set_line(x, y, &child.label, child.label.width() as u16);
 
                         match self.idx {
                             Idx::Child(collection_idx, request_idx) => {
@@ -253,6 +252,7 @@ impl Widget for CollectionList<'_, '_> {
                                     && (padded_children + i) == request_idx
                                 {
                                     buf.set_style(
+                                        // NOTE: this rect would hightligh only the request text portion (not the entire line)
                                         // Rect {
                                         //     x,
                                         //     y,

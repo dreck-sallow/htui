@@ -2,7 +2,8 @@ use crossterm::event::KeyEvent;
 use list::{CollectionList, Item};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::Style,
+    style::{Color, Style, Stylize},
+    text::Line,
     widgets::{Block, BorderType},
 };
 use state::{CollectionsState, MutableList};
@@ -158,7 +159,20 @@ impl<'params> UiComposedElement<'params> for CollectionsComponent {
             .map(|(_i, coll)| {
                 let mut itm = Item::new(coll.name());
                 for (_sub_i, req) in coll.requests().iter().enumerate() {
-                    itm.add_child(Item::new(req.name()));
+                    let color = match req.method() {
+                        HttpMethod::Options => Color::Blue,
+                        HttpMethod::Get => Color::Blue,
+                        HttpMethod::Post => Color::Yellow,
+                        HttpMethod::Put => Color::Green,
+                        HttpMethod::Delete => Color::Red,
+                        HttpMethod::Head => Color::Green,
+                        HttpMethod::Patch => Color::Blue,
+                    };
+                    itm.add_child(Item::new(Line::from(vec![
+                        req.method().as_ref().to_string().fg(color),
+                        " ".into(),
+                        req.name().into(),
+                    ])));
                 }
                 itm
             })
