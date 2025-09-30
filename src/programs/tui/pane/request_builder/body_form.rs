@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use arboard::Clipboard;
 use ratatui::layout::Rect;
 
@@ -25,11 +23,7 @@ impl BodyFormEditor {
     }
 
     pub fn body_model(&self) -> BodyContent {
-        let mut params = HashMap::new();
-        for value_param in self.form.get_data() {
-            params.insert(value_param.key.to_owned(), value_param.value.to_owned());
-        }
-        BodyContent::Form(params)
+        BodyContent::Form(self.form.get_data())
     }
 
     pub fn render_area(&self) -> Rect {

@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -265,7 +264,7 @@ impl TryFrom<&str> for HttpMethod {
 pub enum BodyContent {
     Empty,
     File(PathBuf),
-    Form(HashMap<String, String>), // FIXME: use another value for the hashmap
+    Form(Vec<KeyValueParam>),
     Text(String),
 }
 
@@ -327,8 +326,8 @@ impl<'de> Visitor<'de> for BodyVisitor {
                 Ok(BodyContent::File(PathBuf::from(file_path)))
             }
             "form" => {
-                let form = serde_json::from_value::<HashMap<String, String>>(val)
-                    .map_err(de::Error::custom)?;
+                let form =
+                    serde_json::from_value::<Vec<KeyValueParam>>(val).map_err(de::Error::custom)?;
                 Ok(BodyContent::Form(form))
             }
             "empty" => Ok(BodyContent::Empty),

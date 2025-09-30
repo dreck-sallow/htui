@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Stdout, path::PathBuf};
+use std::{io::Stdout, path::PathBuf};
 
 use arboard::Clipboard;
 use ratatui::{
@@ -10,7 +10,7 @@ use ratatui::{
 };
 
 use crate::{
-    app_project::models::{BodyContent, KeyValueParam},
+    app_project::models::BodyContent,
     programs::tui::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
@@ -62,18 +62,10 @@ impl BodyEditorType {
                 editor.set_data(path.to_owned());
                 BodyEditorType::Binary(editor)
             }
-            BodyContent::Form(map) => {
+            BodyContent::Form(params) => {
                 let mut editor = BodyFormEditor::new();
                 editor.set_area(content_area, viewport_area);
-                editor.set_data(
-                    map.iter()
-                        .map(|(k, v)| KeyValueParam {
-                            enable: true,
-                            key: k.to_string(),
-                            value: v.to_string(),
-                        })
-                        .collect(),
-                );
+                editor.set_data(params.to_owned());
 
                 BodyEditorType::Form(editor)
             }
@@ -100,7 +92,7 @@ impl BodyType {
         match self {
             BodyType::None => BodyContent::Empty,
             BodyType::Binary => BodyContent::File(PathBuf::new()),
-            BodyType::Form => BodyContent::Form(HashMap::new()),
+            BodyType::Form => BodyContent::Form(Vec::new()),
             BodyType::Text => BodyContent::Text(String::new()),
         }
     }
