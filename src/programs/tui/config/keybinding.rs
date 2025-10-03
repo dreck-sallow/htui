@@ -93,6 +93,7 @@ impl<T: KeyAction> std::fmt::Debug for KeyBinding<T> {
 default_key_actions!(GlobalKeyAction {
     NextFocus => "Tab",
     PreviousFocus=> "Shift+BackTab",
+    FocusEnvContext=> "Alt+Shift+F",
 
     MoveDown  => "j",
     MoveUp => "k",

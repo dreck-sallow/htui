@@ -36,6 +36,35 @@ pub mod list_utils {
         }
         current
     }
+
+    pub fn clamp_index(current: Option<usize>, len: usize) -> Option<usize> {
+        match current {
+            Some(idx) => {
+                if len == 0 {
+                    return None;
+                } else if idx >= len {
+                    return Some(idx - 1);
+                }
+            }
+            None => {
+                if len > 0 {
+                    return Some(0);
+                }
+            }
+        }
+
+        current
+    }
+
+    pub fn delete_element<E>(current_idx: Option<usize>, list: &mut Vec<E>) -> Option<usize> {
+        match current_idx {
+            Some(idx) => {
+                list.remove(idx);
+                self::clamp_index(current_idx, list.len())
+            }
+            None => None,
+        }
+    }
 }
 
 pub trait UiComposedElement<'params> {

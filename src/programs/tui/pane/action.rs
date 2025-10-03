@@ -2,6 +2,8 @@
 pub enum PaneAction {
     NextFocus,
     PreviousFocus,
+    /// Used for blur exclusive_focus and show focus the current element
+    RestoreFocus,
 
     ChangeRequest,
     DeleteRequest,

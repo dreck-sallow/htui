@@ -21,7 +21,12 @@ pub fn time_as_id() -> String {
 pub struct ProjectModel {
     id: String,
     pub name: String,
+    #[serde(default)]
     pub collections: Vec<CollectionsModel>,
+    #[serde(default)]
+    pub env_contexts: Vec<ContextEnv>,
+    #[serde(default)]
+    pub selected_env_context: Option<usize>,
 }
 
 impl ProjectModel {
@@ -30,14 +35,24 @@ impl ProjectModel {
             id: time_as_id(),
             name,
             collections: Vec::new(),
+            env_contexts: Vec::new(),
+            selected_env_context: None,
         }
     }
 
-    pub fn from_parts(id: String, name: String, collections: Vec<CollectionsModel>) -> Self {
+    pub fn from_parts(
+        id: String,
+        name: String,
+        collections: Vec<CollectionsModel>,
+        environments: Vec<ContextEnv>,
+        selected_context: Option<usize>,
+    ) -> Self {
         Self {
             id,
             name,
             collections,
+            env_contexts: environments,
+            selected_env_context: selected_context,
         }
     }
 
@@ -57,6 +72,8 @@ impl Default for ProjectModel {
             id: id.clone(),
             name: id,
             collections: Vec::new(),
+            env_contexts: Vec::new(),
+            selected_env_context: None,
         }
     }
 }
@@ -268,16 +285,16 @@ pub enum BodyContent {
     Text(String),
 }
 
-impl BodyContent {
-    pub fn as_tag(&self) -> &str {
-        match self {
-            BodyContent::Empty => "Empty",
-            BodyContent::File(_) => "File",
-            BodyContent::Form(_) => "Form",
-            BodyContent::Text(_) => "Text",
-        }
-    }
-}
+// impl BodyContent {
+//     pub fn as_tag(&self) -> &str {
+//         match self {
+//             BodyContent::Empty => "Empty",
+//             BodyContent::File(_) => "File",
+//             BodyContent::Form(_) => "Form",
+//             BodyContent::Text(_) => "Text",
+//         }
+//     }
+// }
 
 impl Serialize for BodyContent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -383,4 +400,25 @@ impl From<(String, String)> for SendRequestKey {
 pub enum SendRequest {
     Pending,
     Finish(ResponseModel),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContextEnv {
+    pub name: String,
+    pub variables: Vec<EnvVariable>,
+}
+
+impl ContextEnv {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            variables: Vec::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EnvVariable {
+    pub name: String,
+    pub value: String,
 }

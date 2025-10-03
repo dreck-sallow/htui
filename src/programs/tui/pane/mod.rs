@@ -3,6 +3,7 @@ use std::io::Stdout;
 use action::PaneAction;
 use arboard::Clipboard;
 use collections::CollectionsComponent;
+use contexts::EnvironmentContexts;
 use crossterm::event::KeyEvent;
 use method_url_bar::MethodUrlBarComponent;
 use placeholder::PlaceholderView;
@@ -28,6 +29,7 @@ use super::{
 
 mod action;
 mod collections;
+mod contexts;
 mod method_url_bar;
 mod placeholder;
 mod request_builder;
@@ -62,6 +64,12 @@ impl ElementFocus {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum ExclusiveFocus {
+    /// Focus the environments contexts
+    EnvContext,
+}
+
 pub struct Pane {
     project_id: String,
     project_name: String,
@@ -69,8 +77,10 @@ pub struct Pane {
     method_url_component: MethodUrlBarComponent,
     request_builder_component: RequestEditorComponent,
     response_viewer_component: ResponseViewerComponent,
+    env_contexts: EnvironmentContexts,
     placeholder_view: PlaceholderView,
     focus: ElementFocus,
+    exclusive_focus: Option<ExclusiveFocus>,
     // config: Rc<Config>,
     sender: mpsc::Sender<AppMessage>,
 }
@@ -84,12 +94,14 @@ impl Pane {
         Self {
             project_id: project.id().to_string(),
             project_name: project.name().to_string(),
-            focus: ElementFocus::Collections,
             collections_component: CollectionsComponent::new(project.collections),
             method_url_component: MethodUrlBarComponent::new(config),
             request_builder_component: RequestEditorComponent::new(config),
             response_viewer_component: ResponseViewerComponent::new(),
+            env_contexts: EnvironmentContexts::from_list(project.env_contexts),
             placeholder_view: PlaceholderView::new(),
+            focus: ElementFocus::Collections,
+            exclusive_focus: None,
             // config,
             sender: sender,
         }
@@ -131,6 +143,10 @@ impl Pane {
             }
             PaneAction::PreviousFocus => {
                 self.focus = self.focus.previous();
+            }
+
+            PaneAction::RestoreFocus => {
+                self.exclusive_focus = None;
             }
             PaneAction::ChangeRequest => {
                 if let Some(req) = self.collections_component.current_request() {
@@ -180,6 +196,8 @@ impl Pane {
                     self.project_id.clone(),
                     self.project_name.clone(),
                     self.collections_component.as_collections(),
+                    Vec::new(),
+                    None,
                 );
 
                 let store = LocalStore::new();
@@ -208,6 +226,9 @@ impl Pane {
                 keybinding::GlobalKeyAction::SaveProject => {
                     self.handle_action(PaneAction::SaveLocal);
                 }
+                keybinding::GlobalKeyAction::FocusEnvContext => {
+                    self.exclusive_focus = Some(ExclusiveFocus::EnvContext);
+                }
                 _ => return false,
             }
 
@@ -222,7 +243,7 @@ impl<'params> UiComposedElement<'params> for Pane {
     type Params = &'params Config;
 
     fn set_area(&mut self, area: Rect, viewport_area: Rect) {
-        let (collections_area, placeholder_area, content_areas) = {
+        let (left_side_area, placeholder_area, content_areas) = {
             let [collections_area, content_area] =
                 Layout::horizontal([Constraint::Percentage(23), Constraint::Fill(1)])
                     .spacing(1)
@@ -237,8 +258,14 @@ impl<'params> UiComposedElement<'params> for Pane {
 
             (collections_area, content_area, right_areas)
         };
+
+        let [collections_area, contexts_area] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(3)]).areas(left_side_area);
+
         self.collections_component
             .set_area(collections_area, viewport_area);
+        self.env_contexts.set_area(contexts_area, viewport_area);
+
         self.method_url_component
             .set_area(content_areas[0], viewport_area);
         self.request_builder_component
@@ -250,6 +277,14 @@ impl<'params> UiComposedElement<'params> for Pane {
 
     fn draw(&self, config: Self::Params, frame: &mut Frame) {
         self.collections_component.draw((self.focus, config), frame);
+        self.env_contexts.draw(
+            (
+                self.exclusive_focus
+                    .map_or(false, |f| f == ExclusiveFocus::EnvContext),
+                config,
+            ),
+            frame,
+        );
 
         if self.collections_component.current_request().is_some() {
             self.method_url_component.draw((self.focus, config), frame);
@@ -263,6 +298,16 @@ impl<'params> UiComposedElement<'params> for Pane {
 
         self.collections_component
             .draw_overlay((self.focus, config), frame);
+
+        self.env_contexts.draw_overlay(
+            (
+                self.exclusive_focus
+                    .map_or(false, |f| f == ExclusiveFocus::EnvContext),
+                config,
+            ),
+            frame,
+        );
+
         self.method_url_component
             .draw_overlay((self.focus, config), frame);
         self.request_builder_component
@@ -291,29 +336,37 @@ impl<'params> Interactive<'params> for Pane {
         // the system delete the request, but the background task is still running
 
         if !self.handle_pane_action(config, key) {
-            match self.focus {
-                ElementFocus::Collections => {
-                    let effect = self.collections_component.handle_key(config, key);
-                    self.handle_action(effect);
-                }
-                ElementFocus::MethodUrlBar => {
-                    let effect = self.method_url_component.handle_key(config, key);
-                    self.handle_action(effect);
-                    self.handle_action(PaneAction::SetUrlAndMethod);
-                }
-                ElementFocus::RequestBuilder => {
-                    let effect = self
-                        .request_builder_component
-                        .handle_key((config, events, terminal, clipboard), key);
-                    self.handle_action(effect);
-                    self.handle_action(PaneAction::SetHeadersAndBody);
-                }
-                ElementFocus::ResponseViewer => {
-                    let effect = self
-                        .response_viewer_component
-                        .handle_key((config, events, terminal, clipboard), key);
-                    self.handle_action(effect);
-                }
+            match self.exclusive_focus {
+                Some(focus) => match focus {
+                    ExclusiveFocus::EnvContext => {
+                        let action = self.env_contexts.handle_key((self.focus, config), key);
+                        self.handle_action(action);
+                    }
+                },
+                None => match self.focus {
+                    ElementFocus::Collections => {
+                        let effect = self.collections_component.handle_key(config, key);
+                        self.handle_action(effect);
+                    }
+                    ElementFocus::MethodUrlBar => {
+                        let effect = self.method_url_component.handle_key(config, key);
+                        self.handle_action(effect);
+                        self.handle_action(PaneAction::SetUrlAndMethod);
+                    }
+                    ElementFocus::RequestBuilder => {
+                        let effect = self
+                            .request_builder_component
+                            .handle_key((config, events, terminal, clipboard), key);
+                        self.handle_action(effect);
+                        self.handle_action(PaneAction::SetHeadersAndBody);
+                    }
+                    ElementFocus::ResponseViewer => {
+                        let effect = self
+                            .response_viewer_component
+                            .handle_key((config, events, terminal, clipboard), key);
+                        self.handle_action(effect);
+                    }
+                },
             }
         }
     }
