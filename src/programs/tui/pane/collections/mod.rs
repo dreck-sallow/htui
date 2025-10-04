@@ -17,7 +17,7 @@ use crate::{
         common::{
             action_history::{ActionHistory, History, TrackAction},
             component::WithHistory,
-            Interactive, UiComposedElement,
+            Interactive, IsFocused, UiComposedElement,
         },
         config::{
             keybinding::{CollectionsKeyAction, GlobalKeyAction},
@@ -26,7 +26,7 @@ use crate::{
     },
 };
 
-use super::{action::PaneAction, ElementFocus};
+use super::action::PaneAction;
 
 mod list;
 pub mod state;
@@ -129,7 +129,7 @@ impl CollectionsComponent {
 }
 
 impl<'params> UiComposedElement<'params> for CollectionsComponent {
-    type Params = (ElementFocus, &'params Config);
+    type Params = (IsFocused, &'params Config);
 
     fn set_area(&mut self, area: Rect, viewport_area: Rect) {
         self.render_area = area;
@@ -149,8 +149,8 @@ impl<'params> UiComposedElement<'params> for CollectionsComponent {
         self.menu.set_area(menu_area, viewport_area);
     }
 
-    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
-        let is_focus = focus == ElementFocus::Collections;
+    fn draw(&self, (is_focus, config): Self::Params, frame: &mut ratatui::Frame) {
+        // let is_focus = focus == ElementFocus::Collections;
         let items: Vec<Item<'_>> = self
             .state
             .collections()

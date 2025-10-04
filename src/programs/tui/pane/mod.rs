@@ -238,6 +238,10 @@ impl Pane {
 
         false
     }
+
+    fn is_focus_el(&self, focus: ElementFocus) -> bool {
+        self.focus == focus && self.exclusive_focus.is_none()
+    }
 }
 
 impl<'params> UiComposedElement<'params> for Pane {
@@ -277,7 +281,8 @@ impl<'params> UiComposedElement<'params> for Pane {
     }
 
     fn draw(&self, config: Self::Params, frame: &mut Frame) {
-        self.collections_component.draw((self.focus, config), frame);
+        self.collections_component
+            .draw((self.is_focus_el(ElementFocus::Collections), config), frame);
         self.env_contexts.draw(
             (
                 self.exclusive_focus
@@ -288,17 +293,24 @@ impl<'params> UiComposedElement<'params> for Pane {
         );
 
         if self.collections_component.current_request().is_some() {
-            self.method_url_component.draw((self.focus, config), frame);
-            self.request_builder_component
-                .draw((self.focus, config), frame);
-            self.response_viewer_component
-                .draw((self.focus, config), frame);
+            self.method_url_component.draw(
+                (self.is_focus_el(ElementFocus::MethodUrlBar), config),
+                frame,
+            );
+            self.request_builder_component.draw(
+                (self.is_focus_el(ElementFocus::RequestBuilder), config),
+                frame,
+            );
+            self.response_viewer_component.draw(
+                (self.is_focus_el(ElementFocus::ResponseViewer), config),
+                frame,
+            );
         } else {
             self.placeholder_view.draw(frame);
         }
 
         self.collections_component
-            .draw_overlay((self.focus, config), frame);
+            .draw_overlay((self.is_focus_el(ElementFocus::Collections), config), frame);
 
         self.env_contexts.draw_overlay(
             (
@@ -309,12 +321,18 @@ impl<'params> UiComposedElement<'params> for Pane {
             frame,
         );
 
-        self.method_url_component
-            .draw_overlay((self.focus, config), frame);
-        self.request_builder_component
-            .draw_overlay((self.focus, config), frame);
-        self.response_viewer_component
-            .draw_overlay((self.focus, config), frame);
+        self.method_url_component.draw_overlay(
+            (self.is_focus_el(ElementFocus::MethodUrlBar), config),
+            frame,
+        );
+        self.request_builder_component.draw_overlay(
+            (self.is_focus_el(ElementFocus::RequestBuilder), config),
+            frame,
+        );
+        self.response_viewer_component.draw_overlay(
+            (self.is_focus_el(ElementFocus::ResponseViewer), config),
+            frame,
+        );
     }
 }
 

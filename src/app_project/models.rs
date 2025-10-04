@@ -408,15 +408,6 @@ pub struct ContextEnv {
     pub variables: Vec<EnvVariable>,
 }
 
-impl ContextEnv {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            variables: Vec::new(),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EnvVariable {
     pub name: String,

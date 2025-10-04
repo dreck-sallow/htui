@@ -3,7 +3,7 @@ use std::io::Stdout;
 use crate::{
     app_project::models::{BodyContent, KeyValueParam},
     programs::tui::{
-        common::{component::WithHistory, Interactive, UiComposedElement},
+        common::{component::WithHistory, Interactive, IsFocused, UiComposedElement},
         config::{keybinding, Config},
         event_handler::{AppMessage, Events},
     },
@@ -19,7 +19,7 @@ use ratatui::{
     Terminal,
 };
 
-use super::{action::PaneAction, ElementFocus};
+use super::action::PaneAction;
 
 mod body_binary;
 mod body_editor;
@@ -124,7 +124,7 @@ impl RequestEditorComponent {
 }
 
 impl<'params> UiComposedElement<'params> for RequestEditorComponent {
-    type Params = (ElementFocus, &'params Config);
+    type Params = (IsFocused, &'params Config);
 
     fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         let main_areas = Layout::vertical([Constraint::Length(2), Constraint::Fill(50)])
@@ -137,14 +137,14 @@ impl<'params> UiComposedElement<'params> for RequestEditorComponent {
         self.body_editor.set_area(main_areas[1], _viewport_area);
     }
 
-    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
-        let border_style = if focus == ElementFocus::RequestBuilder {
+    fn draw(&self, (is_focus, config): Self::Params, frame: &mut ratatui::Frame) {
+        let border_style = if is_focus {
             Style::default().fg(config.theme.border_focus)
         } else {
             Style::default().fg(config.theme.border)
         };
 
-        let border_type = if focus == ElementFocus::RequestBuilder {
+        let border_type = if is_focus {
             BorderType::Thick
         } else {
             BorderType::Plain

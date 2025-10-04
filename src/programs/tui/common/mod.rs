@@ -4,6 +4,8 @@ use ratatui::{layout::Rect, Frame};
 pub mod action_history;
 pub mod component;
 
+pub type IsFocused = bool;
+
 pub mod input;
 
 /// Common utils for work with lists

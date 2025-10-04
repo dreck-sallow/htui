@@ -9,14 +9,14 @@ use ratatui::{
 use crate::{
     app_project::models::HttpMethod, programs::tui::{
         common::{
-            action_history::{ActionHistory, History, TrackAction}, component::WithHistory, input::mode_input::ModeInput, Interactive, UiComposedElement, UiElementV2
+            action_history::{ActionHistory, History, TrackAction}, component::WithHistory, input::mode_input::ModeInput, Interactive, IsFocused, UiComposedElement, UiElementV2
         },
         config::Config,
         elements::{dropdown::OverlayDropdown, utils::expand, Separator},
     }
 };
 
-use super::{action::PaneAction, ElementFocus};
+use super::action::PaneAction;
 
 const METHODS: [HttpMethod; 7] = [
     HttpMethod::Get,
@@ -84,7 +84,7 @@ impl MethodUrlBarComponent {
 
 
 impl<'params> UiComposedElement<'params> for MethodUrlBarComponent {
-    type Params = (ElementFocus, &'params Config);
+    type Params = (IsFocused, &'params Config);
 
     fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         self.render_area = area;
@@ -92,45 +92,45 @@ impl<'params> UiComposedElement<'params> for MethodUrlBarComponent {
         self.url_input.set_visual_width(url_area.width);
     }
 
-    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
-        let is_focus = focus == ElementFocus::MethodUrlBar;
+    fn draw(&self, (is_focus, config): Self::Params, frame: &mut ratatui::Frame) {
+        // let is_focus = is_focus == ElementFocus::MethodUrlBar;
 
-            let border_style = Style::default().fg(is_focus
-                .then_some(config.theme.border_focus)
-                .unwrap_or(config.theme.border));
+        let border_style = Style::default().fg(is_focus
+            .then_some(config.theme.border_focus)
+            .unwrap_or(config.theme.border));
 
-            let line_block = Block::bordered()
-                .border_type(if is_focus {
-                    BorderType::Thick
-                } else {
-                    BorderType::Plain
-                })
-                .border_style(border_style);
+        let line_block = Block::bordered()
+            .border_type(if is_focus {
+                BorderType::Thick
+            } else {
+                BorderType::Plain
+            })
+            .border_style(border_style);
 
-            let area = line_block.inner(self.render_area);
-            frame.render_widget(line_block, self.render_area);
+        let area = line_block.inner(self.render_area);
+        frame.render_widget(line_block, self.render_area);
 
-            let [method_area, left_separator_area, url_area, right_reparator_area, _indicator_area] = Self::areas(area);
+        let [method_area, left_separator_area, url_area, right_reparator_area, _indicator_area] = Self::areas(area);
 
-            frame.render_widget(
-                Separator::default().style(border_style),
-                left_separator_area,
-            );
-            frame.render_widget(
-                Separator::default().style(border_style),
-                right_reparator_area,
-            );
+        frame.render_widget(
+            Separator::default().style(border_style),
+            left_separator_area,
+        );
+        frame.render_widget(
+            Separator::default().style(border_style),
+            right_reparator_area,
+        );
 
-            frame.render_widget(
-                Span::from(expand(self.method.as_ref(), " ", 10))
-                    .fg(config.theme.dropdown.fg)
-                    .bg(config.theme.dropdown.bg),
-                method_area,
-            );
+        frame.render_widget(
+            Span::from(expand(self.method.as_ref(), " ", 10))
+                .fg(config.theme.dropdown.fg)
+                .bg(config.theme.dropdown.bg),
+            method_area,
+        );
 
-            self.url_input.draw(url_area, frame);
+        self.url_input.draw(url_area, frame);
 
-            // frame.render_widget(&self.url_input, url_area);
+        // frame.render_widget(&self.url_input, url_area);
     }
 
     fn draw_overlay(&self, _params: Self::Params, frame: &mut ratatui::Frame) {

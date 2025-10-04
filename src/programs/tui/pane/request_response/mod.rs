@@ -28,14 +28,14 @@ use crate::{
         self, RequestModel, ResponseFilePath, ResponseModel, SendRequest, SendRequestKey,
     },
     programs::tui::{
-        common::{Interactive, UiComposedElement},
+        common::{Interactive, IsFocused, UiComposedElement},
         config::{keybinding, Config},
         elements::Separator,
         event_handler::{AppMessage, EventSender, Events},
     },
 };
 
-use super::{action::PaneAction, ElementFocus};
+use super::action::PaneAction;
 
 mod binary_body;
 mod body_viewer;
@@ -189,7 +189,7 @@ impl ResponseViewerComponent {
 }
 
 impl<'params> UiComposedElement<'params> for ResponseViewerComponent {
-    type Params = (ElementFocus, &'params Config);
+    type Params = (IsFocused, &'params Config);
 
     fn set_area(&mut self, area: Rect, _viewport_area: Rect) {
         let main_areas = Layout::vertical([
@@ -210,7 +210,7 @@ impl<'params> UiComposedElement<'params> for ResponseViewerComponent {
             .set_area(main_areas[2], _viewport_area);
     }
 
-    fn draw(&self, (focus, config): Self::Params, frame: &mut ratatui::Frame) {
+    fn draw(&self, (is_focus, config): Self::Params, frame: &mut ratatui::Frame) {
         match self
             .response_content
             .read()
@@ -258,7 +258,6 @@ impl<'params> UiComposedElement<'params> for ResponseViewerComponent {
                     // Draw the status line
                     let status_line = self.status_line_ui(response);
 
-                    let is_focus = focus == ElementFocus::ResponseViewer;
                     let border_style = Style::default().fg(if is_focus {
                         config.theme.border_focus
                     } else {
