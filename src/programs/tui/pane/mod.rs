@@ -192,12 +192,13 @@ impl Pane {
                     .set_data_from_request_editor(params, headers, body);
             }
             PaneAction::SaveLocal => {
+                let (context_current, contexts) = self.env_contexts.get_model();
                 let model = ProjectModel::from_parts(
                     self.project_id.clone(),
                     self.project_name.clone(),
                     self.collections_component.as_collections(),
-                    Vec::new(),
-                    None,
+                    contexts,
+                    context_current,
                 );
 
                 let store = LocalStore::new();

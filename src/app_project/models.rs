@@ -417,7 +417,7 @@ impl ContextEnv {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EnvVariable {
     pub name: String,
     pub value: String,
