@@ -1,2 +1,2 @@
 pub mod tui;
-mod tui_v2;
+pub mod tui_v2;

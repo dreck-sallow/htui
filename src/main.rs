@@ -2,7 +2,9 @@ use app_project::store::{LocalStore, Store};
 use clap::Parser;
 use programs::tui;
 mod app_project;
+mod paths;
 mod programs;
+mod store;
 
 #[derive(Parser)]
 #[command(name = "POSTUI")]
@@ -26,12 +28,15 @@ async fn main() {
             println!("{} - {}", project.id, project.name);
         }
     } else {
-        if let Err(err) = tui::run_tui(cli.project).await {
-            match err {
-                tui::TuiError::Io(error) => eprintln!("IO_ERROR: {:?}", error),
-                tui::TuiError::Config(error) => eprintln!("CONFIG_ERROR: {:?}", error),
-            }
+        if let Err(_err) = programs::tui_v2::run(cli.project).await {
             std::process::exit(1)
         }
+        // if let Err(err) = tui::run_tui(cli.project).await {
+        //     match err {
+        //         tui::TuiError::Io(error) => eprintln!("IO_ERROR: {:?}", error),
+        //         tui::TuiError::Config(error) => eprintln!("CONFIG_ERROR: {:?}", error),
+        //     }
+        //     std::process::exit(1)
+        // }
     }
 }

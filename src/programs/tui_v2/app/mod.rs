@@ -1,2 +1,0 @@
-mod areas;
-mod pane;
