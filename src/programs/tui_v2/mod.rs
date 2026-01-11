@@ -6,6 +6,7 @@ use events::create_events;
 use crate::store::{self, models::ProjectModel, Store, StoreError};
 
 mod app;
+mod common;
 mod events;
 mod pane;
 
@@ -14,7 +15,8 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
     let (mut events, draw_signal) = create_events();
     let mut terminal = ratatui::init();
 
-    let mut app = TuiApp::default().add_project(project);
+    let mut app = TuiApp::default();
+    app.add_project(project);
 
     events.start();
     while let Some(ev) = events.next_event().await {
@@ -30,6 +32,9 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
             }
             events::EventMsg::Key(key_event) => {
                 let should_continue = app.handle_key(key_event, draw_signal.clone());
+                terminal.draw(|frame| {
+                    app.handle_draw(frame);
+                })?;
 
                 if !should_continue {
                     break;
@@ -63,5 +68,5 @@ async fn load_project(project_name: Option<String>) -> store::Result<ProjectMode
         return Ok(ProjectModel::new(name));
     }
 
-    Ok(ProjectModel::new("".into()))
+    Ok(ProjectModel::default())
 }

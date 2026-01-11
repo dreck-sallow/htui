@@ -1,13 +1,19 @@
+use collections::CollectionsSidebar;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     Frame,
 };
+use state::PaneState;
 
 use crate::store::models::ProjectModel;
+mod collections;
+mod state;
 
 pub struct Pane {
     project_id: String,
     project_name: String,
+    state: PaneState,
+    collection_sidebar: CollectionsSidebar,
 }
 
 impl Pane {
@@ -15,6 +21,12 @@ impl Pane {
         Self {
             project_id: project.id,
             project_name: project.name,
+            state: PaneState::from_parts(
+                project.collections,
+                project.environments,
+                project.selected_env_context,
+            ),
+            collection_sidebar: CollectionsSidebar,
         }
     }
 
@@ -28,5 +40,8 @@ impl Pane {
         let [sidebar_area, main_area] =
             Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)])
                 .areas(area);
+
+        self.collection_sidebar
+            .draw(sidebar_area, frame, &self.state);
     }
 }

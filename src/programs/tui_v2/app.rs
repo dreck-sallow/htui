@@ -17,7 +17,7 @@ pub struct TuiApp {
 }
 
 impl TuiApp {
-    pub fn add_project(mut self, project: ProjectModel) -> Self {
+    pub fn add_project(&mut self, project: ProjectModel) {
         let pane = Pane::from_project(project);
 
         self.panes.push(pane);
@@ -25,8 +25,6 @@ impl TuiApp {
         if self.selected.is_none() {
             self.selected = Some(0);
         }
-
-        self
     }
 }
 

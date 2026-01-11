@@ -35,6 +35,19 @@ impl ProjectModel {
     }
 }
 
+impl Default for ProjectModel {
+    fn default() -> Self {
+        let id = time_as_id();
+        Self {
+            id: id.clone(),
+            name: id,
+            collections: Vec::new(),
+            environments: Vec::new(),
+            selected_env_context: None,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct CollectionModel {
     pub id: TimeId,
