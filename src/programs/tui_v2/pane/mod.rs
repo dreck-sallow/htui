@@ -26,7 +26,7 @@ impl Pane {
                 project.environments,
                 project.selected_env_context,
             ),
-            collection_sidebar: CollectionsSidebar,
+            collection_sidebar: CollectionsSidebar::new(),
         }
     }
 

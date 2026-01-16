@@ -23,6 +23,7 @@ impl PaneState {
 }
 
 pub struct CollectionsList {
+    pub idx: ListIdx,
     pub items: Vec<CollectionItem>,
 }
 
@@ -38,17 +39,22 @@ impl CollectionsList {
 
             items.push(CollectionItem {
                 id: collection.id,
-                is_open: false,
+                is_open: true,
                 name: collection.name,
                 requests,
             });
         }
 
-        Self { items }
-    }
-}
+        let idx = if items.is_empty() {
+            ListIdx::None
+        } else if items[0].requests.is_empty() {
+            ListIdx::Group(0)
+        } else {
+            ListIdx::Item(0, 0)
+        };
 
-impl CollectionsList {
+        Self { items, idx }
+    }
     pub fn size(&self) -> usize {
         self.items.len()
     }
@@ -56,6 +62,14 @@ impl CollectionsList {
     pub fn list(&self) -> &Vec<CollectionItem> {
         &self.items
     }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Copy)]
+pub enum ListIdx {
+    #[default]
+    None,
+    Group(usize),
+    Item(usize, usize),
 }
 
 pub struct CollectionItem {
