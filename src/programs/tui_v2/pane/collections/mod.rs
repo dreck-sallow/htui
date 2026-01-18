@@ -9,18 +9,13 @@ use crate::programs::tui_v2::common::elements::ui_block;
 
 use super::state::{CollectionsList, ListIdx, PaneState};
 mod list;
+mod upsert_item;
 
-pub struct CollectionsSidebar {
-    // open_symbol: &'static str,
-    // close_symbol: &'static str,
-}
+pub struct CollectionsSidebar {}
 
 impl CollectionsSidebar {
     pub fn new() -> Self {
-        Self {
-            // open_symbol: "\u{25bc} ",
-            // close_symbol: "\u{25b6} ",
-        }
+        Self {}
     }
 }
 
@@ -47,6 +42,8 @@ impl CollectionsSidebar {
             line_area.y += 1;
         }
     }
+
+    pub fn draw_last(&self, area: Rect, frame: &mut Frame, state: &PaneState) {}
 }
 
 fn page_list<'a>(list: &'a CollectionsList, height: u16) -> Vec<Line<'a>> {
