@@ -59,6 +59,11 @@ impl TuiApp {
                 }
                 _ => {}
             }
+
+            // Draw the current selected pane
+            if let Some(pane) = self.selected.and_then(|i| self.panes.get_mut(i)) {
+                pane.handle_key(key);
+            }
         }
 
         true

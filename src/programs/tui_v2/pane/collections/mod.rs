@@ -1,3 +1,4 @@
+use crossterm::event::KeyEvent;
 use ratatui::{
     layout::Rect,
     style::{Style, Stylize},
@@ -7,7 +8,7 @@ use ratatui::{
 
 use crate::programs::tui_v2::common::elements::ui_block;
 
-use super::state::{CollectionsList, ListIdx, PaneState};
+use super::state::{CollectionsList, ListIdx, PaneState, SectionFocus};
 mod list;
 mod upsert_item;
 
@@ -43,7 +44,95 @@ impl CollectionsSidebar {
         }
     }
 
-    pub fn draw_last(&self, area: Rect, frame: &mut Frame, state: &PaneState) {}
+    pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
+        match key.code {
+            crossterm::event::KeyCode::Backspace
+            | crossterm::event::KeyCode::Delete
+            | crossterm::event::KeyCode::Char('d') => {}
+            crossterm::event::KeyCode::Left | crossterm::event::KeyCode::Char('h') => {
+                if let ListIdx::Group(i) = state.collections.idx {
+                    state.collections.items[i].is_open = false;
+                }
+            }
+            crossterm::event::KeyCode::Right | crossterm::event::KeyCode::Char('l') => {
+                if let ListIdx::Group(i) = state.collections.idx {
+                    state.collections.items[i].is_open = true;
+                }
+            }
+            crossterm::event::KeyCode::Up | crossterm::event::KeyCode::Char('k') => {
+                match state.collections.idx {
+                    ListIdx::None => {}
+                    ListIdx::Group(i) => {
+                        if i > 0 {
+                            let prev = &state.collections.items[i - 1];
+                            if !prev.is_open || prev.requests.is_empty() {
+                                state.collections.idx = ListIdx::Group(i - 1);
+                            } else {
+                                state.collections.idx =
+                                    ListIdx::Item(i - 1, prev.requests.len() - 1);
+                            }
+                        }
+                    }
+                    ListIdx::Item(i, sub_i) => {
+                        if sub_i == 0 {
+                            state.collections.idx = ListIdx::Group(i);
+                        } else {
+                            state.collections.idx = ListIdx::Item(i, sub_i - 1);
+                        }
+                    }
+                }
+            }
+            crossterm::event::KeyCode::Down | crossterm::event::KeyCode::Char('j') => {
+                match state.collections.idx {
+                    ListIdx::None => {}
+                    ListIdx::Group(i) => {
+                        let itm = &state.collections.items[i];
+                        if itm.is_open && !itm.requests.is_empty() {
+                            state.collections.idx = ListIdx::Item(i, 0);
+                        } else if i < state.collections.items.len() - 1 {
+                            state.collections.idx = ListIdx::Group(i + 1);
+                        }
+                    }
+                    ListIdx::Item(i, sub_i) => {
+                        let itm = &state.collections.items[i];
+                        if sub_i < itm.requests.len() - 1 {
+                            state.collections.idx = ListIdx::Item(i, sub_i + 1);
+                        } else if i < state.collections.items.len() - 1 {
+                            state.collections.idx = ListIdx::Group(i + 1);
+                        }
+                    }
+                }
+            }
+            crossterm::event::KeyCode::Home => {
+                if !state.collections.items.is_empty() {
+                    state.collections.idx = ListIdx::Group(0);
+                }
+            }
+            crossterm::event::KeyCode::End => {
+                if let Some(itm) = state.collections.items.last() {
+                    if itm.requests.is_empty() {
+                        state.collections.idx = ListIdx::Group(state.collections.items.len() - 1);
+                    } else {
+                        state.collections.idx = ListIdx::Item(
+                            state.collections.items.len() - 1,
+                            itm.requests.len() - 1,
+                        );
+                    }
+                }
+            }
+            crossterm::event::KeyCode::Tab => {
+                state.focus = SectionFocus::UpsertItem;
+            }
+            crossterm::event::KeyCode::BackTab => {}
+            crossterm::event::KeyCode::Char(ch) => match ch {
+                'e' => {}
+                _ => {}
+            },
+            // crossterm::event::KeyCode::Delete => todo!(),
+            // crossterm::event::KeyCode::Enter => todo!(),
+            _ => {}
+        }
+    }
 }
 
 fn page_list<'a>(list: &'a CollectionsList, height: u16) -> Vec<Line<'a>> {

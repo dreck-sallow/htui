@@ -1,4 +1,5 @@
 use collections::CollectionsSidebar;
+use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     Frame,
@@ -43,5 +44,16 @@ impl Pane {
 
         self.collection_sidebar
             .draw(sidebar_area, frame, &self.state);
+    }
+
+    pub fn handle_key(&mut self, key: KeyEvent) -> bool {
+        match self.state.focus {
+            state::SectionFocus::Collections => {
+                self.collection_sidebar.handle_key(key, &mut self.state);
+            }
+            state::SectionFocus::UpsertItem => {}
+        }
+
+        true
     }
 }

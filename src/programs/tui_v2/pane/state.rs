@@ -3,6 +3,7 @@ use crate::store::models::{
 };
 
 pub struct PaneState {
+    pub(crate) focus: SectionFocus,
     pub(crate) collections: CollectionsList,
     pub(crate) environments: Environments,
     pub(crate) selected_env_context: Option<usize>,
@@ -15,11 +16,18 @@ impl PaneState {
         selected_env: Option<usize>,
     ) -> Self {
         Self {
+            focus: SectionFocus::Collections,
             collections: CollectionsList::from_model(collections),
             environments: Environments::from_model(environments),
             selected_env_context: selected_env,
         }
     }
+}
+
+#[derive(PartialEq, Eq)]
+pub enum SectionFocus {
+    Collections,
+    UpsertItem,
 }
 
 pub struct CollectionsList {

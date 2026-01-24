@@ -1,8 +1,9 @@
 use crossterm::event::KeyEvent;
-use ratatui::{layout::Rect, text::Line, widgets::Block, Frame};
+use ratatui::{layout::Rect, text::Line, Frame};
 
 use crate::programs::tui_v2::common::{elements::ui_block, placeholder::PlaceholderLine};
 
+#[derive(PartialEq, Eq)]
 pub enum Mode {
     Insert,
     Normal,
@@ -25,7 +26,7 @@ impl InputMode {
         Self {
             mode: Mode::Normal,
             input,
-            cursor: 0,
+            cursor: chars,
             placeholder: None,
             selection_start: None,
         }
@@ -36,6 +37,14 @@ impl InputMode {
         self
     }
 
+    pub fn is_editing(&self) -> bool {
+        self.mode == Mode::Insert
+    }
+
+    pub fn has_selection(&self) -> bool {
+        self.selection_start.is_some()
+    }
+
     pub fn next_char(&mut self) {
         let chars = self.input.chars().count();
         if chars > self.cursor {
@@ -43,7 +52,7 @@ impl InputMode {
         }
 
         if let Some(start) = self.selection_start.as_mut() {
-            if *start < chars {
+            if *start < chars.saturating_sub(1) {
                 *start += 1;
             }
         }
@@ -112,6 +121,17 @@ impl InputMode {
             self.cursor = self.cursor.min(self.input.chars().count());
         }
     }
+
+    pub fn clear_selection(&mut self) {
+        if self.selection_start.is_some() {
+            self.selection_start = None;
+        }
+    }
+
+    pub fn insert_char(&mut self, ch: char) {
+        self.input.insert(self.cursor, ch);
+        self.cursor += 1;
+    }
 }
 
 impl InputMode {
@@ -130,9 +150,68 @@ impl InputMode {
         }
     }
 
-    fn execute(&mut self, action: InputAction) {}
-
-    pub fn handle_key(&mut self, key: KeyEvent) {}
+    pub fn handle_key(&mut self, key: KeyEvent) {
+        match key.code {
+            crossterm::event::KeyCode::Backspace => {
+                self.delete_char();
+            }
+            crossterm::event::KeyCode::Left => {
+                self.next_char();
+            }
+            crossterm::event::KeyCode::Right => {
+                self.prev_char();
+            }
+            crossterm::event::KeyCode::End => {
+                self.move_end_cursor();
+            }
+            crossterm::event::KeyCode::Home => {
+                self.move_start_cursor();
+            }
+            // crossterm::event::KeyCode::Esc => todo!(),
+            crossterm::event::KeyCode::Enter => {}
+            crossterm::event::KeyCode::Char(ch) => {
+                if ch == 'v' && self.mode != Mode::Insert {
+                    if self.has_selection() {
+                        self.clear_selection();
+                    } else {
+                        self.start_selection();
+                    }
+                } else if ch == 'l' && self.mode != Mode::Insert {
+                    self.next_char();
+                } else if ch == 'h' && self.mode != Mode::Insert {
+                    self.prev_char();
+                } else if ch == 'd' && self.mode != Mode::Insert {
+                    if self.has_selection() {
+                        self.delete_selection();
+                    } else {
+                        self.delete_char();
+                    }
+                } else {
+                    self.insert_char(ch);
+                }
+            }
+            // crossterm::event::KeyCode::Insert => todo!(),
+            // crossterm::event::KeyCode::Delete => todo!(),
+            // crossterm::event::KeyCode::Tab => todo!(),
+            // crossterm::event::KeyCode::BackTab => todo!(),
+            // crossterm::event::KeyCode::Up => todo!(),
+            // crossterm::event::KeyCode::Down => todo!(),
+            // crossterm::event::KeyCode::PageUp => todo!(),
+            // crossterm::event::KeyCode::PageDown => todo!(),
+            // crossterm::event::KeyCode::F(_) => todo!(),
+            // crossterm::event::KeyCode::Null => todo!(),
+            // crossterm::event::KeyCode::CapsLock => todo!(),
+            // crossterm::event::KeyCode::ScrollLock => todo!(),
+            // crossterm::event::KeyCode::NumLock => todo!(),
+            // crossterm::event::KeyCode::PrintScreen => todo!(),
+            // crossterm::event::KeyCode::Pause => todo!(),
+            // crossterm::event::KeyCode::Menu => todo!(),
+            // crossterm::event::KeyCode::KeypadBegin => todo!(),
+            // crossterm::event::KeyCode::Media(media_key_code) => todo!(),
+            // crossterm::event::KeyCode::Modifier(modifier_key_code) => todo!(),
+            _ => {}
+        }
+    }
 }
 
 pub enum InputAction {
