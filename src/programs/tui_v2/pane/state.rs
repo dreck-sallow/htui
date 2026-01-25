@@ -1,9 +1,10 @@
 use crate::store::models::{
-    CollectionModel, Environment, HttpMethod, KeyValueParam, RequestModel, TimeId,
+    time_as_id, CollectionModel, Environment, HttpMethod, KeyValueParam, RequestModel, TimeId,
 };
 
 pub struct PaneState {
     pub(crate) focus: SectionFocus,
+    pub(crate) upsert_item_action: UpsertItemAction,
     pub(crate) collections: CollectionsList,
     pub(crate) environments: Environments,
     pub(crate) selected_env_context: Option<usize>,
@@ -17,11 +18,20 @@ impl PaneState {
     ) -> Self {
         Self {
             focus: SectionFocus::Collections,
+            upsert_item_action: UpsertItemAction::CreateCollection,
             collections: CollectionsList::from_model(collections),
             environments: Environments::from_model(environments),
             selected_env_context: selected_env,
         }
     }
+}
+
+#[derive(PartialEq, Eq)]
+pub enum UpsertItemAction {
+    CreateCollection,
+    CreateRequest,
+    EditCollection,
+    EditRequest,
 }
 
 #[derive(PartialEq, Eq)]
@@ -87,6 +97,17 @@ pub struct CollectionItem {
     pub requests: Vec<RequestItem>,
 }
 
+impl CollectionItem {
+    pub fn new(name: String) -> Self {
+        Self {
+            id: time_as_id(),
+            is_open: false,
+            name,
+            requests: Vec::new(),
+        }
+    }
+}
+
 pub struct RequestItem {
     id: TimeId,
     pub name: String,
@@ -98,6 +119,17 @@ pub struct RequestItem {
 }
 
 impl RequestItem {
+    pub fn new(name: String) -> Self {
+        Self {
+            id: time_as_id(),
+            name,
+            url: "".to_string(),
+            headers: ParamsTable::default(),
+            params: ParamsTable::default(),
+            method: HttpMethod::Get,
+        }
+    }
+
     pub fn from_model(model: RequestModel) -> Self {
         Self {
             id: model.id,
@@ -145,6 +177,7 @@ pub struct Variable {
     pub value: String,
 }
 
+#[derive(Default)]
 pub struct ParamsTable {
     pub items: Vec<ParamItem>,
 }

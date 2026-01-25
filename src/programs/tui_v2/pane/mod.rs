@@ -1,4 +1,4 @@
-use collections::CollectionsSidebar;
+use collections::{upsert_item::UpertItemPopup, CollectionsSidebar};
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -15,6 +15,7 @@ pub struct Pane {
     project_name: String,
     state: PaneState,
     collection_sidebar: CollectionsSidebar,
+    upsert_item: UpertItemPopup,
 }
 
 impl Pane {
@@ -28,6 +29,7 @@ impl Pane {
                 project.selected_env_context,
             ),
             collection_sidebar: CollectionsSidebar::new(),
+            upsert_item: UpertItemPopup::new(),
         }
     }
 
@@ -44,6 +46,10 @@ impl Pane {
 
         self.collection_sidebar
             .draw(sidebar_area, frame, &self.state);
+
+        if self.state.focus == state::SectionFocus::UpsertItem {
+            self.upsert_item.draw(frame, &self.state);
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> bool {
@@ -51,7 +57,9 @@ impl Pane {
             state::SectionFocus::Collections => {
                 self.collection_sidebar.handle_key(key, &mut self.state);
             }
-            state::SectionFocus::UpsertItem => {}
+            state::SectionFocus::UpsertItem => {
+                self.upsert_item.handle_key(key, &mut self.state);
+            }
         }
 
         true

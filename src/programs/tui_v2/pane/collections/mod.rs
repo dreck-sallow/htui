@@ -8,9 +8,9 @@ use ratatui::{
 
 use crate::programs::tui_v2::common::elements::ui_block;
 
-use super::state::{CollectionsList, ListIdx, PaneState, SectionFocus};
+use super::state::{CollectionsList, ListIdx, PaneState, SectionFocus, UpsertItemAction};
 mod list;
-mod upsert_item;
+pub mod upsert_item;
 
 pub struct CollectionsSidebar {}
 
@@ -125,7 +125,26 @@ impl CollectionsSidebar {
             }
             crossterm::event::KeyCode::BackTab => {}
             crossterm::event::KeyCode::Char(ch) => match ch {
-                'e' => {}
+                'e' => match state.collections.idx {
+                    ListIdx::None => {}
+                    ListIdx::Group(_) => {
+                        state.focus = SectionFocus::UpsertItem;
+                        state.upsert_item_action = UpsertItemAction::EditCollection;
+                    }
+                    ListIdx::Item(_, _) => {
+                        state.focus = SectionFocus::UpsertItem;
+                        state.upsert_item_action = UpsertItemAction::EditRequest;
+                    }
+                },
+                'a' => {
+                    state.focus = SectionFocus::UpsertItem;
+                    state.upsert_item_action = UpsertItemAction::CreateRequest;
+                }
+                'n' => {
+                    state.focus = SectionFocus::UpsertItem;
+                    state.upsert_item_action = UpsertItemAction::CreateCollection;
+                }
+
                 _ => {}
             },
             // crossterm::event::KeyCode::Delete => todo!(),

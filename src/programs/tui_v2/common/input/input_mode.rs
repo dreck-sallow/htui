@@ -1,7 +1,7 @@
 use crossterm::event::KeyEvent;
 use ratatui::{layout::Rect, text::Line, Frame};
 
-use crate::programs::tui_v2::common::{elements::ui_block, placeholder::PlaceholderLine};
+use crate::programs::tui_v2::common::placeholder::PlaceholderLine;
 
 #[derive(PartialEq, Eq)]
 pub enum Mode {
@@ -37,12 +37,26 @@ impl InputMode {
         self
     }
 
+    pub fn inner(&self) -> &str {
+        &self.input
+    }
+
+    #[inline]
     pub fn is_editing(&self) -> bool {
         self.mode == Mode::Insert
     }
 
     pub fn has_selection(&self) -> bool {
         self.selection_start.is_some()
+    }
+
+    pub fn reset(&mut self) {
+        if self.is_editing() {
+            self.mode = Mode::Normal;
+        }
+        self.input.clear();
+        self.cursor = 0;
+        self.selection_start = None;
     }
 
     pub fn next_char(&mut self) {
@@ -77,6 +91,7 @@ impl InputMode {
         }
 
         self.input.remove(self.cursor - 1);
+        self.cursor -= 1;
     }
 
     pub fn move_start_cursor(&mut self) {
@@ -136,23 +151,18 @@ impl InputMode {
 
 impl InputMode {
     pub fn draw(&self, area: Rect, frame: &mut Frame) {
-        let block = ui_block("", false);
-        let inner_area = block.inner(area);
-
-        frame.render_widget(block, area);
-
         if self.input.is_empty() {
             if let Some(ref placeholder) = self.placeholder {
-                placeholder.draw(inner_area, frame);
+                placeholder.draw(area, frame);
             }
         } else {
-            frame.render_widget(Line::raw(&self.input), inner_area);
+            frame.render_widget(Line::raw(&self.input), area);
         }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
         match key.code {
-            crossterm::event::KeyCode::Backspace => {
+            crossterm::event::KeyCode::Backspace if self.is_editing() => {
                 self.delete_char();
             }
             crossterm::event::KeyCode::Left => {
@@ -167,48 +177,42 @@ impl InputMode {
             crossterm::event::KeyCode::Home => {
                 self.move_start_cursor();
             }
-            // crossterm::event::KeyCode::Esc => todo!(),
+            crossterm::event::KeyCode::Esc => {
+                if self.is_editing() {
+                    self.mode = Mode::Normal;
+                }
+            }
             crossterm::event::KeyCode::Enter => {}
-            crossterm::event::KeyCode::Char(ch) => {
-                if ch == 'v' && self.mode != Mode::Insert {
+            crossterm::event::KeyCode::Char(ch) => match ch {
+                'v' if self.mode != Mode::Insert => {
                     if self.has_selection() {
                         self.clear_selection();
                     } else {
                         self.start_selection();
                     }
-                } else if ch == 'l' && self.mode != Mode::Insert {
+                }
+                'l' if self.mode != Mode::Insert => {
                     self.next_char();
-                } else if ch == 'h' && self.mode != Mode::Insert {
+                }
+                'h' if self.mode != Mode::Insert => {
                     self.prev_char();
-                } else if ch == 'd' && self.mode != Mode::Insert {
+                }
+                'd' if self.mode != Mode::Insert => {
                     if self.has_selection() {
                         self.delete_selection();
                     } else {
                         self.delete_char();
                     }
-                } else {
-                    self.insert_char(ch);
                 }
-            }
-            // crossterm::event::KeyCode::Insert => todo!(),
-            // crossterm::event::KeyCode::Delete => todo!(),
-            // crossterm::event::KeyCode::Tab => todo!(),
-            // crossterm::event::KeyCode::BackTab => todo!(),
-            // crossterm::event::KeyCode::Up => todo!(),
-            // crossterm::event::KeyCode::Down => todo!(),
-            // crossterm::event::KeyCode::PageUp => todo!(),
-            // crossterm::event::KeyCode::PageDown => todo!(),
-            // crossterm::event::KeyCode::F(_) => todo!(),
-            // crossterm::event::KeyCode::Null => todo!(),
-            // crossterm::event::KeyCode::CapsLock => todo!(),
-            // crossterm::event::KeyCode::ScrollLock => todo!(),
-            // crossterm::event::KeyCode::NumLock => todo!(),
-            // crossterm::event::KeyCode::PrintScreen => todo!(),
-            // crossterm::event::KeyCode::Pause => todo!(),
-            // crossterm::event::KeyCode::Menu => todo!(),
-            // crossterm::event::KeyCode::KeypadBegin => todo!(),
-            // crossterm::event::KeyCode::Media(media_key_code) => todo!(),
-            // crossterm::event::KeyCode::Modifier(modifier_key_code) => todo!(),
+                'i' if self.mode == Mode::Normal => {
+                    self.mode = Mode::Insert;
+                }
+                _ => {
+                    if self.is_editing() {
+                        self.insert_char(ch);
+                    }
+                }
+            },
             _ => {}
         }
     }
