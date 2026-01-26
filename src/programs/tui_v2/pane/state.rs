@@ -4,7 +4,7 @@ use crate::store::models::{
 
 pub struct PaneState {
     pub(crate) focus: SectionFocus,
-    pub(crate) upsert_item_action: UpsertItemAction,
+    // pub(crate) upsert_item_action: UpsertItemAction,
     pub(crate) collections: CollectionsList,
     pub(crate) environments: Environments,
     pub(crate) selected_env_context: Option<usize>,
@@ -18,7 +18,7 @@ impl PaneState {
     ) -> Self {
         Self {
             focus: SectionFocus::Collections,
-            upsert_item_action: UpsertItemAction::CreateCollection,
+            // upsert_item_action: UpsertItemAction::CreateCollection,
             collections: CollectionsList::from_model(collections),
             environments: Environments::from_model(environments),
             selected_env_context: selected_env,
@@ -27,17 +27,8 @@ impl PaneState {
 }
 
 #[derive(PartialEq, Eq)]
-pub enum UpsertItemAction {
-    CreateCollection,
-    CreateRequest,
-    EditCollection,
-    EditRequest,
-}
-
-#[derive(PartialEq, Eq)]
 pub enum SectionFocus {
     Collections,
-    UpsertItem,
 }
 
 pub struct CollectionsList {

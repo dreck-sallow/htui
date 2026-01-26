@@ -50,6 +50,10 @@ impl InputMode {
         self.selection_start.is_some()
     }
 
+    pub fn replace(&mut self, txt: &str) {
+        self.input.extend(txt.chars());
+    }
+
     pub fn reset(&mut self) {
         if self.is_editing() {
             self.mode = Mode::Normal;

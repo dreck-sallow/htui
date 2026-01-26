@@ -6,19 +6,29 @@ use crate::programs::tui_v2::{
         elements::{ui_block, utils::center_area},
         input::input_mode::InputMode,
     },
-    pane::state::{
-        CollectionItem, ListIdx, PaneState, RequestItem, SectionFocus, UpsertItemAction,
-    },
+    pane::state::{CollectionItem, ListIdx, PaneState, RequestItem},
 };
+
+#[derive(PartialEq, Eq)]
+pub enum UpsertItemAction {
+    CreateCollection,
+    CreateRequest,
+    EditCollection,
+    EditRequest,
+}
 
 pub struct UpertItemPopup {
     input: InputMode,
+    action: UpsertItemAction,
+    pub(crate) show_overlay: bool,
 }
 
 impl UpertItemPopup {
     pub fn new() -> Self {
         Self {
             input: InputMode::new(""),
+            action: UpsertItemAction::CreateCollection,
+            show_overlay: false,
         }
     }
 
@@ -31,13 +41,20 @@ impl UpertItemPopup {
         }
     }
 
+    pub fn open(&mut self, action: UpsertItemAction, initial: &str) {
+        self.action = action;
+        self.input.reset();
+        self.input.replace(initial);
+        self.show_overlay = true;
+    }
+
     pub fn draw(&self, frame: &mut Frame, state: &PaneState) {
         let area = center_area(
             frame.area(),
             ratatui::layout::Constraint::Length(3),
             ratatui::layout::Constraint::Percentage(30),
         );
-        let block = ui_block(Self::title(&state.upsert_item_action), true);
+        let block = ui_block(Self::title(&self.action), true);
         let inner_area = block.inner(area);
 
         frame.render_widget(block, area);
@@ -48,12 +65,12 @@ impl UpertItemPopup {
         match key.code {
             crossterm::event::KeyCode::Esc if !self.input.is_editing() => {
                 // cancel
-                state.focus = SectionFocus::Collections;
                 self.input.reset();
+                self.show_overlay = false;
             }
             crossterm::event::KeyCode::Enter => {
                 let input = self.input.inner().to_string();
-                match state.upsert_item_action {
+                match self.action {
                     UpsertItemAction::CreateCollection => {
                         match state.collections.idx {
                             ListIdx::None => {
@@ -95,8 +112,8 @@ impl UpertItemPopup {
                 }
 
                 // Submit
-                state.focus = SectionFocus::Collections;
                 self.input.reset();
+                self.show_overlay = false;
             }
             _ => {
                 self.input.handle_key(key);

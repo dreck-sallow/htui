@@ -5,18 +5,23 @@ use ratatui::{
     text::Line,
     Frame,
 };
+use upsert_item::{UpertItemPopup, UpsertItemAction};
 
 use crate::programs::tui_v2::common::elements::ui_block;
 
-use super::state::{CollectionsList, ListIdx, PaneState, SectionFocus, UpsertItemAction};
+use super::state::{CollectionsList, ListIdx, PaneState};
 mod list;
 pub mod upsert_item;
 
-pub struct CollectionsSidebar {}
+pub struct CollectionsSidebar {
+    upsert_item: UpertItemPopup,
+}
 
 impl CollectionsSidebar {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            upsert_item: UpertItemPopup::new(),
+        }
     }
 }
 
@@ -44,7 +49,21 @@ impl CollectionsSidebar {
         }
     }
 
+    pub fn draw_overlay(&self, _area: Rect, frame: &mut Frame, state: &PaneState) {
+        if self.upsert_item.show_overlay {
+            self.upsert_item.draw(frame, state);
+        }
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
+        if self.upsert_item.show_overlay {
+            self.upsert_item.handle_key(key, state);
+        } else {
+            self.handle_list_key(key, state);
+        }
+    }
+
+    fn handle_list_key(&mut self, key: KeyEvent, state: &mut PaneState) {
         match key.code {
             crossterm::event::KeyCode::Backspace
             | crossterm::event::KeyCode::Delete
@@ -120,29 +139,27 @@ impl CollectionsSidebar {
                     }
                 }
             }
-            crossterm::event::KeyCode::Tab => {
-                state.focus = SectionFocus::UpsertItem;
-            }
+            crossterm::event::KeyCode::Tab => {}
             crossterm::event::KeyCode::BackTab => {}
             crossterm::event::KeyCode::Char(ch) => match ch {
                 'e' => match state.collections.idx {
                     ListIdx::None => {}
-                    ListIdx::Group(_) => {
-                        state.focus = SectionFocus::UpsertItem;
-                        state.upsert_item_action = UpsertItemAction::EditCollection;
+                    ListIdx::Group(i) => {
+                        let name = &state.collections.items[i].name;
+                        self.upsert_item
+                            .open(UpsertItemAction::EditCollection, name);
                     }
-                    ListIdx::Item(_, _) => {
-                        state.focus = SectionFocus::UpsertItem;
-                        state.upsert_item_action = UpsertItemAction::EditRequest;
+                    ListIdx::Item(i, sub_i) => {
+                        let name = &state.collections.items[i].requests[sub_i].name;
+                        self.upsert_item.open(UpsertItemAction::EditRequest, name);
                     }
                 },
                 'a' => {
-                    state.focus = SectionFocus::UpsertItem;
-                    state.upsert_item_action = UpsertItemAction::CreateRequest;
+                    self.upsert_item.open(UpsertItemAction::CreateRequest, "");
                 }
                 'n' => {
-                    state.focus = SectionFocus::UpsertItem;
-                    state.upsert_item_action = UpsertItemAction::CreateCollection;
+                    self.upsert_item
+                        .open(UpsertItemAction::CreateCollection, "");
                 }
 
                 _ => {}
