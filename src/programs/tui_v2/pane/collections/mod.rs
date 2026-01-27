@@ -67,7 +67,40 @@ impl CollectionsSidebar {
         match key.code {
             crossterm::event::KeyCode::Backspace
             | crossterm::event::KeyCode::Delete
-            | crossterm::event::KeyCode::Char('d') => {}
+            | crossterm::event::KeyCode::Char('d') => match state.collections.idx {
+                ListIdx::None => {}
+                ListIdx::Group(i) => {
+                    if i == 0 && state.collections.items.len() == 1 {
+                        state.collections.items.remove(i);
+                        state.collections.idx = ListIdx::None;
+                    } else if i == state.collections.items.len() - 1 {
+                        state.collections.items.remove(i);
+                        let last_idx = i - 1;
+                        let last = &state.collections.items[last_idx];
+
+                        if last.is_open && !last.requests.is_empty() {
+                            state.collections.idx =
+                                ListIdx::Item(last_idx, last.requests.len() - 1);
+                        } else {
+                            state.collections.idx = ListIdx::Group(last_idx);
+                        }
+                    } else {
+                        state.collections.items.remove(i);
+                    }
+                }
+                ListIdx::Item(i, sub_i) => {
+                    let requests = &mut state.collections.items[i].requests;
+                    if sub_i == 0 && requests.len() == 1 {
+                        requests.remove(sub_i);
+                        state.collections.idx = ListIdx::Group(i);
+                    } else if sub_i == requests.len() - 1 {
+                        requests.remove(sub_i);
+                        state.collections.idx = ListIdx::Item(i, sub_i - 1);
+                    } else {
+                        requests.remove(sub_i);
+                    }
+                }
+            },
             crossterm::event::KeyCode::Left | crossterm::event::KeyCode::Char('h') => {
                 if let ListIdx::Group(i) = state.collections.idx {
                     state.collections.items[i].is_open = false;

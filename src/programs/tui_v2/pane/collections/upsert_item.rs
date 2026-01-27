@@ -45,10 +45,11 @@ impl UpertItemPopup {
         self.action = action;
         self.input.reset();
         self.input.replace(initial);
+        self.input.move_end_cursor();
         self.show_overlay = true;
     }
 
-    pub fn draw(&self, frame: &mut Frame, state: &PaneState) {
+    pub fn draw(&self, frame: &mut Frame, _state: &PaneState) {
         let area = center_area(
             frame.area(),
             ratatui::layout::Constraint::Length(3),
@@ -75,6 +76,7 @@ impl UpertItemPopup {
                         match state.collections.idx {
                             ListIdx::None => {
                                 state.collections.items.push(CollectionItem::new(input));
+                                state.collections.idx = ListIdx::Group(0);
                             }
                             ListIdx::Group(i) | ListIdx::Item(i, _) => {
                                 state
