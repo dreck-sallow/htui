@@ -66,7 +66,7 @@ pub struct RequestModel {
     pub body: RequestBody,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {
     Options,
@@ -76,6 +76,22 @@ pub enum HttpMethod {
     Delete,
     Head,
     Patch,
+    Custom(String),
+}
+
+impl ToString for HttpMethod {
+    fn to_string(&self) -> String {
+        match self {
+            HttpMethod::Options => "Options".into(),
+            HttpMethod::Get => "Get".into(),
+            HttpMethod::Post => "Post".into(),
+            HttpMethod::Put => "Put".into(),
+            HttpMethod::Delete => "Delete".into(),
+            HttpMethod::Head => "Head".into(),
+            HttpMethod::Patch => "Patch".into(),
+            HttpMethod::Custom(s) => s.clone(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

@@ -1,13 +1,17 @@
-use collections::{upsert_item::UpertItemPopup, CollectionsSidebar};
+use actions::EffectsCollector;
+use collections::CollectionsSidebar;
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     Frame,
 };
+use request_bar::RequestBar;
 use state::PaneState;
 
 use crate::store::models::ProjectModel;
+mod actions;
 mod collections;
+mod request_bar;
 mod state;
 
 pub struct Pane {
@@ -15,6 +19,7 @@ pub struct Pane {
     project_name: String,
     state: PaneState,
     collection_sidebar: CollectionsSidebar,
+    request_bar: RequestBar,
 }
 
 impl Pane {
@@ -28,6 +33,7 @@ impl Pane {
                 project.selected_env_context,
             ),
             collection_sidebar: CollectionsSidebar::new(),
+            request_bar: RequestBar::new(),
         }
     }
 
@@ -45,14 +51,36 @@ impl Pane {
         self.collection_sidebar
             .draw(sidebar_area, frame, &self.state);
 
+        match self.state.collections.idx {
+            state::ListIdx::None | state::ListIdx::Group(_) => {}
+            state::ListIdx::Item(_, _) => {
+                let [bar_area] = Layout::vertical([Constraint::Length(3)]).areas(main_area);
+                self.request_bar.draw(bar_area, frame, &self.state);
+            }
+        }
+
         self.collection_sidebar
             .draw_overlay(area, frame, &self.state);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> bool {
+        let mut effects = EffectsCollector::new();
+
         match self.state.focus {
             state::SectionFocus::Collections => {
-                self.collection_sidebar.handle_key(key, &mut self.state);
+                self.collection_sidebar
+                    .handle_key(key, &mut self.state, &mut effects);
+            }
+            state::SectionFocus::RequestBar => {
+                self.request_bar.handle_key(key, &mut self.state);
+            }
+        }
+
+        while let Some(effect) = effects.next() {
+            match effect {
+                actions::PaneActionEffect::ChangeIdx => {
+                    self.request_bar.sync(&mut self.state);
+                }
             }
         }
 

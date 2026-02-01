@@ -29,6 +29,7 @@ impl PaneState {
 #[derive(PartialEq, Eq)]
 pub enum SectionFocus {
     Collections,
+    RequestBar,
 }
 
 pub struct CollectionsList {

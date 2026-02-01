@@ -9,7 +9,10 @@ use upsert_item::{UpertItemPopup, UpsertItemAction};
 
 use crate::programs::tui_v2::common::elements::ui_block;
 
-use super::state::{CollectionsList, ListIdx, PaneState};
+use super::{
+    actions::EffectsCollector,
+    state::{CollectionsList, ListIdx, PaneState, SectionFocus},
+};
 mod list;
 pub mod upsert_item;
 
@@ -29,7 +32,7 @@ impl CollectionsSidebar {
     pub fn draw(&self, area: Rect, frame: &mut Frame, state: &PaneState) {
         let block = ui_block(
             format!(" Collections ({}) ", state.collections.size()),
-            false,
+            state.focus == SectionFocus::Collections,
         );
 
         let inner_area = block.inner(area);
@@ -55,15 +58,25 @@ impl CollectionsSidebar {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
+    pub fn handle_key(
+        &mut self,
+        key: KeyEvent,
+        state: &mut PaneState,
+        effects: &mut EffectsCollector,
+    ) {
         if self.upsert_item.show_overlay {
             self.upsert_item.handle_key(key, state);
         } else {
-            self.handle_list_key(key, state);
+            self.handle_list_key(key, state, effects);
         }
     }
 
-    fn handle_list_key(&mut self, key: KeyEvent, state: &mut PaneState) {
+    fn handle_list_key(
+        &mut self,
+        key: KeyEvent,
+        state: &mut PaneState,
+        effects: &mut EffectsCollector,
+    ) {
         match key.code {
             crossterm::event::KeyCode::Backspace
             | crossterm::event::KeyCode::Delete
@@ -87,6 +100,7 @@ impl CollectionsSidebar {
                     } else {
                         state.collections.items.remove(i);
                     }
+                    effects.add(super::actions::PaneActionEffect::ChangeIdx);
                 }
                 ListIdx::Item(i, sub_i) => {
                     let requests = &mut state.collections.items[i].requests;
@@ -99,6 +113,7 @@ impl CollectionsSidebar {
                     } else {
                         requests.remove(sub_i);
                     }
+                    effects.add(super::actions::PaneActionEffect::ChangeIdx);
                 }
             },
             crossterm::event::KeyCode::Left | crossterm::event::KeyCode::Char('h') => {
@@ -123,6 +138,7 @@ impl CollectionsSidebar {
                                 state.collections.idx =
                                     ListIdx::Item(i - 1, prev.requests.len() - 1);
                             }
+                            effects.add(super::actions::PaneActionEffect::ChangeIdx);
                         }
                     }
                     ListIdx::Item(i, sub_i) => {
@@ -131,6 +147,7 @@ impl CollectionsSidebar {
                         } else {
                             state.collections.idx = ListIdx::Item(i, sub_i - 1);
                         }
+                        effects.add(super::actions::PaneActionEffect::ChangeIdx);
                     }
                 }
             }
@@ -144,6 +161,7 @@ impl CollectionsSidebar {
                         } else if i < state.collections.items.len() - 1 {
                             state.collections.idx = ListIdx::Group(i + 1);
                         }
+                        effects.add(super::actions::PaneActionEffect::ChangeIdx);
                     }
                     ListIdx::Item(i, sub_i) => {
                         let itm = &state.collections.items[i];
@@ -152,12 +170,14 @@ impl CollectionsSidebar {
                         } else if i < state.collections.items.len() - 1 {
                             state.collections.idx = ListIdx::Group(i + 1);
                         }
+                        effects.add(super::actions::PaneActionEffect::ChangeIdx);
                     }
                 }
             }
             crossterm::event::KeyCode::Home => {
                 if !state.collections.items.is_empty() {
                     state.collections.idx = ListIdx::Group(0);
+                    effects.add(super::actions::PaneActionEffect::ChangeIdx);
                 }
             }
             crossterm::event::KeyCode::End => {
@@ -170,9 +190,12 @@ impl CollectionsSidebar {
                             itm.requests.len() - 1,
                         );
                     }
+                    effects.add(super::actions::PaneActionEffect::ChangeIdx);
                 }
             }
-            crossterm::event::KeyCode::Tab => {}
+            crossterm::event::KeyCode::Tab => {
+                state.focus = SectionFocus::RequestBar;
+            }
             crossterm::event::KeyCode::BackTab => {}
             crossterm::event::KeyCode::Char(ch) => match ch {
                 'e' => match state.collections.idx {
