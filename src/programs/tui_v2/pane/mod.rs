@@ -61,6 +61,7 @@ impl Pane {
 
         self.collection_sidebar
             .draw_overlay(area, frame, &self.state);
+        self.request_bar.draw_overlay(area, frame);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> bool {
