@@ -51,7 +51,7 @@ impl RequestBar {
         let container = ui_block("", state.focus == SectionFocus::RequestBar);
 
         let [method_area, input_area, status_area] = Layout::horizontal([
-            Constraint::Length(7),
+            Constraint::Length(9),
             Constraint::Fill(1),
             Constraint::Length(6),
         ])
@@ -94,11 +94,18 @@ impl RequestBar {
         } else {
             match key.code {
                 // crossterm::event::KeyCode::Enter => {}
-                // crossterm::event::KeyCode::Tab => {}
                 // crossterm::event::KeyCode::Enter if key.modifiers == KeyModifiers::SHIFT => {
                 crossterm::event::KeyCode::Enter => {
                     self.show_select_method = true;
                     self.select_method.select(&self.method);
+                }
+                crossterm::event::KeyCode::Tab => {
+                    state.focus = SectionFocus::RequestBuilder;
+                    if let ListIdx::Item(i, sub_i) = state.collections.idx {
+                        let request = &mut state.collections.items[i].requests[sub_i];
+                        request.url = self.input_url.inner().to_string();
+                        request.method = self.method.clone();
+                    }
                 }
                 crossterm::event::KeyCode::BackTab => {
                     state.focus = SectionFocus::Collections;

@@ -113,13 +113,9 @@ impl SelectMethodPopup {
         frame.render_widget(block, area);
 
         let (title_area, list_area) = to_section_area(list_area);
-        let title_style = if self.section == Section::Standard {
-            Style::default().underlined().blue().bold()
-        } else {
-            Style::default().underlined()
-        };
         frame.render_widget(
-            Span::raw(format!("Standard ({})", LIST.len())).style(title_style),
+            Span::raw(format!("Standard ({})", LIST.len()))
+                .style(self.section_style(Section::Standard)),
             title_area,
         );
         self.list.draw(list_area, frame);
@@ -136,13 +132,19 @@ impl SelectMethodPopup {
 
         // draw custom method
         let (title_area, input_area) = to_section_area(create_area);
-        let title_style = if self.section == Section::Custom {
+        frame.render_widget(
+            Span::raw("Custom").style(self.section_style(Section::Custom)),
+            title_area,
+        );
+        self.custom_input.draw(input_area, frame);
+    }
+
+    fn section_style(&self, section: Section) -> Style {
+        if self.section == section {
             Style::default().underlined().blue().bold()
         } else {
-            Style::default().underlined()
-        };
-        frame.render_widget(Span::raw("Custom").style(title_style), title_area);
-        self.custom_input.draw(input_area, frame);
+            Style::default()
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, _state: &mut PaneState) {

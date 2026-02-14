@@ -6,12 +6,14 @@ use ratatui::{
     Frame,
 };
 use request_bar::RequestBar;
+use request_builder::RequestBuilder;
 use state::PaneState;
 
 use crate::store::models::ProjectModel;
 mod actions;
 mod collections;
 mod request_bar;
+mod request_builder;
 mod state;
 
 pub struct Pane {
@@ -20,6 +22,7 @@ pub struct Pane {
     state: PaneState,
     collection_sidebar: CollectionsSidebar,
     request_bar: RequestBar,
+    request_builder: RequestBuilder,
 }
 
 impl Pane {
@@ -34,6 +37,7 @@ impl Pane {
             ),
             collection_sidebar: CollectionsSidebar::new(),
             request_bar: RequestBar::new(),
+            request_builder: RequestBuilder::new(),
         }
     }
 
@@ -54,8 +58,11 @@ impl Pane {
         match self.state.collections.idx {
             state::ListIdx::None | state::ListIdx::Group(_) => {}
             state::ListIdx::Item(_, _) => {
-                let [bar_area] = Layout::vertical([Constraint::Length(3)]).areas(main_area);
+                let [bar_area, builder_area] =
+                    Layout::vertical([Constraint::Length(3), Constraint::Percentage(40)])
+                        .areas(main_area);
                 self.request_bar.draw(bar_area, frame, &self.state);
+                self.request_builder.draw(builder_area, frame, &self.state);
             }
         }
 
@@ -74,6 +81,9 @@ impl Pane {
             }
             state::SectionFocus::RequestBar => {
                 self.request_bar.handle_key(key, &mut self.state);
+            }
+            state::SectionFocus::RequestBuilder => {
+                self.request_builder.handle_key(key, &mut self.state);
             }
         }
 

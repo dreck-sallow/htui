@@ -1,5 +1,10 @@
-use crate::store::models::{
-    time_as_id, CollectionModel, Environment, HttpMethod, KeyValueParam, RequestModel, TimeId,
+use std::ops::Not;
+
+use crate::{
+    programs::tui_v2::common::list,
+    store::models::{
+        time_as_id, CollectionModel, Environment, HttpMethod, KeyValueParam, RequestModel, TimeId,
+    },
 };
 
 pub struct PaneState {
@@ -30,6 +35,7 @@ impl PaneState {
 pub enum SectionFocus {
     Collections,
     RequestBar,
+    RequestBuilder,
 }
 
 pub struct CollectionsList {
@@ -171,6 +177,7 @@ pub struct Variable {
 
 #[derive(Default)]
 pub struct ParamsTable {
+    pub idx: Option<(usize, usize)>,
     pub items: Vec<ParamItem>,
 }
 
@@ -186,7 +193,34 @@ impl ParamsTable {
             });
         }
 
-        Self { items }
+        let idx = items.is_empty().not().then_some((0, 0));
+        Self { items, idx }
+    }
+
+    pub fn next_row(&mut self) {
+        let row = list::next(self.idx.map(|(i, _)| i), self.items.len());
+        self.idx = row.map(|i| (i, self.idx.map(|(_, i)| i).unwrap_or(0)));
+    }
+
+    pub fn prev_row(&mut self) {
+        let row = list::prev(self.idx.map(|(i, _)| i));
+        self.idx = row.map(|i| (i, self.idx.map(|(_, i)| i).unwrap_or(0)));
+    }
+
+    pub fn next_col(&mut self) {
+        if let Some((row, col)) = self.idx {
+            if col < 2 {
+                self.idx = Some((row, col + 1));
+            }
+        }
+    }
+
+    pub fn prev_col(&mut self) {
+        if let Some((row, col)) = self.idx {
+            if col > 0 {
+                self.idx = Some((row, col - 1));
+            }
+        }
     }
 }
 
@@ -194,4 +228,14 @@ pub struct ParamItem {
     pub enable: bool,
     pub key: String,
     pub value: String,
+}
+
+impl ParamItem {
+    pub fn enable(&mut self) {
+        self.enable = true;
+    }
+
+    pub fn disabled(&mut self) {
+        self.enable = false;
+    }
 }

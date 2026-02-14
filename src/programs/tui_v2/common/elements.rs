@@ -21,6 +21,10 @@ where
         )
 }
 
+pub fn ui_highlight() -> Style {
+    Style::default().fg(Color::Blue)
+}
+
 pub fn ui_placeholder(line: &str) -> PlaceholderLine {
     PlaceholderLine::new(line).with_style(Style::default().dark_gray().italic())
 }
