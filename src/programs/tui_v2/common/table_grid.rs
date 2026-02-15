@@ -46,40 +46,41 @@ impl<const N: usize> UiTableGrid<'_, '_, N> {
             return;
         }
 
-        if let Some((start_page, end_page)) = list::page_list(
+        let page_opt = list::page_list(
             &self.rows,
             self.index_cell.map(|(i, _)| i).unwrap_or(0),
             area.height as usize,
-        ) {
-            let rows = &self.rows[start_page..(end_page + 1)];
-            let row_idx = self
-                .index_cell
-                .map(|(i, _)| list::in_page_cursor(i, area.height as usize))
-                .unwrap_or(end_page + 1);
+        );
+        let rows = page_opt
+            .map(|(start, end)| &self.rows[start..(end + 1)])
+            .unwrap_or(&[]);
 
-            let col_idx = self.index_cell.map(|(_, i)| i).unwrap_or(self.titles.len());
+        let row_idx = self
+            .index_cell
+            .map(|(i, _)| list::in_page_cursor(i, area.height as usize))
+            .unwrap_or(usize::MAX);
+        let col_idx = self.index_cell.map(|(_, i)| i).unwrap_or(self.titles.len());
 
-            for (col, col_area) in self.splits(area).iter().enumerate() {
-                let mut line_area = Rect {
-                    height: 1,
-                    ..*col_area
-                };
-                let title = &self.titles[col];
+        for (col, col_area) in self.splits(area).iter().enumerate() {
+            let mut line_area = Rect {
+                height: 1,
+                ..*col_area
+            };
+            let title = &self.titles[col];
 
-                frame.render_widget(title, line_area);
+            frame.render_widget(title, line_area);
+
+            line_area.y += 1;
+
+            for (row, list) in rows.iter().enumerate() {
+                let itm = &list[col];
+                frame.render_widget(itm, line_area);
+
+                if row_idx == row && col_idx == col {
+                    frame.buffer_mut().set_style(line_area, self.index_style);
+                }
 
                 line_area.y += 1;
-
-                for (row, list) in rows.iter().enumerate() {
-                    let itm = &list[col];
-                    frame.render_widget(itm, line_area);
-
-                    if row_idx == row && col_idx == col {
-                        frame.buffer_mut().set_style(line_area, self.index_style);
-                    }
-
-                    line_area.y += 1;
-                }
             }
         }
     }
@@ -87,7 +88,7 @@ impl<const N: usize> UiTableGrid<'_, '_, N> {
     fn splits(&self, area: Rect) -> [Rect; N] {
         let column_widths = { self.widths.map(|n| (n * (area.width as f32)) as u16) };
 
-        let mut acc_width = 0;
+        let mut acc_width = area.x;
         column_widths.map(|w| {
             let left = acc_width;
             acc_width += w + 1;

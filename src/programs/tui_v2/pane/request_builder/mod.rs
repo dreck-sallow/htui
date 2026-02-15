@@ -1,9 +1,9 @@
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Style, Stylize},
+    style::{Color, Style, Stylize},
     text::Span,
-    widgets::{Borders, Tabs},
+    widgets::{Block, BorderType, Borders, Tabs},
     Frame,
 };
 
@@ -69,7 +69,8 @@ impl RequestBuilder {
 
 impl RequestBuilder {
     pub fn draw(&self, area: Rect, frame: &mut Frame, state: &PaneState) {
-        let block = ui_block("", state.focus == SectionFocus::RequestBuilder);
+        let is_focus = state.focus == SectionFocus::RequestBuilder;
+        let block = ui_block("", is_focus);
         let inner_area = block.inner(area);
 
         let [tabs_area, content_area] =
@@ -84,7 +85,18 @@ impl RequestBuilder {
         ])
         .select(self.tab_idx())
         .highlight_style(ui_highlight())
-        .block(ui_block("", state.focus == SectionFocus::RequestBuilder).borders(Borders::BOTTOM));
+        .block(
+            Block::bordered()
+                .border_type(if is_focus {
+                    BorderType::Thick
+                } else {
+                    BorderType::Plain
+                })
+                .borders(Borders::BOTTOM)
+                .border_style(
+                    Style::default().fg(is_focus.then_some(Color::Blue).unwrap_or(Color::DarkGray)),
+                ),
+        );
 
         frame.render_widget(tabs, tabs_area);
 
