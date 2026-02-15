@@ -64,7 +64,7 @@ pub fn delete_element<E>(current_idx: Option<usize>, list: &mut Vec<E>) -> Optio
     match current_idx {
         Some(idx) => {
             list.remove(idx);
-            self::clamp_index(current_idx, list.len())
+            clamp_index(current_idx, list.len())
         }
         None => None,
     }

@@ -71,12 +71,21 @@ impl CollectionsList {
 
         Self { items, idx }
     }
+
     pub fn size(&self) -> usize {
         self.items.len()
     }
 
     pub fn list(&self) -> &Vec<CollectionItem> {
         &self.items
+    }
+
+    pub fn current_req_mut(&mut self) -> Option<&mut RequestItem> {
+        if let ListIdx::Item(i, sub_i) = self.idx {
+            return self.items[i].requests.get_mut(sub_i);
+        }
+
+        None
     }
 }
 
@@ -197,6 +206,40 @@ impl ParamsTable {
         Self { items, idx }
     }
 
+    pub fn current(&self) -> Option<&ParamItem> {
+        self.idx.and_then(|(i, _)| self.items.get(i))
+    }
+
+    pub fn current_mut(&mut self) -> Option<&mut ParamItem> {
+        self.idx.and_then(|(i, _)| self.items.get_mut(i))
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn delete(&mut self, n: usize) -> ParamItem {
+        let itm = self.items.remove(n);
+
+        if let Some((i, sub_i)) = self.idx {
+            self.idx = list::clamp_index(Some(i), self.items.len()).map(|i| (i, sub_i));
+        }
+
+        itm
+    }
+
+    pub fn delete_current(&mut self) -> Option<ParamItem> {
+        self.idx.and_then(|(i, _)| Some(self.delete(i)))
+    }
+
+    pub fn add_item(&mut self, itm: ParamItem) {
+        self.items.push(itm);
+
+        if self.idx.is_none() {
+            self.idx = Some((0, 0));
+        }
+    }
+
     pub fn next_row(&mut self) {
         let row = list::next(self.idx.map(|(i, _)| i), self.items.len());
         self.idx = row.map(|i| (i, self.idx.map(|(_, i)| i).unwrap_or(0)));
@@ -231,11 +274,31 @@ pub struct ParamItem {
 }
 
 impl ParamItem {
-    pub fn enable(&mut self) {
-        self.enable = true;
+    pub fn new(key: String, value: String) -> Self {
+        Self {
+            enable: true,
+            key,
+            value,
+        }
     }
 
-    pub fn disabled(&mut self) {
-        self.enable = false;
+    pub fn empty() -> Self {
+        Self {
+            enable: true,
+            key: "".into(),
+            value: "".into(),
+        }
+    }
+
+    // pub fn enable(&mut self) {
+    //     self.enable = true;
+    // }
+
+    // pub fn disabled(&mut self) {
+    //     self.enable = false;
+    // }
+
+    pub fn toggle_enable(&mut self) {
+        self.enable = !self.enable;
     }
 }
