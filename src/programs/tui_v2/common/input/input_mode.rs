@@ -3,11 +3,33 @@ use ratatui::{layout::Rect, text::Line, Frame};
 
 use crate::programs::tui_v2::common::placeholder::PlaceholderLine;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Mode {
     Insert,
     Normal,
     Readonly,
+}
+
+impl Mode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Mode::Insert => "Insert",
+            Mode::Normal => "Normal",
+            Mode::Readonly => "Readonly",
+        }
+    }
+
+    pub fn is_insert(&self) -> bool {
+        matches!(self, Self::Insert)
+    }
+
+    pub fn is_normal(&self) -> bool {
+        matches!(self, Self::Normal)
+    }
+
+    pub fn is_readonly(&self) -> bool {
+        matches!(self, Self::Readonly)
+    }
 }
 
 pub struct InputMode {

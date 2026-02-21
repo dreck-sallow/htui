@@ -3,7 +3,8 @@ use std::ops::Not;
 use crate::{
     programs::tui_v2::common::list,
     store::models::{
-        time_as_id, CollectionModel, Environment, HttpMethod, KeyValueParam, RequestModel, TimeId,
+        time_as_id, CollectionModel, Environment, HttpMethod, KeyValueParam, RequestBody,
+        RequestModel, TimeId,
     },
 };
 
@@ -122,7 +123,7 @@ pub struct RequestItem {
     pub headers: ParamsTable,
     pub params: ParamsTable,
     pub method: HttpMethod,
-    // pub body: RequestBody,
+    pub body: BodyContent, // pub body: RequestBody,
 }
 
 impl RequestItem {
@@ -134,6 +135,7 @@ impl RequestItem {
             headers: ParamsTable::default(),
             params: ParamsTable::default(),
             method: HttpMethod::Get,
+            body: BodyContent::None,
         }
     }
 
@@ -145,6 +147,27 @@ impl RequestItem {
             headers: ParamsTable::from_model(model.headers),
             params: ParamsTable::from_model(model.params),
             method: model.method,
+            body: BodyContent::from_model(model.body),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum BodyContent {
+    None,
+    File(String),
+    Form(ParamsTable),
+    Text(String),
+}
+
+impl BodyContent {
+    pub fn from_model(body: RequestBody) -> Self {
+        match body {
+            RequestBody::None => Self::None,
+            RequestBody::Text(st) => Self::Text(st),
+            RequestBody::Json(value) => Self::Text(value.to_string()),
+            RequestBody::FormUrlEncoded(_) => Self::None,
+            RequestBody::FormData(_) => Self::None,
         }
     }
 }
@@ -184,7 +207,7 @@ pub struct Variable {
     pub value: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ParamsTable {
     pub idx: Option<(usize, usize)>,
     pub items: Vec<ParamItem>,
@@ -267,6 +290,7 @@ impl ParamsTable {
     }
 }
 
+#[derive(Clone)]
 pub struct ParamItem {
     pub enable: bool,
     pub key: String,

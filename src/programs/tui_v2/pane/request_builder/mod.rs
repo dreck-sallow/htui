@@ -1,3 +1,4 @@
+use body_editor::BodyEditor;
 use crossterm::event::KeyEvent;
 use edit_param_table::EditParamTablePopup;
 use ratatui::{
@@ -13,8 +14,9 @@ use crate::programs::tui_v2::common::{
     table_grid::UiTableGrid,
 };
 
-use super::state::{ListIdx, PaneState, ParamItem, ParamsTable, SectionFocus};
+use super::state::{BodyContent, ListIdx, PaneState, ParamItem, ParamsTable, SectionFocus};
 
+mod body_editor;
 mod edit_param_table;
 
 #[derive(PartialEq, Eq)]
@@ -37,6 +39,7 @@ impl Section {
 pub struct RequestBuilder {
     section: Section,
     edit_param_popup: EditParamTablePopup,
+    body_editor: BodyEditor,
 }
 
 impl RequestBuilder {
@@ -44,6 +47,7 @@ impl RequestBuilder {
         Self {
             section: Section::Headers,
             edit_param_popup: EditParamTablePopup::new(),
+            body_editor: BodyEditor::new(),
         }
     }
 
@@ -73,6 +77,10 @@ impl RequestBuilder {
 
     fn is_editing(&self) -> bool {
         self.edit_param_popup.is_visible()
+    }
+
+    pub fn sync(&mut self, state: &mut PaneState) {
+        self.body_editor.sync(state);
     }
 }
 
@@ -119,7 +127,9 @@ impl RequestBuilder {
                     params_to_ui(&request.params).draw(content_area, frame);
                 }
                 Section::Headers => params_to_ui(&request.headers).draw(content_area, frame),
-                Section::Body => {}
+                Section::Body => {
+                    self.body_editor.draw(content_area, frame);
+                }
             }
         }
     }
@@ -128,6 +138,7 @@ impl RequestBuilder {
         if self.edit_param_popup.is_visible() {
             self.edit_param_popup.draw(frame);
         }
+        self.body_editor.draw_overlay(frame);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
@@ -149,7 +160,7 @@ impl RequestBuilder {
                     match self.section {
                         Section::Headers => self.handle_table_key(key, &mut request.headers),
                         Section::Params => self.handle_table_key(key, &mut request.params),
-                        Section::Body => self.handle_body_key(key),
+                        Section::Body => self.handle_body_key(key, &mut request.body),
                     }
                 }
             }
@@ -194,7 +205,9 @@ impl RequestBuilder {
         }
     }
 
-    fn handle_body_key(&mut self, key: KeyEvent) {}
+    fn handle_body_key(&mut self, key: KeyEvent, state: &mut BodyContent) {
+        self.body_editor.handle_key(key, state);
+    }
 }
 
 fn params_to_ui(params: &ParamsTable) -> UiTableGrid<'_, '_, 3> {

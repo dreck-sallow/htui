@@ -92,6 +92,7 @@ impl Pane {
             match effect {
                 actions::PaneActionEffect::ChangeIdx => {
                     self.request_bar.sync(&mut self.state);
+                    self.request_builder.sync(&mut self.state);
                 }
             }
         }
