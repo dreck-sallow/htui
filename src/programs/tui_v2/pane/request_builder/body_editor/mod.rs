@@ -1,8 +1,10 @@
 use crossterm::event::{KeyEvent, KeyModifiers};
+use form_editor::{FormDataEditor, FormUrlEncodedEditor};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Stylize,
     text::Span,
+    widgets::Clear,
     Frame,
 };
 use text_editor::TextEditor;
@@ -22,7 +24,8 @@ mod text_editor;
 enum TypeEditor {
     None(NoneEditor),
     Text(TextEditor),
-    Form,
+    FormData(FormDataEditor),
+    FormUrlEncoded(FormUrlEncodedEditor),
     File,
 }
 
@@ -36,7 +39,8 @@ impl TypeEditor {
         match self {
             TypeEditor::None(_) => PlainBodyType::None,
             TypeEditor::Text(_) => PlainBodyType::Text,
-            TypeEditor::Form => PlainBodyType::Form,
+            TypeEditor::FormData(_) => PlainBodyType::FormData,
+            TypeEditor::FormUrlEncoded(_) => PlainBodyType::FormUrlEncoded,
             TypeEditor::File => PlainBodyType::File,
         }
     }
@@ -45,7 +49,10 @@ impl TypeEditor {
         match plain {
             PlainBodyType::None => TypeEditor::none(),
             PlainBodyType::Text => TypeEditor::Text(TextEditor::new()),
-            PlainBodyType::Form => TypeEditor::Form,
+            PlainBodyType::FormData => TypeEditor::FormData(FormDataEditor::default()),
+            PlainBodyType::FormUrlEncoded => {
+                TypeEditor::FormUrlEncoded(FormUrlEncodedEditor::default())
+            }
             PlainBodyType::File => TypeEditor::File,
         }
     }
@@ -54,7 +61,10 @@ impl TypeEditor {
         match body {
             BodyContent::None => TypeEditor::none(),
             BodyContent::File(_) => TypeEditor::none(),
-            BodyContent::Form(_) => TypeEditor::none(),
+            BodyContent::FormUrlEncoded(params) => {
+                TypeEditor::FormUrlEncoded(FormUrlEncodedEditor::new(params.clone()))
+            }
+            BodyContent::FormData(data) => TypeEditor::FormData(FormDataEditor::new(data.clone())),
             BodyContent::Text(st) => {
                 let mut editor = TextEditor::new();
                 editor.set_content(st);
@@ -64,6 +74,14 @@ impl TypeEditor {
     }
 }
 
+const BODY_LIST: [PlainBodyType; 5] = [
+    PlainBodyType::None,
+    PlainBodyType::Text,
+    PlainBodyType::FormData,
+    PlainBodyType::FormUrlEncoded,
+    PlainBodyType::File,
+];
+
 pub struct BodyEditor {
     editor: TypeEditor,
     select: SelectList<PlainBodyType>,
@@ -72,12 +90,7 @@ pub struct BodyEditor {
 
 impl BodyEditor {
     pub fn new() -> Self {
-        let mut select = SelectList::new(&[
-            PlainBodyType::None,
-            PlainBodyType::Text,
-            PlainBodyType::Form,
-            PlainBodyType::File,
-        ]);
+        let mut select = SelectList::new(&BODY_LIST);
         select.select(&PlainBodyType::None);
 
         Self {
@@ -107,7 +120,12 @@ impl BodyEditor {
             TypeEditor::Text(e) => {
                 e.draw(editor_area, frame);
             }
-            TypeEditor::Form => {}
+            TypeEditor::FormData(e) => {
+                e.draw(editor_area, frame);
+            }
+            TypeEditor::FormUrlEncoded(e) => {
+                e.draw(editor_area, frame);
+            }
             TypeEditor::File => {}
         }
 
@@ -121,12 +139,13 @@ impl BodyEditor {
         if self.show_select {
             let area = center_area(
                 frame.area(),
-                Constraint::Length(6),
+                Constraint::Length(BODY_LIST.len() as u16 + 2),
                 Constraint::Percentage(40),
             );
             let block = ui_block(" Select body type", true);
             let inner_area = block.inner(area);
 
+            frame.render_widget(Clear, area);
             frame.render_widget(block, area);
             self.select.draw(inner_area, frame);
         }
@@ -147,6 +166,7 @@ impl BodyEditor {
                 }
                 crossterm::event::KeyCode::Esc => {
                     self.select.select(&self.editor.as_plain());
+                    self.show_select = false;
                 }
                 _ => {
                     self.select.handle_key(key);
@@ -160,7 +180,8 @@ impl BodyEditor {
                 _ => match &mut self.editor {
                     TypeEditor::None(_) => {}
                     TypeEditor::Text(e) => e.handle_key(key),
-                    TypeEditor::Form => {}
+                    TypeEditor::FormData(e) => {}
+                    TypeEditor::FormUrlEncoded(e) => {}
                     TypeEditor::File => {}
                 },
             }
@@ -180,7 +201,8 @@ impl NoneEditor {
 enum PlainBodyType {
     None,
     Text,
-    Form,
+    FormData,
+    FormUrlEncoded,
     File,
 }
 
@@ -189,7 +211,8 @@ impl PlainBodyType {
         match body {
             BodyContent::None => Self::None,
             BodyContent::File(_) => Self::File,
-            BodyContent::Form(_) => Self::Form,
+            BodyContent::FormData(_) => Self::FormData,
+            BodyContent::FormUrlEncoded(_) => Self::FormUrlEncoded,
             BodyContent::Text(_) => Self::Text,
         }
     }
@@ -200,7 +223,8 @@ impl ToString for PlainBodyType {
         let raw = match self {
             Self::None => "None",
             Self::Text => "Text",
-            Self::Form => "Form",
+            Self::FormData => "Form (multipart)",
+            Self::FormUrlEncoded => "Form (url-encoded)",
             Self::File => "File",
         };
 

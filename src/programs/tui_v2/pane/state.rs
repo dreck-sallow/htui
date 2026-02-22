@@ -1,10 +1,13 @@
-use std::ops::Not;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Not,
+};
 
 use crate::{
     programs::tui_v2::common::list,
     store::models::{
-        time_as_id, CollectionModel, Environment, HttpMethod, KeyValueParam, RequestBody,
-        RequestModel, TimeId,
+        time_as_id, CollectionModel, Environment, FormParam, HttpMethod, KeyValueParam,
+        RequestBody, RequestModel, TimeId,
     },
 };
 
@@ -156,7 +159,8 @@ impl RequestItem {
 pub enum BodyContent {
     None,
     File(String),
-    Form(ParamsTable),
+    FormUrlEncoded(ParamsTable),
+    FormData(BodyForm),
     Text(String),
 }
 
@@ -166,8 +170,10 @@ impl BodyContent {
             RequestBody::None => Self::None,
             RequestBody::Text(st) => Self::Text(st),
             RequestBody::Json(value) => Self::Text(value.to_string()),
-            RequestBody::FormUrlEncoded(_) => Self::None,
-            RequestBody::FormData(_) => Self::None,
+            RequestBody::FormUrlEncoded(values) => {
+                Self::FormUrlEncoded(ParamsTable::from_model(values))
+            }
+            RequestBody::FormData(params) => Self::FormData(BodyForm::from_model(params)),
         }
     }
 }
@@ -324,5 +330,40 @@ impl ParamItem {
 
     pub fn toggle_enable(&mut self) {
         self.enable = !self.enable;
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct BodyForm {
+    pub idx: Option<(usize, usize)>,
+    pub items: Vec<ParamItem>,
+    pub are_files: HashSet<usize>,
+}
+
+impl BodyForm {
+    pub fn from_model(model: Vec<FormParam>) -> Self {
+        let mut items = Vec::with_capacity(model.len());
+        let mut files_set = HashSet::new();
+
+        let mut i = 0;
+        for param in model {
+            if param.is_file {
+                files_set.insert(i);
+            }
+
+            items.push(ParamItem {
+                enable: true,
+                key: param.key,
+                value: param.value,
+            });
+            i += 1;
+        }
+
+        let idx = items.is_empty().not().then_some((0, 0));
+        Self {
+            items,
+            idx,
+            are_files: files_set,
+        }
     }
 }

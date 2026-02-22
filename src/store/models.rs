@@ -99,12 +99,14 @@ pub enum RequestBody {
     None,
     Text(String),
     Json(serde_json::Value),
-    FormUrlEncoded(Vec<(String, String)>),
+    FormUrlEncoded(Vec<KeyValueParam>),
     FormData(Vec<FormParam>),
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct FormParam {
+    #[serde(default)]
+    pub enable: bool,
     pub value: String,
     pub key: String,
     pub is_file: bool,

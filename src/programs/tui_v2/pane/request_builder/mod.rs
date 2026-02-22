@@ -210,7 +210,7 @@ impl RequestBuilder {
     }
 }
 
-fn params_to_ui(params: &ParamsTable) -> UiTableGrid<'_, '_, 3> {
+pub fn params_to_ui(params: &ParamsTable) -> UiTableGrid<'_, '_, 3> {
     UiTableGrid::new(
         ["Enable".blue(), "Header Name".blue(), "Header Value".blue()],
         [0.2, 0.4, 0.4],
