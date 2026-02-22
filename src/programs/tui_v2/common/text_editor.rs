@@ -78,20 +78,8 @@ impl TextEditor {
 
     pub fn handle_key(&mut self, key: KeyEvent) {
         let new_mode = match key.code {
-            KeyCode::Esc => {
-                if self.mode.is_readonly() {
-                    None
-                } else {
-                    Some(Mode::Normal)
-                }
-            }
-            KeyCode::Char('i') => {
-                if self.mode.is_insert() {
-                    Some(Mode::Normal)
-                } else {
-                    None
-                }
-            }
+            KeyCode::Esc => self.mode.is_insert().then_some(Mode::Normal),
+            KeyCode::Char('i') => self.mode.is_normal().then_some(Mode::Insert),
             _ => None,
         };
 
