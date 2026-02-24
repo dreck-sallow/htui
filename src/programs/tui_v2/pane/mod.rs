@@ -12,6 +12,7 @@ use state::PaneState;
 use crate::store::models::ProjectModel;
 mod actions;
 mod collections;
+mod common;
 mod request_bar;
 mod request_builder;
 mod state;

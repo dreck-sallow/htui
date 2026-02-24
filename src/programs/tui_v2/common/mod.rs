@@ -1,6 +1,7 @@
 pub mod elements;
 pub mod input;
 pub mod list;
+pub mod overlays;
 pub mod placeholder;
 pub mod select_list;
 pub mod table_grid;
