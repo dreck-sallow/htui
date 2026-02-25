@@ -1,20 +1,18 @@
 use body_editor::BodyEditor;
 use crossterm::event::KeyEvent;
-use edit_param_table::EditParamTablePopup;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Color, Style, Stylize},
-    text::Span,
+    style::{Color, Style},
     widgets::{Block, BorderType, Borders, Tabs},
     Frame,
 };
 
-use crate::programs::tui_v2::common::{
-    elements::{ui_block, ui_highlight},
-    table_grid::UiTableGrid,
-};
+use crate::programs::tui_v2::common::elements::{ui_block, ui_highlight};
 
-use super::state::{BodyContent, ListIdx, PaneState, ParamItem, ParamsTable, SectionFocus};
+use super::{
+    common::params_table::ParamsTableUi,
+    state::{BodyContent, ListIdx, PaneState, ParamsTable, SectionFocus},
+};
 
 mod body_editor;
 mod edit_param_table;
@@ -38,7 +36,7 @@ impl Section {
 
 pub struct RequestBuilder {
     section: Section,
-    edit_param_popup: EditParamTablePopup,
+    params_table_ui: ParamsTableUi,
     body_editor: BodyEditor,
 }
 
@@ -46,7 +44,7 @@ impl RequestBuilder {
     pub fn new() -> Self {
         Self {
             section: Section::Headers,
-            edit_param_popup: EditParamTablePopup::new(),
+            params_table_ui: ParamsTableUi::new(),
             body_editor: BodyEditor::new(),
         }
     }
@@ -76,7 +74,7 @@ impl RequestBuilder {
     }
 
     fn is_editing(&self) -> bool {
-        self.edit_param_popup.is_visible()
+        self.params_table_ui.is_editing()
     }
 
     pub fn sync(&mut self, state: &mut PaneState) {
@@ -124,9 +122,13 @@ impl RequestBuilder {
 
             match self.section {
                 Section::Params => {
-                    params_to_ui(&request.params).draw(content_area, frame);
+                    self.params_table_ui
+                        .draw(&request.params, content_area, frame);
                 }
-                Section::Headers => params_to_ui(&request.headers).draw(content_area, frame),
+                Section::Headers => {
+                    self.params_table_ui
+                        .draw(&request.headers, content_area, frame)
+                }
                 Section::Body => {
                     self.body_editor.draw(content_area, frame);
                 }
@@ -135,9 +137,7 @@ impl RequestBuilder {
     }
 
     pub fn draw_overlay(&self, frame: &mut Frame) {
-        if self.edit_param_popup.is_visible() {
-            self.edit_param_popup.draw(frame);
-        }
+        self.params_table_ui.draw_overlay(frame);
         self.body_editor.draw_overlay(frame);
     }
 
@@ -168,67 +168,10 @@ impl RequestBuilder {
     }
 
     fn handle_table_key(&mut self, key: KeyEvent, table: &mut ParamsTable) {
-        if self.edit_param_popup.is_visible() {
-            self.edit_param_popup.handle_key(key, table);
-        } else {
-            match key.code {
-                crossterm::event::KeyCode::Char(ch) => match ch {
-                    'j' => table.next_row(),
-                    'k' => table.prev_row(),
-                    'h' => table.prev_col(),
-                    'l' => table.next_col(),
-                    'n' => table.add_item(ParamItem::empty()),
-                    'd' => {
-                        table.delete_current();
-                    }
-                    'e' => {
-                        let idx = table.idx.clone();
-                        if let Some(itm) = table.current_mut() {
-                            match idx.unwrap().1 {
-                                0 => {
-                                    itm.toggle_enable();
-                                }
-                                1 => {
-                                    self.edit_param_popup.edit_key(&itm.key);
-                                }
-                                2 => {
-                                    self.edit_param_popup.edit_value(&itm.value);
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-        }
+        self.params_table_ui.handle_table_key(key, table);
     }
 
     fn handle_body_key(&mut self, key: KeyEvent, state: &mut BodyContent) {
         self.body_editor.handle_key(key, state);
     }
-}
-
-pub fn params_to_ui(params: &ParamsTable) -> UiTableGrid<'_, '_, 3> {
-    UiTableGrid::new(
-        ["Enable".blue(), "Header Name".blue(), "Header Value".blue()],
-        [0.2, 0.4, 0.4],
-    )
-    .with_rows(
-        params
-            .items
-            .iter()
-            .map(|p| {
-                {
-                    [
-                        Span::raw(if p.enable { "Yes" } else { "No" }),
-                        Span::raw(if p.key.len() > 1 { &p.key } else { "-" }),
-                        Span::raw(if p.value.len() > 1 { &p.value } else { "-" }),
-                    ]
-                }
-            })
-            .collect(),
-    )
-    .with_index(params.idx, Style::default().on_dark_gray())
 }

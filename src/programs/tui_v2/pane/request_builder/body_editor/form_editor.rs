@@ -9,7 +9,8 @@ use ratatui::{
 use crate::programs::tui_v2::{
     common::table_grid::UiTableGrid,
     pane::{
-        request_builder::{edit_param_table::EditParamTablePopup, params_to_ui},
+        common::params_table::params_to_ui,
+        request_builder::edit_param_table::EditParamTablePopup,
         state::{BodyForm, ParamItem, ParamsTable},
     },
 };

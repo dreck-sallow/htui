@@ -28,6 +28,10 @@ impl EditParamTablePopup {
         self.popup_input.is_visible()
     }
 
+    pub fn is_editing(&self) -> bool {
+        self.popup_input.is_editing()
+    }
+
     pub fn edit_key(&mut self, value: &str) {
         self.param_field = ParamField::Key;
         self.popup_input.show(value);

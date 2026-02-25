@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Not,
-};
+use std::{collections::HashSet, ops::Not};
 
 use crate::{
     programs::tui_v2::common::list,
