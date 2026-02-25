@@ -1,5 +1,6 @@
 use crossterm::event::{KeyEvent, KeyModifiers};
-use form_editor::{FormDataEditor, FormUrlEncodedEditor};
+use form_data_editor::FormDataEditor;
+use form_urlencoded_editor::FormUrlEncodedEditor;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::Stylize,
@@ -18,7 +19,8 @@ use crate::programs::tui_v2::{
 };
 
 mod file_editor;
-mod form_editor;
+mod form_data_editor;
+mod form_urlencoded_editor;
 mod text_editor;
 
 enum TypeEditor {
@@ -149,6 +151,18 @@ impl BodyEditor {
             frame.render_widget(block, area);
             self.select.draw(inner_area, frame);
         }
+
+        match &self.editor {
+            TypeEditor::None(_) => {}
+            TypeEditor::Text(_) => {}
+            TypeEditor::FormData(_) => {
+                // e.draw(editor_area, frame);
+            }
+            TypeEditor::FormUrlEncoded(e) => {
+                e.draw_overlay(frame);
+            }
+            TypeEditor::File => {}
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, body: &mut BodyContent) {
@@ -181,7 +195,7 @@ impl BodyEditor {
                     TypeEditor::None(_) => {}
                     TypeEditor::Text(e) => e.handle_key(key),
                     TypeEditor::FormData(e) => {}
-                    TypeEditor::FormUrlEncoded(e) => {}
+                    TypeEditor::FormUrlEncoded(e) => e.handle_key(key),
                     TypeEditor::File => {}
                 },
             }

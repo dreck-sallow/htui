@@ -47,13 +47,13 @@ impl PopupInput {
 }
 
 impl PopupInput {
-    pub fn draw(&self, title: &str, area: Rect, frame: &mut Frame) {
-        let block = ui_block(title, true);
-        let inner_area = block.inner(area);
+    // pub fn draw(&self, title: &str, area: Rect, frame: &mut Frame) {
+    //     let block = ui_block(title, true);
+    //     let inner_area = block.inner(area);
 
-        frame.render_widget(block, area);
-        self.input.draw(inner_area, frame);
-    }
+    //     frame.render_widget(block, area);
+    //     self.input.draw(inner_area, frame);
+    // }
 
     pub fn draw_center(&self, title: &str, area: CenterArea, frame: &mut Frame) {
         let area = center_area(frame.area(), area.height, area.width);
