@@ -74,6 +74,7 @@ impl InputMode {
 
     pub fn replace(&mut self, txt: &str) {
         self.input.extend(txt.chars());
+        self.move_end_cursor();
     }
 
     pub fn reset(&mut self) {

@@ -1,9 +1,5 @@
 use crossterm::event::KeyEvent;
-use ratatui::{
-    layout::{Constraint, Rect},
-    widgets::Clear,
-    Frame,
-};
+use ratatui::{layout::Constraint, widgets::Clear, Frame};
 
 use crate::programs::tui_v2::common::{
     elements::{ui_block, utils::center_area},
