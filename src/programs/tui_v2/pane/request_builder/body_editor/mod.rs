@@ -15,6 +15,7 @@ use crate::programs::tui_v2::{
         elements::{ui_block, ui_placeholder, utils::center_area},
         select_list::SelectList,
     },
+    events::DrawSignal,
     pane::state::{BodyContent, PaneState},
 };
 
@@ -47,11 +48,13 @@ impl TypeEditor {
         }
     }
 
-    pub fn from_plain(plain: PlainBodyType) -> Self {
+    pub fn from_plain(plain: PlainBodyType, draw_signal: DrawSignal) -> Self {
         match plain {
             PlainBodyType::None => TypeEditor::none(),
             PlainBodyType::Text => TypeEditor::Text(TextEditor::new()),
-            PlainBodyType::FormData => TypeEditor::FormData(FormDataEditor::default()),
+            PlainBodyType::FormData => {
+                TypeEditor::FormData(FormDataEditor::from_default(draw_signal))
+            }
             PlainBodyType::FormUrlEncoded => {
                 TypeEditor::FormUrlEncoded(FormUrlEncodedEditor::default())
             }
@@ -59,14 +62,16 @@ impl TypeEditor {
         }
     }
 
-    pub fn from_state(body: &BodyContent) -> Self {
+    pub fn from_state(body: &BodyContent, draw_signal: DrawSignal) -> Self {
         match body {
             BodyContent::None => TypeEditor::none(),
             BodyContent::File(_) => TypeEditor::none(),
             BodyContent::FormUrlEncoded(params) => {
                 TypeEditor::FormUrlEncoded(FormUrlEncodedEditor::new(params.clone()))
             }
-            BodyContent::FormData(data) => TypeEditor::FormData(FormDataEditor::new(data.clone())),
+            BodyContent::FormData(data) => {
+                TypeEditor::FormData(FormDataEditor::new(data.clone(), draw_signal))
+            }
             BodyContent::Text(st) => {
                 let mut editor = TextEditor::new();
                 editor.set_content(st);
@@ -88,10 +93,11 @@ pub struct BodyEditor {
     editor: TypeEditor,
     select: SelectList<PlainBodyType>,
     show_select: bool,
+    _draw_signal: DrawSignal,
 }
 
 impl BodyEditor {
-    pub fn new() -> Self {
+    pub fn new(draw_signal: DrawSignal) -> Self {
         let mut select = SelectList::new(&BODY_LIST);
         select.select(&PlainBodyType::None);
 
@@ -99,12 +105,13 @@ impl BodyEditor {
             editor: TypeEditor::None(NoneEditor),
             select,
             show_select: false,
+            _draw_signal: draw_signal,
         }
     }
 
     pub fn sync(&mut self, state: &mut PaneState) {
         if let Some(req) = state.collections.current_req_mut() {
-            self.editor = TypeEditor::from_state(&req.body);
+            self.editor = TypeEditor::from_state(&req.body, self._draw_signal.clone());
             self.select.select(&PlainBodyType::from_model(&req.body));
         }
     }
@@ -155,8 +162,8 @@ impl BodyEditor {
         match &self.editor {
             TypeEditor::None(_) => {}
             TypeEditor::Text(_) => {}
-            TypeEditor::FormData(_) => {
-                // e.draw(editor_area, frame);
+            TypeEditor::FormData(e) => {
+                e.draw_overlay(frame);
             }
             TypeEditor::FormUrlEncoded(e) => {
                 e.draw_overlay(frame);
@@ -165,16 +172,16 @@ impl BodyEditor {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, body: &mut BodyContent) {
+    pub async fn handle_key(&mut self, key: KeyEvent, body: &mut BodyContent) {
         if self.show_select {
             match key.code {
                 crossterm::event::KeyCode::Enter => {
                     let selected = self.select.selected().unwrap();
 
                     if *selected == PlainBodyType::from_model(&body) {
-                        self.editor = TypeEditor::from_state(&body)
+                        self.editor = TypeEditor::from_state(&body, self._draw_signal.clone())
                     } else {
-                        self.editor = TypeEditor::from_plain(*selected);
+                        self.editor = TypeEditor::from_plain(*selected, self._draw_signal.clone());
                     }
                     self.show_select = false;
                 }
@@ -194,7 +201,7 @@ impl BodyEditor {
                 _ => match &mut self.editor {
                     TypeEditor::None(_) => {}
                     TypeEditor::Text(e) => e.handle_key(key),
-                    TypeEditor::FormData(e) => {}
+                    TypeEditor::FormData(e) => e.handle_key(key).await,
                     TypeEditor::FormUrlEncoded(e) => e.handle_key(key),
                     TypeEditor::File => {}
                 },

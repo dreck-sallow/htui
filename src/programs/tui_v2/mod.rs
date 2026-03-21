@@ -16,7 +16,7 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
     let mut terminal = ratatui::init();
 
     let mut app = TuiApp::default();
-    app.add_project(project);
+    app.add_project(project, draw_signal.clone());
 
     events.start();
     while let Some(ev) = events.next_event().await {
@@ -31,7 +31,7 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
                 break;
             }
             events::EventMsg::Key(key_event) => {
-                let should_continue = app.handle_key(key_event, draw_signal.clone());
+                let should_continue = app.handle_key(key_event).await;
                 terminal.draw(|frame| {
                     app.handle_draw(frame);
                 })?;

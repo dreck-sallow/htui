@@ -17,8 +17,8 @@ pub struct TuiApp {
 }
 
 impl TuiApp {
-    pub fn add_project(&mut self, project: ProjectModel) {
-        let pane = Pane::from_project(project);
+    pub fn add_project(&mut self, project: ProjectModel, draw_signal: DrawSignal) {
+        let pane = Pane::from_project(project, draw_signal);
 
         self.panes.push(pane);
 
@@ -49,7 +49,7 @@ impl TuiApp {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, draw_signal: DrawSignal) -> bool {
+    pub async fn handle_key(&mut self, key: KeyEvent) -> bool {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 crossterm::event::KeyCode::Char(ch) => {
@@ -62,7 +62,7 @@ impl TuiApp {
 
             // Draw the current selected pane
             if let Some(pane) = self.selected.and_then(|i| self.panes.get_mut(i)) {
-                pane.handle_key(key);
+                pane.handle_key(key).await;
             }
         }
 

@@ -357,10 +357,67 @@ impl BodyForm {
         }
 
         let idx = items.is_empty().not().then_some((0, 0));
+
         Self {
             items,
             idx,
             are_files: files_set,
+        }
+    }
+
+    pub fn current_mut(&mut self) -> Option<&mut ParamItem> {
+        self.idx.and_then(|(i, _)| self.items.get_mut(i))
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn delete(&mut self, n: usize) -> ParamItem {
+        let itm = self.items.remove(n);
+
+        if let Some((i, sub_i)) = self.idx {
+            self.idx = list::clamp_index(Some(i), self.items.len()).map(|i| (i, sub_i));
+        }
+
+        itm
+    }
+
+    pub fn delete_current(&mut self) -> Option<ParamItem> {
+        self.idx.and_then(|(i, _)| Some(self.delete(i)))
+    }
+
+    pub fn add_item(&mut self, itm: ParamItem) {
+        self.items.push(itm);
+
+        if self.idx.is_none() {
+            self.idx = Some((0, 0));
+        }
+    }
+
+    pub fn next_row(&mut self) {
+        let row = list::next(self.idx.map(|(i, _)| i), self.items.len());
+        self.idx = row.map(|i| (i, self.idx.map(|(_, i)| i).unwrap_or(0)));
+    }
+
+    pub fn prev_row(&mut self) {
+        let row = list::prev(self.idx.map(|(i, _)| i));
+        self.idx = row.map(|i| (i, self.idx.map(|(_, i)| i).unwrap_or(0)));
+    }
+
+    pub fn next_col(&mut self) {
+        if let Some((row, col)) = self.idx {
+            if col < 2 {
+                self.idx = Some((row, col + 1));
+            }
+        }
+    }
+
+    pub fn prev_col(&mut self) {
+        if let Some((row, col)) = self.idx {
+            if col > 0 {
+                self.idx = Some((row, col - 1));
+            }
         }
     }
 }

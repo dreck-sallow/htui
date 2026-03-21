@@ -7,7 +7,10 @@ use ratatui::{
     Frame,
 };
 
-use crate::programs::tui_v2::common::elements::{ui_block, ui_highlight};
+use crate::programs::tui_v2::{
+    common::elements::{ui_block, ui_highlight},
+    events::DrawSignal,
+};
 
 use super::{
     common::params_table::ParamsTableUi,
@@ -41,11 +44,11 @@ pub struct RequestBuilder {
 }
 
 impl RequestBuilder {
-    pub fn new() -> Self {
+    pub fn new(draw_signal: DrawSignal) -> Self {
         Self {
             section: Section::Headers,
             params_table_ui: ParamsTableUi::new(),
-            body_editor: BodyEditor::new(),
+            body_editor: BodyEditor::new(draw_signal),
         }
     }
 
@@ -141,7 +144,7 @@ impl RequestBuilder {
         self.body_editor.draw_overlay(frame);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
+    pub async fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
         match key.code {
             crossterm::event::KeyCode::Left if !self.is_editing() => {
                 self.prev_tab();
@@ -160,7 +163,7 @@ impl RequestBuilder {
                     match self.section {
                         Section::Headers => self.handle_table_key(key, &mut request.headers),
                         Section::Params => self.handle_table_key(key, &mut request.params),
-                        Section::Body => self.handle_body_key(key, &mut request.body),
+                        Section::Body => self.handle_body_key(key, &mut request.body).await,
                     }
                 }
             }
@@ -171,7 +174,7 @@ impl RequestBuilder {
         self.params_table_ui.handle_table_key(key, table);
     }
 
-    fn handle_body_key(&mut self, key: KeyEvent, state: &mut BodyContent) {
-        self.body_editor.handle_key(key, state);
+    async fn handle_body_key(&mut self, key: KeyEvent, state: &mut BodyContent) {
+        self.body_editor.handle_key(key, state).await;
     }
 }

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::Rect,
@@ -6,21 +8,38 @@ use ratatui::{
     Frame,
 };
 
-use crate::programs::tui_v2::{common::table_grid::UiTableGrid, pane::state::BodyForm};
+use crate::programs::tui_v2::{
+    common::{overlays::file_input::FileInput, table_grid::UiTableGrid},
+    events::DrawSignal,
+    pane::{
+        request_builder::edit_param_table::EditParamTablePopup,
+        state::{BodyForm, ParamItem},
+    },
+};
 
 pub struct FormDataEditor {
+    edit_text_field: EditParamTablePopup,
+    edit_file: FileInput,
     state: BodyForm,
 }
 
-impl Default for FormDataEditor {
-    fn default() -> Self {
-        Self::new(BodyForm::default())
-    }
-}
+// impl Default for FormDataEditor {
+//     fn default() -> Self {
+//         Self::new(BodyForm::default())
+//     }
+// }
 
 impl FormDataEditor {
-    pub fn new(state: BodyForm) -> Self {
-        Self { state }
+    pub fn new(state: BodyForm, draw_signal: DrawSignal) -> Self {
+        Self {
+            state,
+            edit_text_field: EditParamTablePopup::new(),
+            edit_file: FileInput::new(draw_signal),
+        }
+    }
+
+    pub fn from_default(draw_signal: DrawSignal) -> Self {
+        Self::new(BodyForm::default(), draw_signal)
     }
 }
 
@@ -56,38 +75,79 @@ impl FormDataEditor {
         .draw(area, frame);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) {
-        // let table = &mut self.state;
-        // match key.code {
-        //     crossterm::event::KeyCode::Char(ch) => match ch {
-        //         'j' => table.next_row(),
-        //         'k' => table.prev_row(),
-        //         'h' => table.prev_col(),
-        //         'l' => table.next_col(),
-        //         'n' => table.add_item(ParamItem::empty()),
-        //         'd' => {
-        //             table.delete_current();
-        //         }
-        //         'e' => {
-        //             let idx = table.idx.clone();
-        //             if let Some(itm) = table.current_mut() {
-        //                 match idx.unwrap().1 {
-        //                     0 => {
-        //                         itm.toggle_enable();
-        //                     }
-        //                     1 => {
-        //                         self.edit_popup.edit_key(&itm.key);
-        //                     }
-        //                     2 => {
-        //                         self.edit_popup.edit_value(&itm.value);
-        //                     }
-        //                     _ => unreachable!(),
-        //                 }
-        //             }
-        //         }
-        //         _ => {}
-        //     },
-        //     _ => {}
-        // }
+    pub fn draw_overlay(&self, frame: &mut Frame) {
+        if self.edit_text_field.is_visible() {
+            self.edit_text_field.draw(frame);
+        } else if self.edit_file.is_visible() {
+            self.edit_file.draw(frame);
+        }
+    }
+
+    pub async fn handle_key(&mut self, key: KeyEvent) {
+        if self.edit_text_field.is_visible() {
+            match key.code {
+                crossterm::event::KeyCode::Enter => {}
+                crossterm::event::KeyCode::Esc => {
+                    self.edit_text_field.hide();
+                }
+                _ => {
+                    // self.edit_text_field.handle_key(key, &mut self.state)
+                }
+            }
+        } else if self.edit_file.is_visible() {
+            match key.code {
+                crossterm::event::KeyCode::Enter => {}
+                crossterm::event::KeyCode::Esc => {
+                    self.edit_file.hide();
+                }
+                _ => {
+                    self.edit_file.handle_key(key).await;
+                }
+            }
+        } else {
+            let table = &mut self.state;
+            match key.code {
+                crossterm::event::KeyCode::Char(ch) => match ch {
+                    'j' => table.next_row(),
+                    'k' => table.prev_row(),
+                    'h' => table.prev_col(),
+                    'l' => table.next_col(),
+                    'n' => table.add_item(ParamItem::empty()),
+                    'd' => {
+                        table.delete_current();
+                    }
+                    'e' => {
+                        let idx = table.idx.clone();
+                        if let Some(itm) = table.current_mut() {
+                            match idx.unwrap().1 {
+                                0 => {
+                                    itm.toggle_enable();
+                                }
+                                1 => {
+                                    self.edit_text_field.edit_key(&itm.key);
+                                }
+                                2 => {
+                                    self.edit_text_field.edit_value(&itm.value);
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                    }
+                    'f' => {
+                        let idx = table.idx.clone().unwrap();
+                        if let Some(itm) = table.current_mut() {
+                            match idx.1 {
+                                2 => {
+                                    self.edit_file.show(PathBuf::from(&itm.value));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
     }
 }

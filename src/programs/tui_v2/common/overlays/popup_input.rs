@@ -1,5 +1,9 @@
 use crossterm::event::KeyEvent;
-use ratatui::{layout::Constraint, widgets::Clear, Frame};
+use ratatui::{
+    layout::{Constraint, Rect},
+    widgets::Clear,
+    Frame,
+};
 
 use crate::programs::tui_v2::common::{
     elements::{ui_block, utils::center_area},
@@ -51,7 +55,7 @@ impl PopupInput {
     //     self.input.draw(inner_area, frame);
     // }
 
-    pub fn draw_center(&self, title: &str, area: CenterArea, frame: &mut Frame) {
+    pub fn draw_center(&self, title: &str, area: CenterArea, frame: &mut Frame) -> Rect {
         let area = center_area(frame.area(), area.height, area.width);
 
         let block = ui_block(title, true);
@@ -60,6 +64,8 @@ impl PopupInput {
         frame.render_widget(Clear, area);
         frame.render_widget(block, area);
         self.input.draw(inner_area, frame);
+
+        area
     }
 
     pub fn handle_input_key(&mut self, key: KeyEvent) {

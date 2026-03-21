@@ -10,6 +10,8 @@ use request_builder::RequestBuilder;
 use state::PaneState;
 
 use crate::store::models::ProjectModel;
+
+use super::events::DrawSignal;
 mod actions;
 mod collections;
 mod common;
@@ -27,7 +29,7 @@ pub struct Pane {
 }
 
 impl Pane {
-    pub fn from_project(project: ProjectModel) -> Self {
+    pub fn from_project(project: ProjectModel, draw_signal: DrawSignal) -> Self {
         Self {
             project_id: project.id,
             project_name: project.name,
@@ -38,7 +40,7 @@ impl Pane {
             ),
             collection_sidebar: CollectionsSidebar::new(),
             request_bar: RequestBar::new(),
-            request_builder: RequestBuilder::new(),
+            request_builder: RequestBuilder::new(draw_signal),
         }
     }
 
@@ -73,7 +75,7 @@ impl Pane {
         self.request_builder.draw_overlay(frame);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) -> bool {
+    pub async fn handle_key(&mut self, key: KeyEvent) -> bool {
         let mut effects = EffectsCollector::new();
 
         match self.state.focus {
@@ -85,7 +87,7 @@ impl Pane {
                 self.request_bar.handle_key(key, &mut self.state);
             }
             state::SectionFocus::RequestBuilder => {
-                self.request_builder.handle_key(key, &mut self.state);
+                self.request_builder.handle_key(key, &mut self.state).await;
             }
         }
 
