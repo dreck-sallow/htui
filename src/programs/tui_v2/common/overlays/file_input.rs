@@ -37,37 +37,14 @@ impl FileInput {
 
         let clone_paths = Arc::clone(&paths);
         let task = tokio::spawn(async move {
-            println!("task spawned!");
-            let mut current_path: Option<PathBuf> = None;
-
-            'out: loop {
-                let Some(value) = rx.recv().await else { break };
-
-                if current_path.as_ref().is_some_and(|p| *p == value) {
-                    continue;
-                }
-
-                current_path = Some(value);
-
-                while let Ok(opt) =
-                    tokio::time::timeout_at(Instant::now() + Duration::from_millis(200), rx.recv())
-                        .await
-                {
-                    match opt {
-                        Some(v) => {
-                            if current_path.as_ref().is_some_and(|p| *p == v) {
-                                continue;
-                            }
-
-                            current_path = Some(v);
-                        }
-                        None => break 'out,
-                    }
-                }
+            loop {
+                let Some(path) = debounce_receiver(&mut rx, Duration::from_millis(200)).await
+                else {
+                    return;
+                };
 
                 // the current path is new!;
-                *clone_paths.write().unwrap() =
-                    Self::search_list(current_path.as_ref().unwrap()).await;
+                *clone_paths.write().unwrap() = Self::search_list(path).await;
                 draw_signal.draw();
             }
         });
@@ -83,11 +60,18 @@ impl FileInput {
 
     async fn search_list<P: AsRef<Path>>(path: P) -> Vec<String> {
         let path = path.as_ref();
-        let Some(parent_dir) = path.parent() else {
-            return vec![];
+
+        let dir_path = if path.is_dir() {
+            Some(path)
+        } else {
+            path.parent()
         };
 
-        let Ok(mut read_dir) = tokio::fs::read_dir(parent_dir).await else {
+        let Some(read_path) = dir_path else {
+            return Vec::new();
+        };
+
+        let Ok(mut read_dir) = tokio::fs::read_dir(read_path).await else {
             return vec![];
         };
 
@@ -131,9 +115,9 @@ impl FileInput {
             return;
         };
 
-        // if items.is_empty() {
-        //     return;
-        // }
+        if items.is_empty() {
+            return;
+        }
 
         let list_block_area = Rect {
             y: render_area.bottom(),
@@ -188,4 +172,17 @@ impl FileInput {
             }
         }
     }
+}
+
+async fn debounce_receiver<T>(
+    rx: &mut tokio::sync::mpsc::Receiver<T>,
+    delay: Duration,
+) -> Option<T> {
+    let mut val = rx.recv().await?;
+
+    while let Ok(opt) = tokio::time::timeout_at(Instant::now() + delay, rx.recv()).await {
+        val = opt?;
+    }
+
+    Some(val)
 }
