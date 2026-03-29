@@ -97,7 +97,7 @@ impl FormDataEditor {
         } else if self.edit_file.is_visible() {
             match key.code {
                 crossterm::event::KeyCode::Enter => {}
-                crossterm::event::KeyCode::Esc => {
+                crossterm::event::KeyCode::Esc if !self.edit_file.is_editing() => {
                     self.edit_file.hide();
                 }
                 _ => {
