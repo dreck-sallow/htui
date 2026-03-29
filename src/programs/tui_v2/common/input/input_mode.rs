@@ -187,72 +187,90 @@ impl InputMode {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) {
+    pub fn map_key_to_action(&self, key: KeyEvent) -> Option<InputAction> {
         match key.code {
             crossterm::event::KeyCode::Backspace if self.is_editing() => {
-                self.delete_char();
+                Some(InputAction::DeleteChar)
             }
-            crossterm::event::KeyCode::Left => {
-                self.next_char();
-            }
-            crossterm::event::KeyCode::Right => {
-                self.prev_char();
-            }
-            crossterm::event::KeyCode::End => {
-                self.move_end_cursor();
-            }
-            crossterm::event::KeyCode::Home => {
-                self.move_start_cursor();
-            }
+            crossterm::event::KeyCode::Left => Some(InputAction::NextChar),
+            crossterm::event::KeyCode::Right => Some(InputAction::PrevChar),
+            crossterm::event::KeyCode::End => Some(InputAction::CursorEnd),
+            crossterm::event::KeyCode::Home => Some(InputAction::CursorStart),
             crossterm::event::KeyCode::Esc => {
                 if self.is_editing() {
-                    self.mode = Mode::Normal;
+                    return Some(InputAction::SetMode(Mode::Normal));
                 }
+                None
             }
-            crossterm::event::KeyCode::Enter => {}
             crossterm::event::KeyCode::Char(ch) => match ch {
                 'v' if self.mode != Mode::Insert => {
                     if self.has_selection() {
-                        self.clear_selection();
+                        Some(InputAction::ClearSelection)
                     } else {
-                        self.start_selection();
+                        Some(InputAction::StartSelection)
                     }
                 }
-                'l' if self.mode != Mode::Insert => {
-                    self.next_char();
-                }
-                'h' if self.mode != Mode::Insert => {
-                    self.prev_char();
-                }
+                'l' if self.mode != Mode::Insert => Some(InputAction::NextChar),
+                'h' if self.mode != Mode::Insert => Some(InputAction::PrevChar),
                 'd' if self.mode != Mode::Insert => {
                     if self.has_selection() {
-                        self.delete_selection();
+                        Some(InputAction::DeleteSelection)
                     } else {
-                        self.delete_char();
+                        Some(InputAction::DeleteChar)
                     }
                 }
-                'i' if self.mode == Mode::Normal => {
-                    self.mode = Mode::Insert;
-                }
+                'i' if self.mode == Mode::Normal => Some(InputAction::SetMode(Mode::Insert)),
                 _ => {
                     if self.is_editing() {
-                        self.insert_char(ch);
+                        Some(InputAction::InsertChar(ch))
+                    } else {
+                        None
                     }
                 }
             },
-            _ => {}
+            _ => None,
         }
+    }
+
+    pub fn handle_action(&mut self, action: InputAction) {
+        match action {
+            InputAction::NextChar => self.next_char(),
+            InputAction::PrevChar => self.prev_char(),
+            InputAction::CursorStart => self.move_start_cursor(),
+            InputAction::CursorEnd => self.move_end_cursor(),
+            InputAction::DeleteChar => self.delete_char(),
+            // InputAction::NextWord => self.nex,
+            // InputAction::PrevWord => todo!(),
+            InputAction::StartSelection => self.start_selection(),
+            InputAction::DeleteSelection => self.delete_selection(),
+            InputAction::ClearSelection => self.clear_selection(),
+            InputAction::InsertChar(ch) => self.insert_char(ch),
+            InputAction::Copy => todo!(),
+            InputAction::Paste => todo!(),
+            InputAction::SetMode(mode) => self.mode = mode,
+        }
+    }
+
+    pub fn handle_key(&mut self, key: KeyEvent) -> Option<InputAction> {
+        let action = self.map_key_to_action(key);
+        if let Some(act) = action {
+            self.handle_action(act);
+        }
+
+        action
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum InputAction {
     NextChar,
     PrevChar,
-    DeleteChar,
-    NextWord,
-    PrevWord,
     CursorStart,
     CursorEnd,
+
+    DeleteChar,
+    // NextWord,
+    // PrevWord,
     // CursorNext,
     // CursorPrev,
     StartSelection,
@@ -261,4 +279,25 @@ pub enum InputAction {
     InsertChar(char),
     Copy,
     Paste,
+    SetMode(Mode),
+}
+
+impl InputAction {
+    pub fn is_mutation(&self) -> bool {
+        // matches!(self, )
+        match self {
+            InputAction::NextChar => false,
+            InputAction::PrevChar => false,
+            InputAction::CursorStart => false,
+            InputAction::CursorEnd => false,
+            InputAction::DeleteChar => true,
+            InputAction::StartSelection => false,
+            InputAction::DeleteSelection => true,
+            InputAction::ClearSelection => false,
+            InputAction::InsertChar(_) => true,
+            InputAction::Copy => false,
+            InputAction::Paste => false,
+            InputAction::SetMode(_) => false,
+        }
+    }
 }

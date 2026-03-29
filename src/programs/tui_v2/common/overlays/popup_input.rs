@@ -68,8 +68,11 @@ impl PopupInput {
         area
     }
 
-    pub fn handle_input_key(&mut self, key: KeyEvent) {
-        self.input.handle_key(key);
+    pub fn handle_input_key(
+        &mut self,
+        key: KeyEvent,
+    ) -> Option<crate::programs::tui_v2::common::input::input_mode::InputAction> {
+        self.input.handle_key(key)
     }
 }
 

@@ -6,3 +6,4 @@ pub mod placeholder;
 pub mod select_list;
 pub mod table_grid;
 pub mod text_editor;
+pub mod ui_elements;

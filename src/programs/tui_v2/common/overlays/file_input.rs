@@ -1,4 +1,5 @@
 use std::{
+    ops::Not,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
     time::Duration,
@@ -7,17 +8,21 @@ use std::{
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::Rect,
-    text::Span,
+    style::{Style, Stylize},
+    text::Line,
     widgets::{Block, Borders},
     Frame,
 };
 use tokio::{sync::mpsc::Sender, task::JoinHandle, time::Instant};
 
-use crate::programs::tui_v2::{common::list, events::DrawSignal};
+use crate::programs::tui_v2::{
+    common::{list, ui_elements::list::UiList},
+    events::DrawSignal,
+};
 
 use super::popup_input::PopupInput;
 
-pub type EntryPaths = Arc<RwLock<Vec<String>>>;
+type EntryPaths = Arc<RwLock<PathSelector>>;
 
 pub struct FileInput {
     popup_input: PopupInput,
@@ -25,15 +30,13 @@ pub struct FileInput {
     task: JoinHandle<()>,
     paths: EntryPaths,
     tx: Sender<PathBuf>,
-
-    paths_idx: Option<usize>,
 }
 
 impl FileInput {
     pub fn new(draw_signal: DrawSignal) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<PathBuf>(10);
 
-        let paths = Arc::new(RwLock::new(Vec::new()));
+        let paths = Arc::new(RwLock::new(PathSelector::new()));
 
         let clone_paths = Arc::clone(&paths);
         let task = tokio::spawn(async move {
@@ -44,14 +47,15 @@ impl FileInput {
                 };
 
                 // the current path is new!;
-                *clone_paths.write().unwrap() = Self::search_list(path).await;
+                let list = Self::search_list(path).await;
+                clone_paths.write().unwrap().set_list(list);
+
                 draw_signal.draw();
             }
         });
 
         Self {
             popup_input: PopupInput::new(),
-            paths_idx: None,
             task,
             paths,
             tx,
@@ -90,6 +94,10 @@ impl FileInput {
         self.popup_input.is_visible()
     }
 
+    pub fn is_editing(&self) -> bool {
+        self.popup_input.is_editing()
+    }
+
     pub fn show(&mut self, path: PathBuf) {
         self.popup_input.show(path.to_str().unwrap());
         let _ = self.tx.send(path);
@@ -111,9 +119,12 @@ impl FileInput {
             frame,
         );
 
-        let Ok(items) = self.paths.try_read() else {
+        let Ok(paths) = self.paths.try_read() else {
             return;
         };
+
+        let (idx, items) = paths.parts();
+        drop(paths);
 
         if items.is_empty() {
             return;
@@ -128,21 +139,35 @@ impl FileInput {
         let block = Block::new().borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM);
 
         let list_area = block.inner(list_block_area);
+        let items = {
+            let mut itms = Vec::with_capacity(items.capacity());
+            for itm in items {
+                itms.push(Line::raw(itm));
+            }
+            itms
+        };
 
         frame.render_widget(block, list_block_area);
 
-        let mut line = Rect {
-            x: list_area.left(),
-            y: list_area.top(),
-            width: list_area.width,
-            height: 1,
+        // TODO: map all items for show only a page?
+        let list = UiList::new()
+            .with_idx(idx)
+            .with_items(items.into())
+            .with_highlight_style(Style::default().on_light_blue());
+
+        list.draw(list_area, frame);
+    }
+
+    async fn handle_input_key(&mut self, key: KeyEvent) {
+        let previous_path = PathBuf::from(self.popup_input.value());
+        let Some(act) = self.popup_input.handle_input_key(key) else {
+            return;
         };
 
-        // Render list
-        for (i, _y) in (list_area.top()..list_area.bottom()).enumerate() {
-            let Some(item) = items.get(i) else { break };
-            frame.render_widget(Span::raw(item), line);
-            line.y += 1;
+        if act.is_mutation() {
+            let path = PathBuf::from(self.popup_input.value());
+            // if (path.parent() == previous_path) {}
+            // let _ = self.tx.send(PathBuf::from(self.popup_input.value())).await;
         }
     }
 
@@ -152,25 +177,55 @@ impl FileInput {
         }
 
         if self.popup_input.is_editing() {
-            self.popup_input.handle_input_key(key);
-            let _ = self.tx.send(PathBuf::from(self.popup_input.value())).await;
+            self.handle_input_key(key).await;
         } else {
             match key.code {
                 crossterm::event::KeyCode::Tab | crossterm::event::KeyCode::Down => {
-                    self.paths_idx = list::next(
-                        self.paths_idx,
-                        self.paths.try_read().map(|itms| itms.len()).unwrap_or(0),
-                    )
+                    self.paths.write().unwrap().next();
                 }
                 crossterm::event::KeyCode::BackTab | crossterm::event::KeyCode::Up => {
-                    self.paths_idx = list::prev(self.paths_idx);
+                    self.paths.write().unwrap().prev();
                 }
                 crossterm::event::KeyCode::Enter => {}
                 _ => {
-                    self.popup_input.handle_input_key(key);
+                    self.handle_input_key(key).await;
                 }
             }
         }
+    }
+}
+
+struct PathSelector {
+    selected: Option<usize>,
+    list: Vec<String>,
+    options: Vec<usize>,
+}
+
+impl PathSelector {
+    pub fn new() -> Self {
+        Self {
+            selected: None,
+            list: Vec::new(),
+            options: Vec::new(),
+        }
+    }
+
+    pub fn set_list(&mut self, list: Vec<String>) {
+        self.options = list.iter().enumerate().map(|(i, _)| i).collect();
+        self.list = list;
+        self.selected = self.options.is_empty().not().then_some(0);
+    }
+
+    pub fn next(&mut self) {
+        self.selected = list::next(self.selected, self.options.len());
+    }
+
+    pub fn prev(&mut self) {
+        self.selected = list::prev(self.selected);
+    }
+
+    pub fn parts(&self) -> (Option<usize>, Vec<String>) {
+        (self.selected.clone(), self.list.clone())
     }
 }
 
