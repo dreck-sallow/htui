@@ -1,6 +1,6 @@
 use std::{
     ops::Not,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf, MAIN_SEPARATOR},
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -16,7 +16,7 @@ use ratatui::{
 use tokio::{sync::mpsc::Sender, task::JoinHandle, time::Instant};
 
 use crate::programs::tui_v2::{
-    common::{list, ui_elements::list::UiList},
+    common::{elements::utils::center_area, list, ui_elements::list::UiList},
     events::DrawSignal,
 };
 
@@ -110,31 +110,42 @@ impl FileInput {
 
 impl FileInput {
     pub fn draw(&self, frame: &mut Frame) {
-        let render_area = self.popup_input.draw_center(
-            "Choose File",
-            super::popup_input::CenterArea {
-                height: ratatui::layout::Constraint::Length(3),
-                width: ratatui::layout::Constraint::Percentage(40),
-            },
-            frame,
-        );
+        let (input_area, list_block_area) = {
+            let area = center_area(
+                frame.area(),
+                ratatui::layout::Constraint::Length(12),
+                ratatui::layout::Constraint::Percentage(40),
+            );
+
+            (
+                Rect { height: 3, ..area },
+                Rect {
+                    y: area.top() + 3,
+                    height: 9,
+                    ..area
+                },
+            )
+        };
+
+        // let render_area = self.popup_input.draw_center(
+        self.popup_input.draw("Choose File", input_area, frame);
 
         let Ok(paths) = self.paths.try_read() else {
             return;
         };
 
-        let (idx, items) = paths.parts();
+        let (idx, items) = paths.selection();
         drop(paths);
 
         if items.is_empty() {
             return;
         }
 
-        let list_block_area = Rect {
-            y: render_area.bottom(),
-            height: 5,
-            ..render_area
-        };
+        // let list_block_area = Rect {
+        //     y: render_area.bottom(),
+        //     height: 5,
+        //     ..render_area
+        // };
 
         let block = Block::new().borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM);
 
@@ -166,8 +177,24 @@ impl FileInput {
 
         if act.is_mutation() {
             let path = PathBuf::from(self.popup_input.value());
-            // if (path.parent() == previous_path) {}
-            // let _ = self.tx.send(PathBuf::from(self.popup_input.value())).await;
+
+            if previous_path == path {
+                return;
+            }
+
+            if self.popup_input.value().is_empty() {
+                self.paths.write().unwrap().set_list(Vec::new());
+            } else if self.popup_input.value().chars().last().unwrap() == MAIN_SEPARATOR {
+                let _ = self.tx.send(path).await;
+            } else {
+                if let Some(last) = path
+                    .components()
+                    .last()
+                    .and_then(|cmp| cmp.as_os_str().to_str())
+                {
+                    self.paths.write().unwrap().filter_by_name(last);
+                }
+            }
         }
     }
 
@@ -216,6 +243,16 @@ impl PathSelector {
         self.selected = self.options.is_empty().not().then_some(0);
     }
 
+    pub fn filter_by_name(&mut self, name: &str) {
+        self.options = Vec::new();
+
+        for (i, itm) in self.list.iter().enumerate() {
+            if itm.starts_with(name) {
+                self.options.push(i);
+            }
+        }
+    }
+
     pub fn next(&mut self) {
         self.selected = list::next(self.selected, self.options.len());
     }
@@ -226,6 +263,13 @@ impl PathSelector {
 
     pub fn parts(&self) -> (Option<usize>, Vec<String>) {
         (self.selected.clone(), self.list.clone())
+    }
+
+    pub fn selection(&self) -> (Option<usize>, Vec<String>) {
+        (
+            self.selected.clone(),
+            self.options.iter().map(|i| self.list[*i].clone()).collect(),
+        )
     }
 }
 
