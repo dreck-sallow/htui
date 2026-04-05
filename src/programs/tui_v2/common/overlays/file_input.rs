@@ -82,8 +82,8 @@ impl FileInput {
         let mut list = Vec::new();
 
         while let Ok(Some(entry)) = read_dir.next_entry().await {
-            if let Ok(p) = entry.path().into_os_string().into_string() {
-                list.push(p);
+            if let Some(p) = entry.path().file_name().and_then(|s| s.to_str()) {
+                list.push(p.to_string());
             }
         }
 
@@ -110,7 +110,7 @@ impl FileInput {
 
 impl FileInput {
     pub fn draw(&self, frame: &mut Frame) {
-        let (input_area, list_block_area) = {
+        let (input_area, mut list_block_area) = {
             let area = center_area(
                 frame.area(),
                 ratatui::layout::Constraint::Length(12),
@@ -141,11 +141,7 @@ impl FileInput {
             return;
         }
 
-        // let list_block_area = Rect {
-        //     y: render_area.bottom(),
-        //     height: 5,
-        //     ..render_area
-        // };
+        list_block_area.height = (items.len().min(7) + 1) as u16;
 
         let block = Block::new().borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM);
 
@@ -164,7 +160,7 @@ impl FileInput {
         let list = UiList::new()
             .with_idx(idx)
             .with_items(items.into())
-            .with_highlight_style(Style::default().on_light_blue());
+            .with_highlight_style(Style::default().underlined().on_dark_gray().blue());
 
         list.draw(list_area, frame);
     }
@@ -176,17 +172,28 @@ impl FileInput {
         };
 
         if act.is_mutation() {
-            let path = PathBuf::from(self.popup_input.value());
-
-            if previous_path == path {
+            if self.popup_input.value().is_empty() {
+                self.paths.write().unwrap().set_list(Vec::new());
                 return;
             }
 
-            if self.popup_input.value().is_empty() {
-                self.paths.write().unwrap().set_list(Vec::new());
-            } else if self.popup_input.value().chars().last().unwrap() == MAIN_SEPARATOR {
+            let path = PathBuf::from(self.popup_input.value());
+
+            if let Some(p) = path.parent() {
+                let are_diferent = previous_path
+                    .parent()
+                    .map(|old_parent| old_parent != p)
+                    .unwrap_or(false);
+
+                if are_diferent {
+                    let _ = self.tx.send(path).await;
+                    return;
+                }
+            }
+
+            if self.popup_input.value().chars().last().unwrap() == MAIN_SEPARATOR {
                 let _ = self.tx.send(path).await;
-            } else {
+            } else if previous_path != path {
                 if let Some(last) = path
                     .components()
                     .last()
@@ -203,20 +210,36 @@ impl FileInput {
             return;
         }
 
-        if self.popup_input.is_editing() {
-            self.handle_input_key(key).await;
-        } else {
-            match key.code {
-                crossterm::event::KeyCode::Tab | crossterm::event::KeyCode::Down => {
-                    self.paths.write().unwrap().next();
+        match key.code {
+            crossterm::event::KeyCode::Tab | crossterm::event::KeyCode::Down => {
+                self.paths.write().unwrap().next();
+            }
+            crossterm::event::KeyCode::BackTab | crossterm::event::KeyCode::Up => {
+                self.paths.write().unwrap().prev();
+            }
+            crossterm::event::KeyCode::Enter => {
+                if self.popup_input.is_editing() {
+                    if !self.popup_input.value().is_empty() {
+                        let Some(name) = self.paths.read().unwrap().selected() else {
+                            return;
+                        };
+
+                        let mut path = PathBuf::from(self.popup_input.value());
+                        path.pop();
+                        path.push(name);
+
+                        // self.popup_input.handle_input_key(key);
+                        if path.is_dir() {
+                            let _ = self.tx.send(path).await;
+                        }
+                    }
+                    // autocomplete
+                } else {
+                    // enter and hide
                 }
-                crossterm::event::KeyCode::BackTab | crossterm::event::KeyCode::Up => {
-                    self.paths.write().unwrap().prev();
-                }
-                crossterm::event::KeyCode::Enter => {}
-                _ => {
-                    self.handle_input_key(key).await;
-                }
+            }
+            _ => {
+                self.handle_input_key(key).await;
             }
         }
     }
@@ -243,7 +266,7 @@ impl PathSelector {
         self.selected = self.options.is_empty().not().then_some(0);
     }
 
-    pub fn filter_by_name(&mut self, name: &str) {
+    pub fn filter_by_name(&mut self, name: &str) -> usize {
         self.options = Vec::new();
 
         for (i, itm) in self.list.iter().enumerate() {
@@ -251,6 +274,7 @@ impl PathSelector {
                 self.options.push(i);
             }
         }
+        self.options.len()
     }
 
     pub fn next(&mut self) {
@@ -261,8 +285,12 @@ impl PathSelector {
         self.selected = list::prev(self.selected);
     }
 
-    pub fn parts(&self) -> (Option<usize>, Vec<String>) {
-        (self.selected.clone(), self.list.clone())
+    // pub fn parts(&self) -> (Option<usize>, Vec<String>) {
+    //     (self.selected.clone(), self.list.clone())
+    // }
+
+    pub fn selected(&self) -> Option<String> {
+        self.selected.map(|i| self.list[i].clone())
     }
 
     pub fn selection(&self) -> (Option<usize>, Vec<String>) {
