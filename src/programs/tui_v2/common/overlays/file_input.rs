@@ -10,23 +10,26 @@ use ratatui::{
     layout::Rect,
     style::{Style, Stylize},
     text::Line,
-    widgets::{Block, Borders},
+    widgets::{Block, Borders, Clear},
     Frame,
 };
 use tokio::{sync::mpsc::Sender, task::JoinHandle, time::Instant};
 
 use crate::programs::tui_v2::{
-    common::{elements::utils::center_area, list, ui_elements::list::UiList},
+    common::{
+        elements::{ui_block, utils::center_area},
+        input::input_mode::InputMode,
+        list,
+        ui_elements::list::UiList,
+    },
     events::DrawSignal,
 };
-
-use super::popup_input::PopupInput;
 
 type EntryPaths = Arc<RwLock<PathSelector>>;
 
 pub struct FileInput {
-    popup_input: PopupInput,
-
+    visible: bool,
+    input: InputMode,
     task: JoinHandle<()>,
     paths: EntryPaths,
     tx: Sender<PathBuf>,
@@ -55,7 +58,8 @@ impl FileInput {
         });
 
         Self {
-            popup_input: PopupInput::new(),
+            input: InputMode::new(""),
+            visible: false,
             task,
             paths,
             tx,
@@ -91,26 +95,86 @@ impl FileInput {
     }
 
     pub fn is_visible(&self) -> bool {
-        self.popup_input.is_visible()
+        self.visible
     }
 
     pub fn is_editing(&self) -> bool {
-        self.popup_input.is_editing()
+        self.input.is_editing()
     }
 
     pub fn show(&mut self, path: PathBuf) {
-        self.popup_input.show(path.to_str().unwrap());
+        self.visible = true;
+        self.input.replace(path.to_str().unwrap());
         let _ = self.tx.send(path);
     }
 
     pub fn hide(&mut self) {
-        self.popup_input.hide();
+        self.visible = false;
+        self.input.reset();
+    }
+
+    // pub fn raw_input(&self) -> &str {
+    //     self.input.inner()
+    // }
+
+    pub fn path(&self) -> Option<PathBuf> {
+        let val = self.input.inner();
+        if !val.is_empty() {
+            return Some(PathBuf::from(val));
+        }
+        None
     }
 }
 
 impl FileInput {
+    fn draw_input(&self, area: Rect, frame: &mut Frame) {
+        let block = ui_block("Choose File", true);
+        let inner_area = block.inner(area);
+
+        frame.render_widget(Clear, area);
+        frame.render_widget(block, area);
+        self.input.draw(inner_area, frame);
+    }
+
+    fn draw_options(&self, mut area: Rect, frame: &mut Frame) {
+        let Ok(paths) = self.paths.try_read() else {
+            return;
+        };
+
+        let (idx, items) = paths.selection();
+        drop(paths);
+
+        if items.is_empty() {
+            return;
+        }
+        frame.render_widget(Clear, area);
+
+        area.height = (items.len().min(7) + 1) as u16;
+
+        let block = Block::new().borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM);
+
+        let list_area = block.inner(area);
+        let items = {
+            let mut itms = Vec::with_capacity(items.capacity());
+            for itm in items {
+                itms.push(Line::raw(itm));
+            }
+            itms
+        };
+
+        frame.render_widget(block, area);
+
+        // TODO: map all items for show only a page?
+        let list = UiList::new()
+            .with_idx(idx)
+            .with_items(items.into())
+            .with_highlight_style(Style::default().underlined().on_dark_gray().blue());
+
+        list.draw(list_area, frame);
+    }
+
     pub fn draw(&self, frame: &mut Frame) {
-        let (input_area, mut list_block_area) = {
+        let (input_area, list_block_area) = {
             let area = center_area(
                 frame.area(),
                 ratatui::layout::Constraint::Length(12),
@@ -127,57 +191,23 @@ impl FileInput {
             )
         };
 
-        // let render_area = self.popup_input.draw_center(
-        self.popup_input.draw("Choose File", input_area, frame);
-
-        let Ok(paths) = self.paths.try_read() else {
-            return;
-        };
-
-        let (idx, items) = paths.selection();
-        drop(paths);
-
-        if items.is_empty() {
-            return;
-        }
-
-        list_block_area.height = (items.len().min(7) + 1) as u16;
-
-        let block = Block::new().borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM);
-
-        let list_area = block.inner(list_block_area);
-        let items = {
-            let mut itms = Vec::with_capacity(items.capacity());
-            for itm in items {
-                itms.push(Line::raw(itm));
-            }
-            itms
-        };
-
-        frame.render_widget(block, list_block_area);
-
-        // TODO: map all items for show only a page?
-        let list = UiList::new()
-            .with_idx(idx)
-            .with_items(items.into())
-            .with_highlight_style(Style::default().underlined().on_dark_gray().blue());
-
-        list.draw(list_area, frame);
+        self.draw_input(input_area, frame);
+        self.draw_options(list_block_area, frame);
     }
 
     async fn handle_input_key(&mut self, key: KeyEvent) {
-        let previous_path = PathBuf::from(self.popup_input.value());
-        let Some(act) = self.popup_input.handle_input_key(key) else {
+        let previous_path = PathBuf::from(self.input.inner());
+        let Some(act) = self.input.handle_key(key) else {
             return;
         };
 
         if act.is_mutation() {
-            if self.popup_input.value().is_empty() {
+            if self.input.inner().is_empty() {
                 self.paths.write().unwrap().set_list(Vec::new());
                 return;
             }
 
-            let path = PathBuf::from(self.popup_input.value());
+            let path = PathBuf::from(self.input.inner());
 
             if let Some(p) = path.parent() {
                 let are_diferent = previous_path
@@ -191,7 +221,7 @@ impl FileInput {
                 }
             }
 
-            if self.popup_input.value().chars().last().unwrap() == MAIN_SEPARATOR {
+            if self.input.inner().chars().last().unwrap() == MAIN_SEPARATOR {
                 let _ = self.tx.send(path).await;
             } else if previous_path != path {
                 if let Some(last) = path
@@ -206,7 +236,7 @@ impl FileInput {
     }
 
     pub async fn handle_key(&mut self, key: KeyEvent) {
-        if !self.popup_input.is_visible() {
+        if !self.visible {
             return;
         }
 
@@ -218,24 +248,32 @@ impl FileInput {
                 self.paths.write().unwrap().prev();
             }
             crossterm::event::KeyCode::Enter => {
-                if self.popup_input.is_editing() {
-                    if !self.popup_input.value().is_empty() {
+                if self.input.is_editing() {
+                    let input = self.input.inner();
+                    if !input.is_empty() {
                         let Some(name) = self.paths.read().unwrap().selected() else {
                             return;
                         };
 
-                        let mut path = PathBuf::from(self.popup_input.value());
-                        path.pop();
+                        let mut path = PathBuf::from(input);
+                        if input
+                            .chars()
+                            .last()
+                            .map(|l| l != MAIN_SEPARATOR)
+                            .unwrap_or(false)
+                        {
+                            path.pop();
+                        }
                         path.push(name);
 
-                        // self.popup_input.handle_input_key(key);
+                        self.input
+                            .set(path.clone().into_os_string().to_str().unwrap());
+
                         if path.is_dir() {
+                            self.input.insert_char(MAIN_SEPARATOR);
                             let _ = self.tx.send(path).await;
                         }
                     }
-                    // autocomplete
-                } else {
-                    // enter and hide
                 }
             }
             _ => {
@@ -290,7 +328,7 @@ impl PathSelector {
     // }
 
     pub fn selected(&self) -> Option<String> {
-        self.selected.map(|i| self.list[i].clone())
+        self.selected.map(|i| self.list[self.options[i]].clone())
     }
 
     pub fn selection(&self) -> (Option<usize>, Vec<String>) {

@@ -77,6 +77,12 @@ impl InputMode {
         self.move_end_cursor();
     }
 
+    pub fn set(&mut self, txt: &str) {
+        self.input.clear();
+        self.input.extend(txt.chars());
+        self.move_end_cursor();
+    }
+
     pub fn reset(&mut self) {
         if self.is_editing() {
             self.mode = Mode::Normal;
