@@ -10,7 +10,7 @@ use ratatui::{
     layout::Rect,
     style::{Style, Stylize},
     text::Line,
-    widgets::{Block, Borders, Clear},
+    widgets::Clear,
     Frame,
 };
 use tokio::{sync::mpsc::Sender, task::JoinHandle, time::Instant};
@@ -127,16 +127,7 @@ impl FileInput {
 }
 
 impl FileInput {
-    fn draw_input(&self, area: Rect, frame: &mut Frame) {
-        let block = ui_block("Choose File", true);
-        let inner_area = block.inner(area);
-
-        frame.render_widget(Clear, area);
-        frame.render_widget(block, area);
-        self.input.draw(inner_area, frame);
-    }
-
-    fn draw_options(&self, mut area: Rect, frame: &mut Frame) {
+    pub fn draw(&self, frame: &mut Frame) {
         let Ok(paths) = self.paths.try_read() else {
             return;
         };
@@ -144,16 +135,52 @@ impl FileInput {
         let (idx, items) = paths.selection();
         drop(paths);
 
+        let block = ui_block("Choose File", true);
+        let center_area = center_area(
+            frame.area(),
+            ratatui::layout::Constraint::Length(3 + if items.is_empty() { 0 } else { 9 }),
+            ratatui::layout::Constraint::Percentage(40),
+        );
+
+        let (input_area, line_area, list_block_area) = {
+            let area = block.inner(center_area);
+
+            (
+                Rect { height: 1, ..area },
+                Rect {
+                    height: 1,
+                    y: area.top() + 1,
+                    ..area
+                },
+                Rect {
+                    y: area.top() + 2,
+                    height: (items.len().min(7) + 1) as u16,
+                    ..area
+                },
+            )
+        };
+
+        frame.render_widget(Clear, center_area);
+        frame.render_widget(block, center_area);
+
+        self.input.draw(input_area, frame);
+
         if items.is_empty() {
             return;
         }
-        frame.render_widget(Clear, area);
 
-        area.height = (items.len().min(7) + 1) as u16;
+        {
+            let y = line_area.y;
+            for x in line_area.x..line_area.right() {
+                frame.buffer_mut().set_string(
+                    x,
+                    y,
+                    ratatui::symbols::line::THICK_HORIZONTAL,
+                    Style::default().blue(),
+                );
+            }
+        }
 
-        let block = Block::new().borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM);
-
-        let list_area = block.inner(area);
         let items = {
             let mut itms = Vec::with_capacity(items.capacity());
             for itm in items {
@@ -162,37 +189,13 @@ impl FileInput {
             itms
         };
 
-        frame.render_widget(block, area);
-
         // TODO: map all items for show only a page?
         let list = UiList::new()
             .with_idx(idx)
             .with_items(items.into())
             .with_highlight_style(Style::default().underlined().on_dark_gray().blue());
 
-        list.draw(list_area, frame);
-    }
-
-    pub fn draw(&self, frame: &mut Frame) {
-        let (input_area, list_block_area) = {
-            let area = center_area(
-                frame.area(),
-                ratatui::layout::Constraint::Length(12),
-                ratatui::layout::Constraint::Percentage(40),
-            );
-
-            (
-                Rect { height: 3, ..area },
-                Rect {
-                    y: area.top() + 3,
-                    height: 9,
-                    ..area
-                },
-            )
-        };
-
-        self.draw_input(input_area, frame);
-        self.draw_options(list_block_area, frame);
+        list.draw(list_block_area, frame);
     }
 
     async fn handle_input_key(&mut self, key: KeyEvent) {
