@@ -104,6 +104,10 @@ impl FormDataEditor {
                     };
 
                     if path.is_file() {
+                        let current = self.state.current_mut().unwrap();
+                        current.value = path.to_str().unwrap().to_string();
+                        self.state.are_files.insert(self.state.idx.unwrap().0);
+
                         self.edit_file.hide();
                     }
                 }
