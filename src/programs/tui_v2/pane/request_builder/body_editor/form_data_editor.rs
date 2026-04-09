@@ -86,12 +86,23 @@ impl FormDataEditor {
     pub async fn handle_key(&mut self, key: KeyEvent) {
         if self.edit_text_field.is_visible() {
             match key.code {
-                crossterm::event::KeyCode::Enter => {}
+                crossterm::event::KeyCode::Enter => {
+                    let text = self.edit_text_field.value().to_string();
+
+                    let current = self.state.current_mut().unwrap();
+                    if self.edit_text_field.is_key_field() {
+                        current.key = text;
+                    } else {
+                        current.value = text;
+                        self.state.are_files.remove(&self.state.idx.unwrap().0);
+                    }
+                    self.edit_text_field.hide();
+                }
                 crossterm::event::KeyCode::Esc => {
                     self.edit_text_field.hide();
                 }
                 _ => {
-                    // self.edit_text_field.handle_key(key, &mut self.state)
+                    self.edit_text_field.handle_key_inner(key);
                 }
             }
         } else if self.edit_file.is_visible() {

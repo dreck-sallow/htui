@@ -4,7 +4,7 @@ use ratatui::Frame;
 use crate::programs::tui_v2::{
     common::{
         elements::{ui_block, utils::center_area},
-        input::input_mode::InputMode,
+        input::input_mode::{InputAction, InputMode},
     },
     pane::state::ParamsTable,
 };
@@ -31,6 +31,14 @@ impl EditParamTablePopup {
 
     pub fn is_visible(&self) -> bool {
         self.show_edit_param
+    }
+
+    pub fn value(&self) -> &str {
+        self.input_str.inner()
+    }
+
+    pub fn is_key_field(&self) -> bool {
+        matches!(self.param_field, ParamField::Key)
     }
 
     pub fn edit_key(&mut self, value: &str) {
@@ -90,5 +98,9 @@ impl EditParamTablePopup {
                 self.input_str.handle_key(key);
             }
         }
+    }
+
+    pub fn handle_key_inner(&mut self, key: KeyEvent) -> Option<InputAction> {
+        self.input_str.handle_key(key)
     }
 }
