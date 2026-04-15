@@ -41,6 +41,10 @@ impl FormDataEditor {
     pub fn from_default(draw_signal: DrawSignal) -> Self {
         Self::new(BodyForm::default(), draw_signal)
     }
+
+    pub fn is_editing(&self) -> bool {
+        self.edit_text_field.is_visible() || self.edit_file.is_visible()
+    }
 }
 
 impl FormDataEditor {

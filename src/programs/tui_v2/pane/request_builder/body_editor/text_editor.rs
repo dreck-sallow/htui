@@ -34,4 +34,8 @@ impl TextEditor {
     pub fn handle_key(&mut self, key: KeyEvent) {
         self.editor.handle_key(key);
     }
+
+    pub fn is_editing(&self) -> bool {
+        self.editor.mode().is_insert()
+    }
 }

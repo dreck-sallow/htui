@@ -77,7 +77,7 @@ impl RequestBuilder {
     }
 
     fn is_editing(&self) -> bool {
-        self.params_table_ui.is_editing()
+        self.params_table_ui.is_editing() || self.body_editor.is_editing()
     }
 
     pub fn sync(&mut self, state: &mut PaneState) {

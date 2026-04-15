@@ -115,6 +115,16 @@ impl BodyEditor {
             self.select.select(&PlainBodyType::from_model(&req.body));
         }
     }
+
+    pub fn is_editing(&self) -> bool {
+        match &self.editor {
+            TypeEditor::None(_) => false,
+            TypeEditor::Text(t) => t.is_editing(),
+            TypeEditor::FormData(e) => e.is_editing(),
+            TypeEditor::FormUrlEncoded(e) => e.is_editing(),
+            TypeEditor::File => false,
+        }
+    }
 }
 
 impl BodyEditor {
