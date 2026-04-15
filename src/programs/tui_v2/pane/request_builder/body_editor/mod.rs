@@ -1,4 +1,5 @@
 use crossterm::event::{KeyEvent, KeyModifiers};
+use file_editor::FileEditor;
 use form_data_editor::FormDataEditor;
 use form_urlencoded_editor::FormUrlEncodedEditor;
 use ratatui::{
@@ -29,7 +30,7 @@ enum TypeEditor {
     Text(TextEditor),
     FormData(FormDataEditor),
     FormUrlEncoded(FormUrlEncodedEditor),
-    File,
+    File(FileEditor),
 }
 
 impl TypeEditor {
@@ -44,7 +45,7 @@ impl TypeEditor {
             TypeEditor::Text(_) => PlainBodyType::Text,
             TypeEditor::FormData(_) => PlainBodyType::FormData,
             TypeEditor::FormUrlEncoded(_) => PlainBodyType::FormUrlEncoded,
-            TypeEditor::File => PlainBodyType::File,
+            TypeEditor::File(_) => PlainBodyType::File,
         }
     }
 
@@ -58,7 +59,7 @@ impl TypeEditor {
             PlainBodyType::FormUrlEncoded => {
                 TypeEditor::FormUrlEncoded(FormUrlEncodedEditor::default())
             }
-            PlainBodyType::File => TypeEditor::File,
+            PlainBodyType::File => TypeEditor::File(FileEditor::new(draw_signal)),
         }
     }
 
@@ -122,7 +123,7 @@ impl BodyEditor {
             TypeEditor::Text(t) => t.is_editing(),
             TypeEditor::FormData(e) => e.is_editing(),
             TypeEditor::FormUrlEncoded(e) => e.is_editing(),
-            TypeEditor::File => false,
+            TypeEditor::File(e) => e.is_editing(),
         }
     }
 }
@@ -145,7 +146,9 @@ impl BodyEditor {
             TypeEditor::FormUrlEncoded(e) => {
                 e.draw(editor_area, frame);
             }
-            TypeEditor::File => {}
+            TypeEditor::File(e) => {
+                e.draw(editor_area, frame);
+            }
         }
 
         let label = Span::raw(format!(" {} ", self.editor.as_plain().to_string()))
@@ -178,7 +181,9 @@ impl BodyEditor {
             TypeEditor::FormUrlEncoded(e) => {
                 e.draw_overlay(frame);
             }
-            TypeEditor::File => {}
+            TypeEditor::File(e) => {
+                e.draw_overlay(frame);
+            }
         }
     }
 
@@ -213,7 +218,7 @@ impl BodyEditor {
                     TypeEditor::Text(e) => e.handle_key(key),
                     TypeEditor::FormData(e) => e.handle_key(key).await,
                     TypeEditor::FormUrlEncoded(e) => e.handle_key(key),
-                    TypeEditor::File => {}
+                    TypeEditor::File(e) => e.handle_key(key).await,
                 },
             }
         }

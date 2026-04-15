@@ -23,12 +23,6 @@ pub struct FormDataEditor {
     state: BodyForm,
 }
 
-// impl Default for FormDataEditor {
-//     fn default() -> Self {
-//         Self::new(BodyForm::default())
-//     }
-// }
-
 impl FormDataEditor {
     pub fn new(state: BodyForm, draw_signal: DrawSignal) -> Self {
         Self {
