@@ -103,7 +103,11 @@ impl RequestBuilder {
             let tabs = Tabs::new([
                 format!("{} ({})", Section::Headers.as_str(), request.headers.len()),
                 format!("{} ({})", Section::Params.as_str(), request.params.len()),
-                Section::Body.as_str().to_string(),
+                format!(
+                    "{} ({})",
+                    Section::Body.as_str(),
+                    self.body_editor.type_label()
+                ),
             ])
             .select(self.tab_idx())
             .highlight_style(ui_highlight())

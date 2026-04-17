@@ -144,6 +144,10 @@ impl BodyEditor {
             TypeEditor::File(e) => e.is_editing(),
         }
     }
+
+    pub fn type_label(&self) -> &'static str {
+        self.editor.as_plain().label()
+    }
 }
 
 impl BodyEditor {
@@ -269,6 +273,16 @@ impl PlainBodyType {
             BodyContent::FormData(_) => Self::FormData,
             BodyContent::FormUrlEncoded(_) => Self::FormUrlEncoded,
             BodyContent::Text(_) => Self::Text,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Text => "Text",
+            Self::FormData => "Multipart",
+            Self::FormUrlEncoded => "Url-encoded",
+            Self::File => "File",
         }
     }
 }
