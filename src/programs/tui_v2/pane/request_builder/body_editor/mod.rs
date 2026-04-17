@@ -247,7 +247,8 @@ pub struct NoneEditor;
 
 impl NoneEditor {
     pub fn draw(&self, area: Rect, frame: &mut Frame) {
-        ui_placeholder("No Body").draw(area, frame);
+        let center_area = center_area(area, Constraint::Length(1), Constraint::Length(7));
+        ui_placeholder("No Body").draw(center_area, frame);
     }
 }
 
