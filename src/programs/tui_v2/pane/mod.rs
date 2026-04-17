@@ -1,3 +1,5 @@
+use std::os::unix::fs::MetadataExt;
+
 use actions::EffectsCollector;
 use collections::CollectionsSidebar;
 use crossterm::event::KeyEvent;
@@ -7,7 +9,10 @@ use ratatui::{
 };
 use request_bar::RequestBar;
 use request_builder::RequestBuilder;
-use state::PaneState;
+use state::{
+    BodyContent, BodyForm, CollectionItem, CollectionsList, Environments, FileInfo, PaneState,
+    ParamsTable, RequestItem,
+};
 
 use crate::store::models::ProjectModel;
 
@@ -101,5 +106,73 @@ impl Pane {
         }
 
         true
+    }
+}
+
+pub async fn new_pane(project: ProjectModel, draw_signal: DrawSignal) -> Pane {
+    let mut list = Vec::new();
+
+    for coll in project.collections {
+        let mut reqs = Vec::new();
+
+        for req in coll.requests {
+            let body = match req.body {
+                crate::store::models::RequestBody::None => BodyContent::None,
+                crate::store::models::RequestBody::Text(st) => BodyContent::Text(st),
+                crate::store::models::RequestBody::Json(v) => BodyContent::Text(v.to_string()),
+                crate::store::models::RequestBody::FormUrlEncoded(m) => {
+                    BodyContent::FormUrlEncoded(ParamsTable::from_model(m))
+                }
+                crate::store::models::RequestBody::FormData(m) => {
+                    BodyContent::FormData(BodyForm::from_model(m))
+                }
+                crate::store::models::RequestBody::File(path) => {
+                    if path.is_file() {
+                        match tokio::fs::metadata(&path).await {
+                            Ok(m) => {
+                                let name = path.file_name().unwrap().to_str().unwrap().to_string();
+                                let path_str = path.to_str().unwrap().to_string();
+
+                                BodyContent::File(state::FileContent::Content {
+                                    path,
+                                    info: FileInfo {
+                                        name,
+                                        size: m.size().to_string(),
+                                        path: path_str,
+                                    },
+                                })
+                            }
+                            Err(_) => BodyContent::File(state::FileContent::None),
+                        }
+                    } else {
+                        BodyContent::File(state::FileContent::None)
+                    }
+                }
+            };
+
+            reqs.push(RequestItem::new_v2(
+                req.id,
+                req.name,
+                req.url,
+                ParamsTable::from_model(req.headers),
+                ParamsTable::from_model(req.params),
+                req.method,
+                body,
+            ));
+        }
+        list.push(CollectionItem::new_v2(coll.id, coll.name).with_reqs(reqs));
+    }
+
+    Pane {
+        project_id: project.id,
+        project_name: project.name,
+        state: PaneState::new(
+            CollectionsList::new().with_collections(list),
+            Environments::from_model(project.environments),
+            project.selected_env_context,
+        ),
+        collection_sidebar: CollectionsSidebar::new(),
+        request_bar: RequestBar::new(),
+        request_builder: RequestBuilder::new(draw_signal),
     }
 }

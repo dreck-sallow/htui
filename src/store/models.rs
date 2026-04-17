@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub type TimeId = String;
 
@@ -98,6 +101,7 @@ impl ToString for HttpMethod {
 pub enum RequestBody {
     None,
     Text(String),
+    File(PathBuf),
     Json(serde_json::Value),
     FormUrlEncoded(Vec<KeyValueParam>),
     FormData(Vec<FormParam>),

@@ -16,7 +16,7 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
     let mut terminal = ratatui::init();
 
     let mut app = TuiApp::default();
-    app.add_project(project, draw_signal.clone());
+    app.add_project_v2(project, draw_signal.clone()).await;
 
     events.start();
     while let Some(ev) = events.next_event().await {

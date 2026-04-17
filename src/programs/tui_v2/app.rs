@@ -8,7 +8,10 @@ use ratatui::{
 
 use crate::store::models::ProjectModel;
 
-use super::{events::DrawSignal, pane::Pane};
+use super::{
+    events::DrawSignal,
+    pane::{new_pane, Pane},
+};
 
 #[derive(Default)]
 pub struct TuiApp {
@@ -19,6 +22,16 @@ pub struct TuiApp {
 impl TuiApp {
     pub fn add_project(&mut self, project: ProjectModel, draw_signal: DrawSignal) {
         let pane = Pane::from_project(project, draw_signal);
+
+        self.panes.push(pane);
+
+        if self.selected.is_none() {
+            self.selected = Some(0);
+        }
+    }
+
+    pub async fn add_project_v2(&mut self, project: ProjectModel, draw_signal: DrawSignal) {
+        let pane = new_pane(project, draw_signal).await;
 
         self.panes.push(pane);
 

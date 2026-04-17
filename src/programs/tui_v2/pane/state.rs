@@ -1,4 +1,4 @@
-use std::{collections::HashSet, ops::Not};
+use std::{collections::HashSet, ops::Not, path::PathBuf};
 
 use crate::{
     programs::tui_v2::common::list,
@@ -27,6 +27,15 @@ impl PaneState {
             // upsert_item_action: UpsertItemAction::CreateCollection,
             collections: CollectionsList::from_model(collections),
             environments: Environments::from_model(environments),
+            selected_env_context: selected_env,
+        }
+    }
+
+    pub fn new(list: CollectionsList, envs: Environments, selected_env: Option<usize>) -> Self {
+        Self {
+            focus: SectionFocus::Collections,
+            collections: list,
+            environments: envs,
             selected_env_context: selected_env,
         }
     }
@@ -73,6 +82,27 @@ impl CollectionsList {
         Self { items, idx }
     }
 
+    pub fn new() -> Self {
+        Self {
+            idx: ListIdx::None,
+            items: Vec::new(),
+        }
+    }
+
+    pub fn with_collections(mut self, items: Vec<CollectionItem>) -> Self {
+        self.idx = if items.is_empty() {
+            ListIdx::None
+        } else if items[0].requests.is_empty() {
+            ListIdx::Group(0)
+        } else {
+            ListIdx::Item(0, 0)
+        };
+
+        self.items = items;
+
+        self
+    }
+
     pub fn size(&self) -> usize {
         self.items.len()
     }
@@ -114,6 +144,20 @@ impl CollectionItem {
             requests: Vec::new(),
         }
     }
+
+    pub fn new_v2(id: TimeId, name: String) -> Self {
+        Self {
+            id,
+            is_open: true,
+            name,
+            requests: Vec::new(),
+        }
+    }
+
+    pub fn with_reqs(mut self, requests: Vec<RequestItem>) -> Self {
+        self.requests = requests;
+        self
+    }
 }
 
 pub struct RequestItem {
@@ -139,6 +183,26 @@ impl RequestItem {
         }
     }
 
+    pub fn new_v2(
+        id: TimeId,
+        name: String,
+        url: String,
+        headers: ParamsTable,
+        params: ParamsTable,
+        method: HttpMethod,
+        body: BodyContent,
+    ) -> Self {
+        Self {
+            id: id,
+            name: name,
+            url: url,
+            headers,
+            params,
+            method,
+            body,
+        }
+    }
+
     pub fn from_model(model: RequestModel) -> Self {
         Self {
             id: model.id,
@@ -155,7 +219,7 @@ impl RequestItem {
 #[derive(Clone)]
 pub enum BodyContent {
     None,
-    File(String),
+    File(FileContent),
     FormUrlEncoded(ParamsTable),
     FormData(BodyForm),
     Text(String),
@@ -171,15 +235,30 @@ impl BodyContent {
                 Self::FormUrlEncoded(ParamsTable::from_model(values))
             }
             RequestBody::FormData(params) => Self::FormData(BodyForm::from_model(params)),
+            RequestBody::File(path) => todo!(),
         }
     }
-}
 
-// pub struct KeyValueParam {
-//     pub enable: bool,
-//     pub key: String,
-//     pub value: String,
-// }
+    pub fn none() -> Self {
+        Self::None
+    }
+
+    pub fn file(content: FileContent) -> Self {
+        Self::File(content)
+    }
+
+    pub fn form_url(params: ParamsTable) -> Self {
+        Self::FormUrlEncoded(params)
+    }
+
+    pub fn form_data(form: BodyForm) -> Self {
+        Self::FormData(form)
+    }
+
+    pub fn text(txt: String) -> Self {
+        Self::Text(txt)
+    }
+}
 
 pub struct Environments {
     items: Vec<EnvironmentItem>,
@@ -420,4 +499,17 @@ impl BodyForm {
             }
         }
     }
+}
+
+#[derive(Clone)]
+pub enum FileContent {
+    None,
+    Content { path: PathBuf, info: FileInfo },
+}
+
+#[derive(Clone)]
+pub struct FileInfo {
+    pub name: String,
+    pub size: String,
+    pub path: String,
 }
