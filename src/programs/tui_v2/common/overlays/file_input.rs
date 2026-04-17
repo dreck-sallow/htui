@@ -342,6 +342,12 @@ impl PathSelector {
     }
 }
 
+impl Drop for FileInput {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
 async fn debounce_receiver<T>(
     rx: &mut tokio::sync::mpsc::Receiver<T>,
     delay: Duration,

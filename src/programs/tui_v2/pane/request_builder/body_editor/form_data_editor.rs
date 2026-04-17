@@ -39,6 +39,10 @@ impl FormDataEditor {
     pub fn is_editing(&self) -> bool {
         self.edit_text_field.is_visible() || self.edit_file.is_visible()
     }
+
+    pub fn value(&self) -> &BodyForm {
+        &self.state
+    }
 }
 
 impl FormDataEditor {

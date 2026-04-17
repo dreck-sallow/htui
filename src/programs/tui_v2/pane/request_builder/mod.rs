@@ -154,9 +154,11 @@ impl RequestBuilder {
             }
             crossterm::event::KeyCode::Tab if !self.is_editing() => {
                 state.focus = SectionFocus::RequestBuilder;
+                self.body_editor.save_to_state(state);
             }
             crossterm::event::KeyCode::BackTab if !self.is_editing() => {
                 state.focus = SectionFocus::RequestBar;
+                self.body_editor.save_to_state(state);
             }
             _ => {
                 if let Some(request) = state.collections.current_req_mut() {

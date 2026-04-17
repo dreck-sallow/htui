@@ -66,7 +66,9 @@ impl TypeEditor {
     pub fn from_state(body: &BodyContent, draw_signal: DrawSignal) -> Self {
         match body {
             BodyContent::None => TypeEditor::none(),
-            BodyContent::File(_) => TypeEditor::none(),
+            BodyContent::File(file) => {
+                TypeEditor::File(FileEditor::from_file_content(file, draw_signal))
+            }
             BodyContent::FormUrlEncoded(params) => {
                 TypeEditor::FormUrlEncoded(FormUrlEncodedEditor::new(params.clone()))
             }
@@ -78,6 +80,16 @@ impl TypeEditor {
                 editor.set_content(st);
                 TypeEditor::Text(editor)
             }
+        }
+    }
+
+    pub fn to_state(&self) -> BodyContent {
+        match self {
+            TypeEditor::None(_) => BodyContent::None,
+            TypeEditor::Text(e) => BodyContent::Text(e.value()),
+            TypeEditor::FormData(e) => BodyContent::FormData(e.value().clone()),
+            TypeEditor::FormUrlEncoded(e) => BodyContent::FormUrlEncoded(e.value().clone()),
+            TypeEditor::File(e) => BodyContent::File(e.as_file_content()),
         }
     }
 }
@@ -114,6 +126,12 @@ impl BodyEditor {
         if let Some(req) = state.collections.current_req_mut() {
             self.editor = TypeEditor::from_state(&req.body, self._draw_signal.clone());
             self.select.select(&PlainBodyType::from_model(&req.body));
+        }
+    }
+
+    pub fn save_to_state(&mut self, state: &mut PaneState) {
+        if let Some(req) = state.collections.current_req_mut() {
+            req.body = self.editor.to_state();
         }
     }
 

@@ -25,6 +25,10 @@ impl FormUrlEncodedEditor {
     pub fn is_editing(&self) -> bool {
         self.params_table.is_editing()
     }
+
+    pub fn value(&self) -> &ParamsTable {
+        &self.state
+    }
 }
 
 impl FormUrlEncodedEditor {

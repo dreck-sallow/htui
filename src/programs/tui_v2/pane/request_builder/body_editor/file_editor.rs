@@ -11,6 +11,7 @@ use ratatui::{
 use crate::programs::tui_v2::{
     common::{elements::utils::center_area, overlays::file_input::FileInput},
     events::DrawSignal,
+    pane::state::{FileContent, FileInfo},
 };
 
 pub struct FileEditor {
@@ -26,8 +27,35 @@ impl FileEditor {
         }
     }
 
+    pub fn from_file_content(content: &FileContent, draw_signal: DrawSignal) -> Self {
+        Self {
+            state: match content {
+                FileContent::None => Inner::None,
+                FileContent::Content { path, info } => Inner::File {
+                    path: path.clone(),
+                    details: info.clone(),
+                },
+            },
+            file_input: FileInput::new(draw_signal.clone()),
+        }
+    }
+
     pub fn is_editing(&self) -> bool {
         self.file_input.is_editing()
+    }
+
+    pub fn as_file_content(&self) -> FileContent {
+        match &self.state {
+            Inner::None | Inner::Error => FileContent::None,
+            Inner::File { path, details } => FileContent::Content {
+                path: path.clone(),
+                info: FileInfo {
+                    name: details.name.clone(),
+                    size: details.size.clone(),
+                    path: details.path.clone(),
+                },
+            },
+        }
     }
 }
 
@@ -44,7 +72,7 @@ impl FileEditor {
 
                 frame.render_widget(text, area);
             }
-            Inner::File { path, details } => {
+            Inner::File { details, .. } => {
                 let (title_area, content_area) = {
                     let center_area =
                         center_area(area, Constraint::Length(5), Constraint::Percentage(80));
@@ -140,7 +168,7 @@ impl FileEditor {
 
                                 self.state = Inner::File {
                                     path,
-                                    details: FileDetails {
+                                    details: FileInfo {
                                         name,
                                         size: m.size().to_string(),
                                         path: path_str,
@@ -172,12 +200,6 @@ impl FileEditor {
 
 pub enum Inner {
     None,
-    File { path: PathBuf, details: FileDetails },
+    File { path: PathBuf, details: FileInfo },
     Error,
-}
-
-pub struct FileDetails {
-    name: String,
-    size: String,
-    path: String,
 }
