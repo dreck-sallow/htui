@@ -196,7 +196,9 @@ impl CollectionsSidebar {
             crossterm::event::KeyCode::Tab => {
                 state.focus = SectionFocus::RequestBar;
             }
-            crossterm::event::KeyCode::BackTab => {}
+            crossterm::event::KeyCode::BackTab => {
+                state.focus = SectionFocus::ResponseViewer;
+            }
             crossterm::event::KeyCode::Char(ch) => match ch {
                 'e' => match state.collections.idx {
                     ListIdx::None => {}

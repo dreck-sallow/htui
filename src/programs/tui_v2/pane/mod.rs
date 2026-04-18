@@ -9,6 +9,7 @@ use ratatui::{
 };
 use request_bar::RequestBar;
 use request_builder::RequestBuilder;
+use response_viewer::ResponseViewer;
 use state::{
     BodyContent, BodyForm, CollectionItem, CollectionsList, Environments, FileInfo, PaneState,
     ParamsTable, RequestItem,
@@ -22,6 +23,7 @@ mod collections;
 mod common;
 mod request_bar;
 mod request_builder;
+mod response_viewer;
 mod state;
 
 pub struct Pane {
@@ -31,6 +33,7 @@ pub struct Pane {
     collection_sidebar: CollectionsSidebar,
     request_bar: RequestBar,
     request_builder: RequestBuilder,
+    response_viewer: ResponseViewer,
 }
 
 impl Pane {
@@ -46,6 +49,7 @@ impl Pane {
             collection_sidebar: CollectionsSidebar::new(),
             request_bar: RequestBar::new(),
             request_builder: RequestBuilder::new(draw_signal),
+            response_viewer: ResponseViewer::new(),
         }
     }
 
@@ -66,11 +70,15 @@ impl Pane {
         match self.state.collections.idx {
             state::ListIdx::None | state::ListIdx::Group(_) => {}
             state::ListIdx::Item(_, _) => {
-                let [bar_area, builder_area] =
-                    Layout::vertical([Constraint::Length(3), Constraint::Percentage(40)])
-                        .areas(main_area);
+                let [bar_area, builder_area, response_area] = Layout::vertical([
+                    Constraint::Length(3),
+                    Constraint::Fill(1),
+                    Constraint::Fill(1),
+                ])
+                .areas(main_area);
                 self.request_bar.draw(bar_area, frame, &self.state);
                 self.request_builder.draw(builder_area, frame, &self.state);
+                self.response_viewer.draw(response_area, frame, &self.state);
             }
         }
 
@@ -78,6 +86,7 @@ impl Pane {
             .draw_overlay(area, frame, &self.state);
         self.request_bar.draw_overlay(area, frame);
         self.request_builder.draw_overlay(frame);
+        self.response_viewer.draw_overlay(frame);
     }
 
     pub async fn handle_key(&mut self, key: KeyEvent) -> bool {
@@ -93,6 +102,9 @@ impl Pane {
             }
             state::SectionFocus::RequestBuilder => {
                 self.request_builder.handle_key(key, &mut self.state).await;
+            }
+            state::SectionFocus::ResponseViewer => {
+                self.response_viewer.handle_key(key, &mut self.state);
             }
         }
 
@@ -174,5 +186,6 @@ pub async fn new_pane(project: ProjectModel, draw_signal: DrawSignal) -> Pane {
         collection_sidebar: CollectionsSidebar::new(),
         request_bar: RequestBar::new(),
         request_builder: RequestBuilder::new(draw_signal),
+        response_viewer: ResponseViewer::new(),
     }
 }

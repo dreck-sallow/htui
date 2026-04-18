@@ -46,6 +46,7 @@ pub enum SectionFocus {
     Collections,
     RequestBar,
     RequestBuilder,
+    ResponseViewer,
 }
 
 pub struct CollectionsList {

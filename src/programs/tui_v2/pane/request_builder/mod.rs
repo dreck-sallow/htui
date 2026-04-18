@@ -157,7 +157,7 @@ impl RequestBuilder {
                 self.next_tab();
             }
             crossterm::event::KeyCode::Tab if !self.is_editing() => {
-                state.focus = SectionFocus::RequestBuilder;
+                state.focus = SectionFocus::ResponseViewer;
                 self.body_editor.save_to_state(state);
             }
             crossterm::event::KeyCode::BackTab if !self.is_editing() => {
