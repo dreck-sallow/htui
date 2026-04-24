@@ -1,6 +1,9 @@
 use ratatui::{
+    layout::{Constraint, Rect},
     style::{Color, Style, Stylize},
+    text::Span,
     widgets::{block::Title, Block, BorderType},
+    Frame,
 };
 
 use super::placeholder::PlaceholderLine;
@@ -27,6 +30,14 @@ pub fn ui_highlight() -> Style {
 
 pub fn ui_placeholder(line: &str) -> PlaceholderLine {
     PlaceholderLine::new(line).with_style(Style::default().dark_gray().italic())
+}
+
+pub fn draw_center_span(txt: Span, area: Rect, frame: &mut Frame) {
+    let w = txt.width() as u16;
+    frame.render_widget(
+        txt,
+        utils::center_area(area, Constraint::Length(1), Constraint::Length(w)),
+    )
 }
 
 pub mod utils {

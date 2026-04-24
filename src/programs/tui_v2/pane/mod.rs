@@ -2,14 +2,14 @@ use std::os::unix::fs::MetadataExt;
 
 use actions::EffectsCollector;
 use collections::CollectionsSidebar;
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     Frame,
 };
 use request_bar::RequestBar;
 use request_builder::RequestBuilder;
-use response_viewer::ResponseViewer;
+use response_viewer::ResponsesViewer;
 use state::{
     BodyContent, BodyForm, CollectionItem, CollectionsList, Environments, FileInfo, PaneState,
     ParamsTable, RequestItem,
@@ -33,23 +33,37 @@ pub struct Pane {
     collection_sidebar: CollectionsSidebar,
     request_bar: RequestBar,
     request_builder: RequestBuilder,
-    response_viewer: ResponseViewer,
+    response_viewer: ResponsesViewer,
 }
+
+type ProjectDetails = (String, String);
 
 impl Pane {
     pub fn from_project(project: ProjectModel, draw_signal: DrawSignal) -> Self {
-        Self {
-            project_id: project.id,
-            project_name: project.name,
-            state: PaneState::from_parts(
+        Self::new(
+            (project.id, project.name),
+            PaneState::from_parts(
                 project.collections,
                 project.environments,
                 project.selected_env_context,
             ),
+            draw_signal,
+        )
+    }
+
+    pub fn new(
+        (project_id, project_name): ProjectDetails,
+        state: PaneState,
+        draw_signal: DrawSignal,
+    ) -> Self {
+        Self {
+            project_id,
+            project_name,
+            state,
             collection_sidebar: CollectionsSidebar::new(),
             request_bar: RequestBar::new(),
-            request_builder: RequestBuilder::new(draw_signal),
-            response_viewer: ResponseViewer::new(),
+            request_builder: RequestBuilder::new(draw_signal.clone()),
+            response_viewer: ResponsesViewer::new(draw_signal),
         }
     }
 
@@ -90,6 +104,15 @@ impl Pane {
     }
 
     pub async fn handle_key(&mut self, key: KeyEvent) -> bool {
+        if crossterm::event::KeyCode::Char('S') == key.code
+            && key.modifiers.contains(KeyModifiers::SHIFT)
+        {
+            if let Some(req) = self.state.collections.current_req() {
+                self.response_viewer.send_req(req, &self.state.responses);
+                return true;
+            }
+        }
+
         let mut effects = EffectsCollector::new();
 
         match self.state.focus {
@@ -175,17 +198,13 @@ pub async fn new_pane(project: ProjectModel, draw_signal: DrawSignal) -> Pane {
         list.push(CollectionItem::new_v2(coll.id, coll.name).with_reqs(reqs));
     }
 
-    Pane {
-        project_id: project.id,
-        project_name: project.name,
-        state: PaneState::new(
+    Pane::new(
+        (project.id, project.name),
+        PaneState::new(
             CollectionsList::new().with_collections(list),
             Environments::from_model(project.environments),
             project.selected_env_context,
         ),
-        collection_sidebar: CollectionsSidebar::new(),
-        request_bar: RequestBar::new(),
-        request_builder: RequestBuilder::new(draw_signal),
-        response_viewer: ResponseViewer::new(),
-    }
+        draw_signal,
+    )
 }

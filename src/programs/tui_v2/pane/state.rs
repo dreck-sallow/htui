@@ -1,4 +1,10 @@
-use std::{collections::HashSet, ops::Not, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Not,
+    path::PathBuf,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use crate::{
     programs::tui_v2::common::list,
@@ -14,6 +20,7 @@ pub struct PaneState {
     pub(crate) collections: CollectionsList,
     pub(crate) environments: Environments,
     pub(crate) selected_env_context: Option<usize>,
+    pub(crate) responses: Responses,
 }
 
 impl PaneState {
@@ -28,6 +35,7 @@ impl PaneState {
             collections: CollectionsList::from_model(collections),
             environments: Environments::from_model(environments),
             selected_env_context: selected_env,
+            responses: Responses::new(),
         }
     }
 
@@ -37,6 +45,7 @@ impl PaneState {
             collections: list,
             environments: envs,
             selected_env_context: selected_env,
+            responses: Responses::new(),
         }
     }
 }
@@ -112,6 +121,14 @@ impl CollectionsList {
         &self.items
     }
 
+    pub fn current_req(&self) -> Option<&RequestItem> {
+        if let ListIdx::Item(i, sub_i) = self.idx {
+            return self.items[i].requests.get(sub_i);
+        }
+
+        None
+    }
+
     pub fn current_req_mut(&mut self) -> Option<&mut RequestItem> {
         if let ListIdx::Item(i, sub_i) = self.idx {
             return self.items[i].requests.get_mut(sub_i);
@@ -182,6 +199,10 @@ impl RequestItem {
             method: HttpMethod::Get,
             body: BodyContent::None,
         }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
     pub fn new_v2(
@@ -297,6 +318,13 @@ pub struct ParamsTable {
 }
 
 impl ParamsTable {
+    pub fn new() -> Self {
+        Self {
+            idx: None,
+            items: Vec::new(),
+        }
+    }
+
     pub fn from_model(model: Vec<KeyValueParam>) -> Self {
         let mut items = Vec::with_capacity(model.len());
 
@@ -513,4 +541,43 @@ pub struct FileInfo {
     pub name: String,
     pub size: String,
     pub path: String,
+}
+
+pub struct Responses {
+    pub map: Arc<RwLock<HashMap<TimeId, ResponseStatus>>>,
+}
+
+impl Responses {
+    pub fn new() -> Self {
+        Self {
+            map: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub fn responses(&self) -> Arc<RwLock<HashMap<TimeId, ResponseStatus>>> {
+        Arc::clone(&self.map)
+    }
+}
+
+pub enum ResponseStatus {
+    Fetching,
+    Success(Response),
+    Error(String),
+    Cancelled,
+}
+
+pub struct Response {
+    pub status: u16,
+    pub status_text: String,
+    pub version: String,
+    pub duration: Duration,
+    pub size_bytes: usize,
+    pub headers: ParamsTable,
+    pub body: ResponseBody,
+}
+
+pub enum ResponseBody {
+    Text(String),
+    Binary(Vec<u8>),
+    Empty,
 }
