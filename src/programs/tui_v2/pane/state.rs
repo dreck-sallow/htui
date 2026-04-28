@@ -544,12 +544,14 @@ pub struct FileInfo {
 }
 
 pub struct Responses {
+    pub list: HashMap<TimeId, ResponseStatus>,
     pub map: Arc<RwLock<HashMap<TimeId, ResponseStatus>>>,
 }
 
 impl Responses {
     pub fn new() -> Self {
         Self {
+            list: HashMap::new(),
             map: Arc::new(RwLock::new(HashMap::new())),
         }
     }

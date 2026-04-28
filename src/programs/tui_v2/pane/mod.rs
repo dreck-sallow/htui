@@ -17,7 +17,10 @@ use state::{
 
 use crate::store::models::ProjectModel;
 
-use super::events::DrawSignal;
+use super::{
+    app_event::{ReqResponse, TaskSender},
+    events::DrawSignal,
+};
 mod actions;
 mod collections;
 mod common;
@@ -34,12 +37,17 @@ pub struct Pane {
     request_bar: RequestBar,
     request_builder: RequestBuilder,
     response_viewer: ResponsesViewer,
+    _task_sender: TaskSender,
 }
 
 type ProjectDetails = (String, String);
 
 impl Pane {
-    pub fn from_project(project: ProjectModel, draw_signal: DrawSignal) -> Self {
+    pub fn from_project(
+        project: ProjectModel,
+        draw_signal: DrawSignal,
+        task_sender: TaskSender,
+    ) -> Self {
         Self::new(
             (project.id, project.name),
             PaneState::from_parts(
@@ -48,6 +56,7 @@ impl Pane {
                 project.selected_env_context,
             ),
             draw_signal,
+            task_sender,
         )
     }
 
@@ -55,6 +64,7 @@ impl Pane {
         (project_id, project_name): ProjectDetails,
         state: PaneState,
         draw_signal: DrawSignal,
+        task_sender: TaskSender,
     ) -> Self {
         Self {
             project_id,
@@ -64,6 +74,7 @@ impl Pane {
             request_bar: RequestBar::new(),
             request_builder: RequestBuilder::new(draw_signal.clone()),
             response_viewer: ResponsesViewer::new(draw_signal),
+            _task_sender: task_sender,
         }
     }
 
@@ -108,7 +119,14 @@ impl Pane {
             && key.modifiers.contains(KeyModifiers::SHIFT)
         {
             if let Some(req) = self.state.collections.current_req() {
-                self.response_viewer.send_req(req, &self.state.responses);
+                self.state
+                    .responses
+                    .list
+                    .insert(req.id().to_string(), state::ResponseStatus::Fetching);
+
+                self.response_viewer
+                    .send_req_v2(req, self._task_sender.clone())
+                    .await;
                 return true;
             }
         }
@@ -142,9 +160,35 @@ impl Pane {
 
         true
     }
+
+    pub fn handle_response(&mut self, req_res: ReqResponse) {
+        let list = &mut self.state.responses.list;
+
+        match req_res {
+            ReqResponse::Err(req_id, txt) => {
+                list.insert(req_id, state::ResponseStatus::Error(txt));
+            }
+            ReqResponse::Sucess(req_id, res) => {
+                let response = state::Response {
+                    status: res.status,
+                    status_text: res.status_text,
+                    version: res.version,
+                    duration: res.duration,
+                    size_bytes: 10,
+                    headers: ParamsTable::new(),
+                    body: state::ResponseBody::Empty,
+                };
+                list.insert(req_id, state::ResponseStatus::Success(response));
+            }
+        }
+    }
 }
 
-pub async fn new_pane(project: ProjectModel, draw_signal: DrawSignal) -> Pane {
+pub async fn new_pane(
+    project: ProjectModel,
+    draw_signal: DrawSignal,
+    task_sender: TaskSender,
+) -> Pane {
     let mut list = Vec::new();
 
     for coll in project.collections {
@@ -206,5 +250,6 @@ pub async fn new_pane(project: ProjectModel, draw_signal: DrawSignal) -> Pane {
             project.selected_env_context,
         ),
         draw_signal,
+        task_sender,
     )
 }

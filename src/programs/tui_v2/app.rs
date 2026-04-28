@@ -9,6 +9,7 @@ use ratatui::{
 use crate::store::models::ProjectModel;
 
 use super::{
+    app_event::{ReqResponse, TaskSender},
     events::DrawSignal,
     pane::{new_pane, Pane},
 };
@@ -20,8 +21,13 @@ pub struct TuiApp {
 }
 
 impl TuiApp {
-    pub fn add_project(&mut self, project: ProjectModel, draw_signal: DrawSignal) {
-        let pane = Pane::from_project(project, draw_signal);
+    pub fn add_project(
+        &mut self,
+        project: ProjectModel,
+        draw_signal: DrawSignal,
+        task_sender: TaskSender,
+    ) {
+        let pane = Pane::from_project(project, draw_signal, task_sender);
 
         self.panes.push(pane);
 
@@ -30,8 +36,13 @@ impl TuiApp {
         }
     }
 
-    pub async fn add_project_v2(&mut self, project: ProjectModel, draw_signal: DrawSignal) {
-        let pane = new_pane(project, draw_signal).await;
+    pub async fn add_project_v2(
+        &mut self,
+        project: ProjectModel,
+        draw_signal: DrawSignal,
+        task_sender: TaskSender,
+    ) {
+        let pane = new_pane(project, draw_signal, task_sender).await;
 
         self.panes.push(pane);
 
@@ -80,6 +91,13 @@ impl TuiApp {
         }
 
         true
+    }
+
+    pub fn handle_response(&mut self, res: ReqResponse) {
+        // Draw the current selected pane
+        if let Some(pane) = self.selected.and_then(|i| self.panes.get_mut(i)) {
+            pane.handle_response(res);
+        }
     }
 
     pub fn handle_quit(&self) {}

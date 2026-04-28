@@ -1,47 +1,74 @@
 use std::io;
 
 use app::TuiApp;
+use app_event::create_background_tasks;
 use events::create_events;
 
 use crate::store::{self, models::ProjectModel, Store, StoreError};
 
 mod app;
+mod app_event;
 mod common;
 mod events;
 mod pane;
 
 pub async fn run(project_name: Option<String>) -> io::Result<()> {
     let project = load_project(project_name).await.unwrap();
+
     let (mut events, draw_signal) = create_events();
+    let (sender_tasks, mut bg_tasks) = create_background_tasks();
+
     let mut terminal = ratatui::init();
 
     let mut app = TuiApp::default();
-    app.add_project_v2(project, draw_signal.clone()).await;
+    app.add_project_v2(project, draw_signal.clone(), sender_tasks)
+        .await;
 
     events.start();
-    while let Some(ev) = events.next_event().await {
-        match ev {
-            events::EventMsg::Draw => {
-                terminal.draw(|frame| {
-                    app.handle_draw(frame);
-                })?;
-            }
-            events::EventMsg::Quit => {
-                app.handle_quit();
-                break;
-            }
-            events::EventMsg::Key(key_event) => {
-                let should_continue = app.handle_key(key_event).await;
-                terminal.draw(|frame| {
-                    app.handle_draw(frame);
-                })?;
 
-                if !should_continue {
-                    break;
+    loop {
+        tokio::select! {
+            Some(ev) = events.next_event() => {
+                match ev {
+                    events::EventMsg::Draw => {
+                        terminal.draw(|frame| {
+                            app.handle_draw(frame);
+                        })?;
+                    }
+                    events::EventMsg::Quit => {
+                        app.handle_quit();
+                        break;
+                    }
+                    events::EventMsg::Key(key_event) => {
+                        let should_continue = app.handle_key(key_event).await;
+                        terminal.draw(|frame| {
+                           app.handle_draw(frame);
+                        })?;
+                        if !should_continue {
+                            break;
+                        }
+                    }
                 }
+
+            }
+            Some(ev) = bg_tasks.next_event() => {
+                match ev {
+                    app_event::AppEvent::Response(res) =>  {
+                        app.handle_response(res);
+
+                        terminal.draw(|frame| {
+                            app.handle_draw(frame);
+                        })?;
+                    },
+                }
+            }
+            else => {
+                break;
             }
         }
     }
+
+    bg_tasks.stop();
 
     events.finish();
 

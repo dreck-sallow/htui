@@ -13,6 +13,7 @@ use tokio::task::JoinHandle;
 
 use crate::{
     programs::tui_v2::{
+        app_event::{AppTask, TaskSender},
         common::elements::{draw_center_span, ui_block, ui_highlight},
         events::DrawSignal,
     },
@@ -79,6 +80,15 @@ impl ResponsesViewer {
             tasks: HashMap::new(),
             _draw_signal: draw_signal,
         }
+    }
+
+    pub async fn send_req_v2(&mut self, req_itm: &RequestItem, task_sender: TaskSender) {
+        let Some(req) = from_req_state(req_itm) else {
+            return;
+        };
+        let req_id = req_itm.id().to_string();
+
+        let _ = task_sender.send(AppTask::Request(req_id, req)).await;
     }
 
     pub fn send_req(&mut self, req_itm: &RequestItem, st: &Responses) {
@@ -179,7 +189,7 @@ impl ResponsesViewer {
             (line_status, tabs, content)
         };
 
-        match state.responses.map.read().unwrap().get(&req_id) {
+        match state.responses.list.get(&req_id) {
             Some(response) => {
                 match response {
                     super::state::ResponseStatus::Fetching => {
@@ -231,13 +241,11 @@ impl ResponsesViewer {
                             },
                         }
                     }
-                };
+                }
 
                 frame.render_widget(block, area);
             }
-            None => {
-                draw_center_span("Send request with CTRl + Enter".into(), area, frame);
-            }
+            None => draw_center_span("Send request with SHIT + S".into(), area, frame),
         }
     }
 
