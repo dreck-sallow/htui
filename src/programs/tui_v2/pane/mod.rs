@@ -15,7 +15,7 @@ use state::{
     ParamsTable, RequestItem,
 };
 
-use crate::store::models::ProjectModel;
+use crate::store::models::{ProjectModel, TimeId};
 
 use super::{
     app_event::{ReqResponse, TaskSender},
@@ -81,6 +81,10 @@ impl Pane {
     pub fn name(&self) -> &str {
         &self.project_name
     }
+
+    pub fn id(&self) -> &str {
+        &self.project_id
+    }
 }
 
 impl Pane {
@@ -125,7 +129,7 @@ impl Pane {
                     .insert(req.id().to_string(), state::ResponseStatus::Fetching);
 
                 self.response_viewer
-                    .send_req_v2(req, self._task_sender.clone())
+                    .send_req_v2(self.project_id.to_string(), req, self._task_sender.clone())
                     .await;
                 return true;
             }
@@ -161,21 +165,31 @@ impl Pane {
         true
     }
 
-    pub fn handle_response(&mut self, req_res: ReqResponse) {
+    pub fn handle_response(&mut self, req_id: TimeId, req_res: ReqResponse) {
         let list = &mut self.state.responses.list;
 
         match req_res {
-            ReqResponse::Err(req_id, txt) => {
+            ReqResponse::Err(txt) => {
                 list.insert(req_id, state::ResponseStatus::Error(txt));
             }
-            ReqResponse::Sucess(req_id, res) => {
+            ReqResponse::Sucess(res) => {
+                let mut headers = ParamsTable::new();
+
+                for (key, value) in res.headers {
+                    headers.add_item(state::ParamItem {
+                        enable: true,
+                        key,
+                        value,
+                    });
+                }
+
                 let response = state::Response {
                     status: res.status,
                     status_text: res.status_text,
                     version: res.version,
                     duration: res.duration,
                     size_bytes: 10,
-                    headers: ParamsTable::new(),
+                    headers,
                     body: state::ResponseBody::Empty,
                 };
                 list.insert(req_id, state::ResponseStatus::Success(response));

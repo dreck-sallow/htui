@@ -82,13 +82,20 @@ impl ResponsesViewer {
         }
     }
 
-    pub async fn send_req_v2(&mut self, req_itm: &RequestItem, task_sender: TaskSender) {
+    pub async fn send_req_v2(
+        &mut self,
+        pane_id: TimeId,
+        req_itm: &RequestItem,
+        task_sender: TaskSender,
+    ) {
         let Some(req) = from_req_state(req_itm) else {
             return;
         };
         let req_id = req_itm.id().to_string();
 
-        let _ = task_sender.send(AppTask::Request(req_id, req)).await;
+        let _ = task_sender
+            .send(AppTask::for_request(pane_id, req_id, req))
+            .await;
     }
 
     pub fn send_req(&mut self, req_itm: &RequestItem, st: &Responses) {
@@ -208,7 +215,7 @@ impl ResponsesViewer {
                         //- Render tabs
                         let tabs = Tabs::new([
                             format!("{} ({})", SectionTab::Body.label(), 0),
-                            format!("{} ({})", SectionTab::Headers.label(), 0),
+                            format!("{} ({})", SectionTab::Headers.label(), res.headers.len()),
                         ])
                         .select(self.section.idx() as usize)
                         .highlight_style(ui_highlight())

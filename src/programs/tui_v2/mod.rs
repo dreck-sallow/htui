@@ -52,12 +52,11 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
 
             }
             Some(ev) = bg_tasks.next_event() => {
-                match ev {
-                    app_event::AppEvent::Response(res) =>  {
-                        app.handle_response(res);
-
+                match ev.event {
+                    app_event::Event::Response { req_id, response } => {
+                    let should_continue = app.handle_response(ev.pane_id, req_id, response);
                         terminal.draw(|frame| {
-                            app.handle_draw(frame);
+                           app.handle_draw(frame);
                         })?;
                     },
                 }

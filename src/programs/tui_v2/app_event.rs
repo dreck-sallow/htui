@@ -4,17 +4,45 @@ use tokio::sync::mpsc;
 
 use crate::store::models::TimeId;
 
-// pub type EventSender = mpsc::Sender<AppEvent>;
 pub type EventReceiver = mpsc::Receiver<AppEvent>;
 
-pub enum AppEvent {
-    Response(ReqResponse),
+pub struct AppEvent {
+    pub pane_id: TimeId,
+    pub event: Event,
+}
+
+pub enum Event {
+    Response {
+        req_id: TimeId,
+        response: ReqResponse,
+    },
 }
 
 pub type TaskSender = mpsc::Sender<AppTask>;
 pub type TaskReceiver = mpsc::Receiver<AppTask>;
-pub enum AppTask {
-    Request(TimeId, reqwest::RequestBuilder),
+
+pub struct AppTask {
+    pub pane_id: TimeId,
+    pub task: Task,
+}
+
+impl AppTask {
+    pub fn for_request(pane_id: TimeId, request_id: TimeId, req: reqwest::RequestBuilder) -> Self {
+        Self {
+            pane_id,
+            task: Task::Request {
+                request_id,
+                request: req,
+            },
+        }
+    }
+}
+
+pub enum Task {
+    Request {
+        request_id: TimeId,
+        request: reqwest::RequestBuilder,
+    },
 }
 
 pub fn create_background_tasks() -> (TaskSender, BackgroundTasks) {
@@ -33,13 +61,24 @@ impl BackgroundTasks {
 
         let jh = tokio::spawn(async move {
             // TODO:  handle the abort spawn task gracefully with a map of JoinHandles
-            while let Some(ev) = rx.recv().await {
-                match ev {
-                    AppTask::Request(req_id, builder) => {
+            while let Some(AppTask { pane_id, task }) = rx.recv().await {
+                match task {
+                    Task::Request {
+                        request_id,
+                        request,
+                    } => {
                         let _tx = sender.clone();
                         tokio::spawn(async move {
-                            let res = process_request(req_id, builder).await;
-                            let _ = _tx.send(AppEvent::Response(res)).await;
+                            let res = process_request(request).await;
+                            let _ = _tx
+                                .send(AppEvent {
+                                    pane_id,
+                                    event: Event::Response {
+                                        req_id: request_id,
+                                        response: res,
+                                    },
+                                })
+                                .await;
                         });
                     }
                 }
@@ -59,10 +98,8 @@ impl BackgroundTasks {
 }
 
 pub enum ReqResponse {
-    // Err { id: TimeId, msg: String },
-    Err(TimeId, String),
-    // Sucess { id: TimeId, response: Response },
-    Sucess(TimeId, Response),
+    Err(String),
+    Sucess(Response),
 }
 
 pub struct Response {
@@ -70,9 +107,10 @@ pub struct Response {
     pub status_text: String,
     pub version: String,
     pub duration: Duration,
+    pub headers: Vec<(String, String)>,
 }
 
-pub async fn process_request(req_id: TimeId, req: reqwest::RequestBuilder) -> ReqResponse {
+pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
     let timer = tokio::time::Instant::now();
     let result = req.send().await;
     let duration = timer.elapsed();
@@ -80,20 +118,27 @@ pub async fn process_request(req_id: TimeId, req: reqwest::RequestBuilder) -> Re
     let res = match result {
         Ok(r) => r,
         Err(e) => {
-            return ReqResponse::Err(req_id, e.to_string());
+            return ReqResponse::Err(e.to_string());
         }
     };
 
-    ReqResponse::Sucess(
-        req_id,
-        Response {
-            status: res.status().as_u16(),
-            status_text: res.status().as_str().to_string(),
-            version: format!("{:?}", res.version()),
-            duration,
-            // headers: headers,
-            // body: super::state::ResponseBody::Empty,
-            // size_bytes: res.bytes().await.map(|b| b.len()).unwrap_or(0),
-        },
-    )
+    let mut headers = Vec::new();
+
+    for (name, value) in res.headers() {
+        // NOTE: support non-ascii text?
+        let Ok(value) = value.to_str() else {
+            continue;
+        };
+        headers.push((name.as_str().to_string(), value.to_string()));
+    }
+
+    ReqResponse::Sucess(Response {
+        status: res.status().as_u16(),
+        status_text: res.status().as_str().to_string(),
+        version: format!("{:?}", res.version()),
+        duration,
+        headers,
+        // body: super::state::ResponseBody::Empty,
+        // size_bytes: res.bytes().await.map(|b| b.len()).unwrap_or(0),
+    })
 }

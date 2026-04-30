@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::store::models::ProjectModel;
+use crate::store::models::{ProjectModel, TimeId};
 
 use super::{
     app_event::{ReqResponse, TaskSender},
@@ -93,10 +93,13 @@ impl TuiApp {
         true
     }
 
-    pub fn handle_response(&mut self, res: ReqResponse) {
+    pub fn handle_response(&mut self, pane_id: TimeId, req_id: TimeId, res: ReqResponse) {
         // Draw the current selected pane
-        if let Some(pane) = self.selected.and_then(|i| self.panes.get_mut(i)) {
-            pane.handle_response(res);
+        for pane in &mut self.panes {
+            if pane.id() == pane_id {
+                pane.handle_response(req_id, res);
+                break;
+            }
         }
     }
 
