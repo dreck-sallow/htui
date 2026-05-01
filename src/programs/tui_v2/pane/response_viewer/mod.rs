@@ -9,7 +9,6 @@ use ratatui::{
     Frame,
 };
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use tokio::task::JoinHandle;
 
 use crate::{
     programs::tui_v2::{
@@ -21,8 +20,8 @@ use crate::{
 };
 
 use super::{
-    common::params_table::params_to_ui,
-    state::{BodyContent, PaneState, ParamsTable, RequestItem, Responses, SectionFocus},
+    common::params_table::readonly_params,
+    state::{BodyContent, PaneState, ParamsTable, RequestItem, SectionFocus},
 };
 
 enum SectionTab {
@@ -65,11 +64,8 @@ impl Section {
     }
 }
 
-type Tasks = HashMap<TimeId, JoinHandle<()>>;
-
 pub struct ResponsesViewer {
     section: Section,
-    tasks: Tasks,
     _draw_signal: DrawSignal,
 }
 
@@ -77,7 +73,6 @@ impl ResponsesViewer {
     pub fn new(draw_signal: DrawSignal) -> Self {
         Self {
             section: Section::new(),
-            tasks: HashMap::new(),
             _draw_signal: draw_signal,
         }
     }
@@ -98,82 +93,17 @@ impl ResponsesViewer {
             .await;
     }
 
-    pub fn send_req(&mut self, req_itm: &RequestItem, st: &Responses) {
-        let Some(req) = from_req_state(req_itm) else {
-            return;
-        };
-        let req_id = req_itm.id().to_string();
+    // pub fn cancel_req(&mut self, req_id: String, st: &Responses) {
+    //     // we need abort the previous task
+    //     if let Some(t) = self.tasks.remove(&req_id) {
+    //         t.abort();
+    //     }
 
-        // we need abort the previous task
-        if let Some(t) = self.tasks.remove(&req_id) {
-            t.abort();
-        }
-
-        let map = st.map.clone();
-
-        map.write()
-            .unwrap()
-            .insert(req_id.to_string(), super::state::ResponseStatus::Fetching);
-
-        let draw_signal = self._draw_signal.clone();
-
-        let jh = tokio::spawn(async move {
-            let timer = tokio::time::Instant::now();
-            match req.send().await {
-                Ok(res) => {
-                    let duration = timer.elapsed();
-                    let mut headers = ParamsTable::new();
-
-                    for (name, value) in res.headers() {
-                        // NOTE: support non-ascii text?
-                        let Ok(value) = value.to_str() else {
-                            continue;
-                        };
-
-                        headers.add_item(super::state::ParamItem {
-                            enable: true,
-                            key: name.as_str().to_string(),
-                            value: value.to_string(),
-                        });
-                    }
-
-                    let response = super::state::Response {
-                        status: res.status().as_u16(),
-                        status_text: res.status().as_str().to_string(),
-                        version: format!("{:?}", res.version()),
-                        duration,
-                        headers: headers,
-                        body: super::state::ResponseBody::Empty,
-                        size_bytes: res.bytes().await.map(|b| b.len()).unwrap_or(0),
-                    };
-                    map.write()
-                        .unwrap()
-                        .insert(req_id, super::state::ResponseStatus::Success(response));
-                }
-                Err(e) => {
-                    map.write()
-                        .unwrap()
-                        .insert(req_id, super::state::ResponseStatus::Error(e.to_string()));
-                }
-            };
-
-            draw_signal.draw();
-        });
-
-        self.tasks.insert(req_itm.id().to_string(), jh);
-    }
-
-    pub fn cancel_req(&mut self, req_id: String, st: &Responses) {
-        // we need abort the previous task
-        if let Some(t) = self.tasks.remove(&req_id) {
-            t.abort();
-        }
-
-        st.map
-            .write()
-            .unwrap()
-            .insert(req_id, super::state::ResponseStatus::Cancelled);
-    }
+    //     st.map
+    //         .write()
+    //         .unwrap()
+    //         .insert(req_id, super::state::ResponseStatus::Cancelled);
+    // }
 }
 
 impl ResponsesViewer {
@@ -214,7 +144,7 @@ impl ResponsesViewer {
 
                         //- Render tabs
                         let tabs = Tabs::new([
-                            format!("{} ({})", SectionTab::Body.label(), 0),
+                            format!("{}", SectionTab::Body.label()),
                             format!("{} ({})", SectionTab::Headers.label(), res.headers.len()),
                         ])
                         .select(self.section.idx() as usize)
@@ -235,7 +165,7 @@ impl ResponsesViewer {
 
                         match self.section.tab {
                             SectionTab::Headers => {
-                                params_to_ui(&res.headers).draw(content_area, frame);
+                                readonly_params(&res.headers).draw(content_area, frame);
                             }
                             SectionTab::Body => match &res.body {
                                 super::state::ResponseBody::Text(s) => {
@@ -256,7 +186,7 @@ impl ResponsesViewer {
         }
     }
 
-    pub fn draw_overlay(&self, frame: &mut Frame) {}
+    pub fn draw_overlay(&self, _frame: &mut Frame) {}
 
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
         match key.code {
@@ -273,14 +203,39 @@ impl ResponsesViewer {
                 state.focus = SectionFocus::RequestBuilder;
             }
             _ => {
-                // if let Some(request) = state.collections.current_req_mut() {
-                //     match self.section {
-                //         Section::Headers => self.handle_table_key(key, &mut request.headers),
-                //         Section::Params => self.handle_table_key(key, &mut request.params),
-                //         Section::Body => self.handle_body_key(key, &mut request.body).await,
-                //     }
-                // }
+                let Some(res) = state
+                    .collections
+                    .current_req()
+                    .map(|r| r.id().to_string())
+                    .and_then(|id| state.responses.list.get_mut(&id))
+                else {
+                    return;
+                };
+
+                match res {
+                    super::state::ResponseStatus::Success(response) => match self.section.tab {
+                        SectionTab::Headers => {
+                            self.handle_params_key(key, &mut response.headers);
+                        }
+                        SectionTab::Body => {}
+                    },
+                    super::state::ResponseStatus::Error(_) => todo!(),
+                    _ => {}
+                }
             }
+        }
+    }
+
+    fn handle_params_key(&mut self, key: KeyEvent, table: &mut ParamsTable) {
+        match key.code {
+            crossterm::event::KeyCode::Char(ch) => match ch {
+                'j' => table.next_row(),
+                'k' => table.prev_row(),
+                'h' => table.prev_col(),
+                'l' => table.next_col(),
+                _ => {}
+            },
+            _ => {}
         }
     }
 }

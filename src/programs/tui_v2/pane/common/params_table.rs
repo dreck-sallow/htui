@@ -101,3 +101,22 @@ pub fn params_to_ui(params: &ParamsTable) -> UiTableGrid<'_, '_, 3> {
     )
     .with_index(params.idx, Style::default().on_dark_gray())
 }
+
+pub fn readonly_params(params: &ParamsTable) -> UiTableGrid<'_, '_, 2> {
+    UiTableGrid::new(["Header Name".blue(), "Header Value".blue()], [0.5, 0.5])
+        .with_rows(
+            params
+                .items
+                .iter()
+                .map(|p| {
+                    {
+                        [
+                            Span::raw(if p.key.len() > 1 { &p.key } else { "-" }),
+                            Span::raw(if p.value.len() > 1 { &p.value } else { "-" }),
+                        ]
+                    }
+                })
+                .collect(),
+        )
+        .with_index(params.idx, Style::default().on_dark_gray())
+}

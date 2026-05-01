@@ -190,7 +190,11 @@ impl Pane {
                     duration: res.duration,
                     size_bytes: 10,
                     headers,
-                    body: state::ResponseBody::Empty,
+                    body: match res.body {
+                        super::app_event::Body::Text(s) => state::ResponseBody::Text(s),
+                        super::app_event::Body::Binary(items) => state::ResponseBody::Binary(items),
+                        super::app_event::Body::Empty => state::ResponseBody::Empty,
+                    },
                 };
                 list.insert(req_id, state::ResponseStatus::Success(response));
             }
