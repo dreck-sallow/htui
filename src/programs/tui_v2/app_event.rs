@@ -1,5 +1,7 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
+use mime::Mime;
+use reqwest::header::CONTENT_TYPE;
 use tokio::sync::mpsc;
 
 use crate::store::models::TimeId;
@@ -108,6 +110,13 @@ pub struct Response {
     pub version: String,
     pub duration: Duration,
     pub headers: Vec<(String, String)>,
+    pub body: Body,
+}
+
+pub enum Body {
+    Text(String),
+    Binary(Vec<u8>),
+    Empty,
 }
 
 pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
@@ -124,21 +133,48 @@ pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
 
     let mut headers = Vec::new();
 
+    let mut mime = None;
+
     for (name, value) in res.headers() {
         // NOTE: support non-ascii text?
         let Ok(value) = value.to_str() else {
             continue;
         };
+
+        if name == CONTENT_TYPE {
+            mime = Mime::from_str(value).ok();
+        }
+
         headers.push((name.as_str().to_string(), value.to_string()));
     }
 
+    let status = res.status().as_u16();
+    let status_text = res.status().as_str().to_string();
+    let version = res.version();
+
+    let body = match mime {
+        Some(mime) => {
+            // println!("mime {:?}", mime);
+            let bytes = res.bytes().await.unwrap();
+            match mime.type_() {
+                mime::TEXT => match mime.subtype() {
+                    // mime::PLAIN => Body::Text(String::from_utf8(bytes.to_vec()).unwrap()),
+                    mime::JSON => Body::Text(serde_json::from_slice(&bytes.to_vec()).unwrap()),
+                    _ => Body::Text(String::from_utf8(bytes.to_vec()).unwrap()),
+                },
+                _ => Body::Empty,
+            }
+        }
+        None => Body::Empty,
+    };
+
     ReqResponse::Sucess(Response {
-        status: res.status().as_u16(),
-        status_text: res.status().as_str().to_string(),
-        version: format!("{:?}", res.version()),
+        status,
+        status_text,
+        version: format!("{:?}", version),
         duration,
         headers,
-        // body: super::state::ResponseBody::Empty,
-        // size_bytes: res.bytes().await.map(|b| b.len()).unwrap_or(0),
+        body, // body: super::state::ResponseBody::Empty,
+              // size_bytes: res.bytes().await.map(|b| b.len()).unwrap_or(0),
     })
 }
