@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
-    text::Span,
+    text::{Line, Span},
     widgets::{Block, BorderType, Borders, Tabs},
     Frame,
 };
@@ -140,7 +140,16 @@ impl ResponsesViewer {
                     }
                     super::state::ResponseStatus::Success(res) => {
                         //- Render line
-                        frame.render_widget(Span::raw("Status line"), line_area);
+                        let line = Line::from_iter([
+                            Span::raw(&res.version),
+                            Span::raw("   "),
+                            Span::raw(res.status.to_string()),
+                            Span::raw("   "),
+                            Span::raw(format!("{}", res.status_text)),
+                            Span::raw("   "),
+                            Span::raw(format!("{}", duration_as_str(res.duration))),
+                        ]);
+                        frame.render_widget(line, line_area);
 
                         //- Render tabs
                         let tabs = Tabs::new([
@@ -281,4 +290,21 @@ fn from_req_state(req_state: &RequestItem) -> Option<reqwest::RequestBuilder> {
     };
 
     Some(builder)
+}
+
+fn duration_as_str(d: Duration) -> String {
+    let millis = d.as_millis();
+    let secs = d.as_secs_f64();
+
+    if secs < 1_f64 {
+        return format!("{:.3}ms", millis);
+    }
+
+    let minutes = secs / 60_f64;
+
+    if minutes < 1_f64 {
+        return format!("{:.3}s", secs);
+    }
+
+    return format!("{:.4}m", minutes);
 }

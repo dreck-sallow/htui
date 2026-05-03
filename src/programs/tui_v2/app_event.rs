@@ -149,12 +149,15 @@ pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
     }
 
     let status = res.status().as_u16();
-    let status_text = res.status().as_str().to_string();
+    let status_text = res
+        .status()
+        .canonical_reason()
+        .unwrap_or("Unknow status")
+        .to_string();
     let version = res.version();
 
     let body = match mime {
         Some(mime) => {
-            // println!("mime {:?}", mime);
             let bytes = res.bytes().await.unwrap();
             match mime.type_() {
                 mime::TEXT => match mime.subtype() {
