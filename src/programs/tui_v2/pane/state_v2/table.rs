@@ -1,4 +1,4 @@
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum TableIdx {
     #[default]
     None,
@@ -6,9 +6,34 @@ pub enum TableIdx {
     Cell(usize, usize),
 }
 
+impl TableIdx {
+    pub fn as_cell(&self) -> Option<(usize, usize)> {
+        match self {
+            TableIdx::Cell(row, cell) => Some((*row, *cell)),
+            TableIdx::None | TableIdx::Row(_) => None,
+        }
+    }
+
+    pub fn as_row(&self) -> Option<usize> {
+        match self {
+            TableIdx::Row(row) | TableIdx::Cell(row, _) => Some(*row),
+            TableIdx::None => None,
+        }
+    }
+}
+
 pub struct TableState<I> {
     idx: TableIdx,
     items: Vec<I>,
+}
+
+impl<R: Clone> Clone for TableState<R> {
+    fn clone(&self) -> Self {
+        Self {
+            idx: self.idx,
+            items: self.items.clone(),
+        }
+    }
 }
 
 impl<R> TableState<R> {
@@ -17,6 +42,14 @@ impl<R> TableState<R> {
             idx: TableIdx::None,
             items: Vec::new(),
         }
+    }
+
+    pub fn items(&self) -> &[R] {
+        &self.items
+    }
+
+    pub fn idx(&self) -> TableIdx {
+        self.idx
     }
 
     pub fn next_row(&mut self) {
@@ -106,10 +139,30 @@ impl<R> TableState<R> {
         Some(self.items.remove(idx))
     }
 
+    pub fn remove_current_row(&mut self) -> Option<R> {
+        match self.idx {
+            TableIdx::Row(row) | TableIdx::Cell(row, _) => self.remove_row(row),
+            _ => None,
+        }
+    }
+
     pub fn current_mut(&mut self) -> Option<&mut R> {
         match self.idx {
             TableIdx::None => None,
             TableIdx::Row(row) | TableIdx::Cell(row, _) => self.items.get_mut(row),
+        }
+    }
+}
+
+impl<R> From<Vec<R>> for TableState<R> {
+    fn from(value: Vec<R>) -> Self {
+        Self {
+            idx: if value.is_empty() {
+                TableIdx::None
+            } else {
+                TableIdx::Row(0)
+            },
+            items: value,
         }
     }
 }
