@@ -10,10 +10,20 @@ use ratatui::{
 use request_bar::RequestBar;
 use request_builder::RequestBuilder;
 use response_viewer::ResponsesViewer;
-use state::{
-    BodyContent, BodyForm, CollectionItem, CollectionsList, Environments, FileInfo, PaneState,
-    ParamsTable, RequestItem,
+use state_v2::{
+    collections::{
+        BodyContent, BodyForm, CollectionItem, CollectionsList, FileContent, FileInfo, ListIdx,
+        RequestItem,
+    },
+    param_item,
+    responses::{self, ResponseStatus},
+    table::{self, TableState},
+    PaneState, SectionFocus,
 };
+// use state::{
+//     BodyContent, BodyForm, CollectionItem, CollectionsList, Environments, FileInfo, PaneState,
+//     ParamsTable, RequestItem,
+// };
 
 use crate::store::models::{ProjectModel, TimeId};
 
@@ -27,7 +37,8 @@ mod common;
 mod request_bar;
 mod request_builder;
 mod response_viewer;
-mod state;
+// mod state;
+mod state_v2;
 
 pub struct Pane {
     project_id: String,
@@ -43,22 +54,22 @@ pub struct Pane {
 type ProjectDetails = (String, String);
 
 impl Pane {
-    pub fn from_project(
-        project: ProjectModel,
-        draw_signal: DrawSignal,
-        task_sender: TaskSender,
-    ) -> Self {
-        Self::new(
-            (project.id, project.name),
-            PaneState::from_parts(
-                project.collections,
-                project.environments,
-                project.selected_env_context,
-            ),
-            draw_signal,
-            task_sender,
-        )
-    }
+    // pub fn from_project(
+    //     project: ProjectModel,
+    //     draw_signal: DrawSignal,
+    //     task_sender: TaskSender,
+    // ) -> Self {
+    //     Self::new(
+    //         (project.id, project.name),
+    //         PaneState::from_parts(
+    //             project.collections,
+    //             project.environments,
+    //             project.selected_env_context,
+    //         ),
+    //         draw_signal,
+    //         task_sender,
+    //     )
+    // }
 
     pub fn new(
         (project_id, project_name): ProjectDetails,
@@ -97,8 +108,8 @@ impl Pane {
             .draw(sidebar_area, frame, &self.state);
 
         match self.state.collections.idx {
-            state::ListIdx::None | state::ListIdx::Group(_) => {}
-            state::ListIdx::Item(_, _) => {
+            ListIdx::None | ListIdx::Group(_) => {}
+            ListIdx::Item(_, _) => {
                 let [bar_area, builder_area, response_area] = Layout::vertical([
                     Constraint::Length(3),
                     Constraint::Fill(1),
@@ -126,7 +137,7 @@ impl Pane {
                 self.state
                     .responses
                     .list
-                    .insert(req.id().to_string(), state::ResponseStatus::Fetching);
+                    .insert(req.id().to_string(), ResponseStatus::Fetching);
 
                 self.response_viewer
                     .send_req_v2(self.project_id.to_string(), req, self._task_sender.clone())
@@ -138,17 +149,17 @@ impl Pane {
         let mut effects = EffectsCollector::new();
 
         match self.state.focus {
-            state::SectionFocus::Collections => {
+            SectionFocus::Collections => {
                 self.collection_sidebar
                     .handle_key(key, &mut self.state, &mut effects);
             }
-            state::SectionFocus::RequestBar => {
+            SectionFocus::RequestBar => {
                 self.request_bar.handle_key(key, &mut self.state);
             }
-            state::SectionFocus::RequestBuilder => {
+            SectionFocus::RequestBuilder => {
                 self.request_builder.handle_key(key, &mut self.state).await;
             }
-            state::SectionFocus::ResponseViewer => {
+            SectionFocus::ResponseViewer => {
                 self.response_viewer.handle_key(key, &mut self.state);
             }
         }
@@ -170,33 +181,33 @@ impl Pane {
 
         match req_res {
             ReqResponse::Err(txt) => {
-                list.insert(req_id, state::ResponseStatus::Error(txt));
+                list.insert(req_id, ResponseStatus::Error(txt));
             }
             ReqResponse::Sucess(res) => {
-                let mut headers = ParamsTable::new();
+                let mut headers = table::TableState::new();
 
                 for (key, value) in res.headers {
-                    headers.add_item(state::ParamItem {
-                        enable: true,
-                        key,
-                        value,
-                    });
+                    headers.add_row(responses::ReadonlyHeader { key, value });
                 }
 
-                let response = state::Response {
+                let response = responses::Response {
                     status: res.status,
                     status_text: res.status_text,
                     version: res.version,
                     duration: res.duration,
                     size_bytes: 10,
+                    content_type: res.content_type,
                     headers,
                     body: match res.body {
-                        super::app_event::Body::Text(s) => state::ResponseBody::Text(s),
-                        super::app_event::Body::Binary(items) => state::ResponseBody::Binary(items),
-                        super::app_event::Body::Empty => state::ResponseBody::Empty,
+                        super::app_event::Body::Text(s) => responses::ResponseBody::Text(s),
+                        super::app_event::Body::Binary(items) => {
+                            responses::ResponseBody::Binary(items)
+                        }
+                        super::app_event::Body::Empty => responses::ResponseBody::Empty,
                     },
+                    cookies: TableState::new(),
                 };
-                list.insert(req_id, state::ResponseStatus::Success(response));
+                list.insert(req_id, responses::ResponseStatus::Success(response));
             }
         }
     }
@@ -218,10 +229,31 @@ pub async fn new_pane(
                 crate::store::models::RequestBody::Text(st) => BodyContent::Text(st),
                 crate::store::models::RequestBody::Json(v) => BodyContent::Text(v.to_string()),
                 crate::store::models::RequestBody::FormUrlEncoded(m) => {
-                    BodyContent::FormUrlEncoded(ParamsTable::from_model(m))
+                    let mut list = Vec::new();
+                    for param in m {
+                        list.push(param_item::ParamItem {
+                            enable: param.enable,
+                            key: param.key,
+                            value: param.value,
+                        });
+                    }
+
+                    BodyContent::FormUrlEncoded(TableState::from(list))
                 }
                 crate::store::models::RequestBody::FormData(m) => {
-                    BodyContent::FormData(BodyForm::from_model(m))
+                    let mut list = Vec::new();
+                    for param in m {
+                        list.push((
+                            param.is_file,
+                            param_item::ParamItem {
+                                enable: param.enable,
+                                key: param.key,
+                                value: param.value,
+                            },
+                        ));
+                    }
+
+                    BodyContent::FormData(BodyForm::from(list))
                 }
                 crate::store::models::RequestBody::File(path) => {
                     if path.is_file() {
@@ -230,7 +262,7 @@ pub async fn new_pane(
                                 let name = path.file_name().unwrap().to_str().unwrap().to_string();
                                 let path_str = path.to_str().unwrap().to_string();
 
-                                BodyContent::File(state::FileContent::Content {
+                                BodyContent::File(FileContent::Content {
                                     path,
                                     info: FileInfo {
                                         name,
@@ -239,22 +271,40 @@ pub async fn new_pane(
                                     },
                                 })
                             }
-                            Err(_) => BodyContent::File(state::FileContent::None),
+                            Err(_) => BodyContent::File(FileContent::None),
                         }
                     } else {
-                        BodyContent::File(state::FileContent::None)
+                        BodyContent::File(FileContent::None)
                     }
                 }
             };
 
+            let headers = {
+                let mut table = TableState::new();
+                for header in req.headers {
+                    table.add_row(param_item::ParamItem {
+                        enable: header.enable,
+                        key: header.key,
+                        value: header.value,
+                    });
+                }
+                table
+            };
+
+            let params = {
+                let mut table = TableState::new();
+                for param in req.params {
+                    table.add_row(param_item::ParamItem {
+                        enable: param.enable,
+                        key: param.key,
+                        value: param.value,
+                    });
+                }
+                table
+            };
+
             reqs.push(RequestItem::new_v2(
-                req.id,
-                req.name,
-                req.url,
-                ParamsTable::from_model(req.headers),
-                ParamsTable::from_model(req.params),
-                req.method,
-                body,
+                req.id, req.name, req.url, headers, params, req.method, body,
             ));
         }
         list.push(CollectionItem::new_v2(coll.id, coll.name).with_reqs(reqs));
@@ -262,11 +312,7 @@ pub async fn new_pane(
 
     Pane::new(
         (project.id, project.name),
-        PaneState::new(
-            CollectionsList::new().with_collections(list),
-            Environments::from_model(project.environments),
-            project.selected_env_context,
-        ),
+        PaneState::new(CollectionsList::new().with_collections(list)),
         draw_signal,
         task_sender,
     )

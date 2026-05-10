@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::programs::tui_v2::{
     common::table_grid::UiTableGrid,
-    pane::state::{ParamItem, ParamsTable},
+    pane::state_v2::{param_item::ParamItem, responses::ReadonlyHeader, table::TableState},
 };
 
 use super::edit_param_table_popup::EditParamTablePopup;
@@ -30,7 +30,7 @@ impl ParamsTableUi {
 }
 
 impl ParamsTableUi {
-    pub fn draw(&self, table: &ParamsTable, area: Rect, frame: &mut Frame) {
+    pub fn draw(&self, table: &TableState<ParamItem>, area: Rect, frame: &mut Frame) {
         params_to_ui(table).draw(area, frame);
     }
 
@@ -40,7 +40,7 @@ impl ParamsTableUi {
         }
     }
 
-    pub fn handle_table_key(&mut self, key: KeyEvent, table: &mut ParamsTable) {
+    pub fn handle_table_key(&mut self, key: KeyEvent, table: &mut TableState<ParamItem>) {
         if self.edit_popup.is_visible() {
             self.edit_popup.handle_key(key, table);
         } else {
@@ -48,16 +48,16 @@ impl ParamsTableUi {
                 crossterm::event::KeyCode::Char(ch) => match ch {
                     'j' => table.next_row(),
                     'k' => table.prev_row(),
-                    'h' => table.prev_col(),
-                    'l' => table.next_col(),
-                    'n' => table.add_item(ParamItem::empty()),
+                    'h' => table.prev_cell(),
+                    'l' => table.next_cell(),
+                    'n' => table.add_row(ParamItem::empty()),
                     'd' => {
-                        table.delete_current();
+                        table.remove_current_row();
                     }
                     'e' => {
-                        let idx = table.idx.clone();
+                        let idx = table.idx();
                         if let Some(itm) = table.current_mut() {
-                            match idx.unwrap().1 {
+                            match idx.as_cell().unwrap().1 {
                                 0 => {
                                     itm.toggle_enable();
                                 }
@@ -79,14 +79,14 @@ impl ParamsTableUi {
     }
 }
 
-pub fn params_to_ui(params: &ParamsTable) -> UiTableGrid<'_, '_, 3> {
+pub fn params_to_ui(params: &TableState<ParamItem>) -> UiTableGrid<'_, '_, 3> {
     UiTableGrid::new(
         ["Enable".blue(), "Header Name".blue(), "Header Value".blue()],
         [0.2, 0.4, 0.4],
     )
     .with_rows(
         params
-            .items
+            .items()
             .iter()
             .map(|p| {
                 {
@@ -99,14 +99,14 @@ pub fn params_to_ui(params: &ParamsTable) -> UiTableGrid<'_, '_, 3> {
             })
             .collect(),
     )
-    .with_index(params.idx, Style::default().on_dark_gray())
+    .with_index(params.idx().as_cell(), Style::default().on_dark_gray())
 }
 
-pub fn readonly_params(params: &ParamsTable) -> UiTableGrid<'_, '_, 2> {
+pub fn readonly_params(params: &TableState<ReadonlyHeader>) -> UiTableGrid<'_, '_, 2> {
     UiTableGrid::new(["Header Name".blue(), "Header Value".blue()], [0.5, 0.5])
         .with_rows(
             params
-                .items
+                .items()
                 .iter()
                 .map(|p| {
                     {
@@ -118,5 +118,5 @@ pub fn readonly_params(params: &ParamsTable) -> UiTableGrid<'_, '_, 2> {
                 })
                 .collect(),
         )
-        .with_index(params.idx, Style::default().on_dark_gray())
+        .with_index(params.idx().as_cell(), Style::default().on_dark_gray())
 }

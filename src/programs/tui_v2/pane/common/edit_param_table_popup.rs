@@ -3,7 +3,7 @@ use ratatui::{layout::Constraint, Frame};
 
 use crate::programs::tui_v2::{
     common::overlays::popup_input::{CenterArea, PopupInput},
-    pane::state::ParamsTable,
+    pane::state_v2::{param_item::ParamItem, table::TableState},
 };
 
 enum ParamField {
@@ -64,7 +64,7 @@ impl EditParamTablePopup {
         );
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, table: &mut ParamsTable) {
+    pub fn handle_key(&mut self, key: KeyEvent, table: &mut TableState<ParamItem>) {
         let itm = table.current_mut().unwrap();
 
         match key.code {

@@ -109,6 +109,7 @@ pub struct Response {
     pub status_text: String,
     pub version: String,
     pub duration: Duration,
+    pub content_type: String,
     pub headers: Vec<(String, String)>,
     pub body: Body,
 }
@@ -134,6 +135,7 @@ pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
     let mut headers = Vec::new();
 
     let mut mime = None;
+    let mut raw_content_type = None;
 
     for (name, value) in res.headers() {
         // NOTE: support non-ascii text?
@@ -143,6 +145,8 @@ pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
 
         if name == CONTENT_TYPE {
             mime = Mime::from_str(value).ok();
+            raw_content_type = Some(value.to_string());
+            continue;
         }
 
         headers.push((name.as_str().to_string(), value.to_string()));
@@ -176,6 +180,7 @@ pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
         status_text,
         version: format!("{:?}", version),
         duration,
+        content_type: raw_content_type.unwrap_or("unknown".into()),
         headers,
         body, // body: super::state::ResponseBody::Empty,
               // size_bytes: res.bytes().await.map(|b| b.len()).unwrap_or(0),

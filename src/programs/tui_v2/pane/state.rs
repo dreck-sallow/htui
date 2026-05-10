@@ -574,7 +574,9 @@ pub struct Response {
     pub version: String,
     pub duration: Duration,
     pub size_bytes: usize,
+    pub content_type: String,
     pub headers: ParamsTable,
+    pub cookies: ParamsTable,
     pub body: ResponseBody,
 }
 
@@ -582,4 +584,17 @@ pub enum ResponseBody {
     Text(String),
     Binary(Vec<u8>),
     Empty,
+}
+
+pub struct Cookie {
+    name: String,
+    value: String,
+    domain: Option<String>,
+    expires: Option<String>,
+    max_ge: Option<String>,
+    path: Option<String>,
+    http_only: Option<bool>,
+    partitioned: Option<bool>,
+    secure: Option<bool>,
+    same_site: Option<String>,
 }

@@ -11,7 +11,7 @@ use crate::{
     store::models::HttpMethod,
 };
 
-use super::state::{ListIdx, PaneState, SectionFocus};
+use super::state_v2::{collections::ListIdx, PaneState, SectionFocus};
 
 mod select_method;
 
@@ -35,8 +35,8 @@ impl RequestBar {
     pub fn sync(&mut self, state: &mut PaneState) {
         self.reset();
 
-        if let super::state::ListIdx::Item(i, sub_i) = state.collections.idx {
-            let request = &state.collections.items[i].requests[sub_i];
+        if let ListIdx::Item(i, sub_i) = state.collections.idx {
+            let request = &state.collections.get_requests(i).unwrap()[sub_i];
             self.input_url.replace(&request.url);
             self.method = request.method.clone();
         }
@@ -102,7 +102,7 @@ impl RequestBar {
                 crossterm::event::KeyCode::Tab => {
                     state.focus = SectionFocus::RequestBuilder;
                     if let ListIdx::Item(i, sub_i) = state.collections.idx {
-                        let request = &mut state.collections.items[i].requests[sub_i];
+                        let request = state.collections.get_request_mut((i, sub_i)).unwrap();
                         request.url = self.input_url.inner().to_string();
                         request.method = self.method.clone();
                     }
@@ -110,7 +110,7 @@ impl RequestBar {
                 crossterm::event::KeyCode::BackTab => {
                     state.focus = SectionFocus::Collections;
                     if let ListIdx::Item(i, sub_i) = state.collections.idx {
-                        let request = &mut state.collections.items[i].requests[sub_i];
+                        let request = state.collections.get_request_mut((i, sub_i)).unwrap();
                         request.url = self.input_url.inner().to_string();
                         request.method = self.method.clone();
                     }

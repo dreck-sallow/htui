@@ -1,21 +1,24 @@
 use crossterm::event::KeyEvent;
 use ratatui::{layout::Rect, Frame};
 
-use crate::programs::tui_v2::pane::{common::params_table::ParamsTableUi, state::ParamsTable};
+use crate::programs::tui_v2::pane::{
+    common::params_table::ParamsTableUi,
+    state_v2::{param_item::ParamItem, table::TableState},
+};
 
 pub struct FormUrlEncodedEditor {
     params_table: ParamsTableUi,
-    state: ParamsTable,
+    state: TableState<ParamItem>,
 }
 
 impl Default for FormUrlEncodedEditor {
     fn default() -> Self {
-        Self::new(ParamsTable::default())
+        Self::new(TableState::new())
     }
 }
 
 impl FormUrlEncodedEditor {
-    pub fn new(state: ParamsTable) -> Self {
+    pub fn new(state: TableState<ParamItem>) -> Self {
         Self {
             params_table: ParamsTableUi::new(),
             state,
@@ -26,7 +29,7 @@ impl FormUrlEncodedEditor {
         self.params_table.is_editing()
     }
 
-    pub fn value(&self) -> &ParamsTable {
+    pub fn value(&self) -> &TableState<ParamItem> {
         &self.state
     }
 }

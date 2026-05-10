@@ -11,7 +11,10 @@ use crate::programs::tui_v2::common::elements::ui_block;
 
 use super::{
     actions::EffectsCollector,
-    state::{CollectionsList, ListIdx, PaneState, SectionFocus},
+    state_v2::{
+        collections::{CollectionsList, ListIdx},
+        PaneState, SectionFocus,
+    },
 };
 mod list;
 pub mod upsert_item;
@@ -83,13 +86,13 @@ impl CollectionsSidebar {
             | crossterm::event::KeyCode::Char('d') => match state.collections.idx {
                 ListIdx::None => {}
                 ListIdx::Group(i) => {
-                    if i == 0 && state.collections.items.len() == 1 {
-                        state.collections.items.remove(i);
+                    if i == 0 && state.collections.size() == 1 {
+                        state.collections.remove_collection(i);
                         state.collections.idx = ListIdx::None;
-                    } else if i == state.collections.items.len() - 1 {
-                        state.collections.items.remove(i);
+                    } else if i == state.collections.size() - 1 {
+                        state.collections.remove_collection(i);
                         let last_idx = i - 1;
-                        let last = &state.collections.items[last_idx];
+                        let last = state.collections.get_collection(last_idx).unwrap();
 
                         if last.is_open && !last.requests.is_empty() {
                             state.collections.idx =
@@ -98,12 +101,12 @@ impl CollectionsSidebar {
                             state.collections.idx = ListIdx::Group(last_idx);
                         }
                     } else {
-                        state.collections.items.remove(i);
+                        state.collections.remove_collection(i);
                     }
                     effects.add(super::actions::PaneActionEffect::ChangeIdx);
                 }
                 ListIdx::Item(i, sub_i) => {
-                    let requests = &mut state.collections.items[i].requests;
+                    let requests = state.collections.get_mut_requests(i).unwrap();
                     if sub_i == 0 && requests.len() == 1 {
                         requests.remove(sub_i);
                         state.collections.idx = ListIdx::Group(i);
@@ -118,12 +121,12 @@ impl CollectionsSidebar {
             },
             crossterm::event::KeyCode::Left | crossterm::event::KeyCode::Char('h') => {
                 if let ListIdx::Group(i) = state.collections.idx {
-                    state.collections.items[i].is_open = false;
+                    state.collections.get_mut_collection(i).unwrap().is_open = false;
                 }
             }
             crossterm::event::KeyCode::Right | crossterm::event::KeyCode::Char('l') => {
                 if let ListIdx::Group(i) = state.collections.idx {
-                    state.collections.items[i].is_open = true;
+                    state.collections.get_mut_collection(i).unwrap().is_open = true;
                 }
             }
             crossterm::event::KeyCode::Up | crossterm::event::KeyCode::Char('k') => {
@@ -131,7 +134,7 @@ impl CollectionsSidebar {
                     ListIdx::None => {}
                     ListIdx::Group(i) => {
                         if i > 0 {
-                            let prev = &state.collections.items[i - 1];
+                            let prev = state.collections.get_collection(i - 1).unwrap();
                             if !prev.is_open || prev.requests.is_empty() {
                                 state.collections.idx = ListIdx::Group(i - 1);
                             } else {
@@ -155,19 +158,19 @@ impl CollectionsSidebar {
                 match state.collections.idx {
                     ListIdx::None => {}
                     ListIdx::Group(i) => {
-                        let itm = &state.collections.items[i];
+                        let itm = state.collections.get_collection(i).unwrap();
                         if itm.is_open && !itm.requests.is_empty() {
                             state.collections.idx = ListIdx::Item(i, 0);
-                        } else if i < state.collections.items.len() - 1 {
+                        } else if i < state.collections.size() - 1 {
                             state.collections.idx = ListIdx::Group(i + 1);
                         }
                         effects.add(super::actions::PaneActionEffect::ChangeIdx);
                     }
                     ListIdx::Item(i, sub_i) => {
-                        let itm = &state.collections.items[i];
+                        let itm = state.collections.get_collection(i).unwrap();
                         if sub_i < itm.requests.len() - 1 {
                             state.collections.idx = ListIdx::Item(i, sub_i + 1);
-                        } else if i < state.collections.items.len() - 1 {
+                        } else if i < state.collections.size() - 1 {
                             state.collections.idx = ListIdx::Group(i + 1);
                         }
                         effects.add(super::actions::PaneActionEffect::ChangeIdx);
@@ -175,20 +178,21 @@ impl CollectionsSidebar {
                 }
             }
             crossterm::event::KeyCode::Home => {
-                if !state.collections.items.is_empty() {
+                if state.collections.size() != 0 {
                     state.collections.idx = ListIdx::Group(0);
                     effects.add(super::actions::PaneActionEffect::ChangeIdx);
                 }
             }
             crossterm::event::KeyCode::End => {
-                if let Some(itm) = state.collections.items.last() {
+                if let Some(itm) = state
+                    .collections
+                    .get_collection(state.collections.size() - 1)
+                {
                     if itm.requests.is_empty() {
-                        state.collections.idx = ListIdx::Group(state.collections.items.len() - 1);
+                        state.collections.idx = ListIdx::Group(state.collections.size() - 1);
                     } else {
-                        state.collections.idx = ListIdx::Item(
-                            state.collections.items.len() - 1,
-                            itm.requests.len() - 1,
-                        );
+                        state.collections.idx =
+                            ListIdx::Item(state.collections.size() - 1, itm.requests.len() - 1);
                     }
                     effects.add(super::actions::PaneActionEffect::ChangeIdx);
                 }
@@ -203,12 +207,12 @@ impl CollectionsSidebar {
                 'e' => match state.collections.idx {
                     ListIdx::None => {}
                     ListIdx::Group(i) => {
-                        let name = &state.collections.items[i].name;
+                        let name = &state.collections.get_collection(i).unwrap().name;
                         self.upsert_item
                             .open(UpsertItemAction::EditCollection, name);
                     }
                     ListIdx::Item(i, sub_i) => {
-                        let name = &state.collections.items[i].requests[sub_i].name;
+                        let name = &state.collections.get_requests(i).unwrap()[sub_i].name;
                         self.upsert_item.open(UpsertItemAction::EditRequest, name);
                     }
                 },
@@ -245,7 +249,7 @@ fn page_list<'a>(list: &'a CollectionsList, height: u16) -> Vec<Line<'a>> {
 
     // Naive implementation :(
     let mut iterate_idx = 0;
-    for coll in &list.items {
+    for coll in list.items() {
         if iterate_idx >= start_idx && iterate_idx <= end_idx {
             let symbol = if coll.is_open {
                 "\u{25bc} "
@@ -287,7 +291,7 @@ fn page_list<'a>(list: &'a CollectionsList, height: u16) -> Vec<Line<'a>> {
 
 fn compute_flat_idx(list: &CollectionsList) -> usize {
     let mut flat_idx = 0;
-    for (coll_i, coll) in list.items.iter().enumerate() {
+    for (coll_i, coll) in list.items().iter().enumerate() {
         match list.idx {
             ListIdx::Group(i) if i == coll_i => break,
             ListIdx::Item(i, sub_i) if i == coll_i => {

@@ -11,7 +11,7 @@ use ratatui::{
 use crate::programs::tui_v2::{
     common::{elements::utils::center_area, overlays::file_input::FileInput},
     events::DrawSignal,
-    pane::state::{FileContent, FileInfo},
+    pane::state_v2::collections::{FileContent, FileInfo},
 };
 
 pub struct FileEditor {

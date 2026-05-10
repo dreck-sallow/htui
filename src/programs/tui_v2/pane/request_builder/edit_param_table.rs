@@ -6,7 +6,7 @@ use crate::programs::tui_v2::{
         elements::{ui_block, utils::center_area},
         input::input_mode::{InputAction, InputMode},
     },
-    pane::state::ParamsTable,
+    pane::state_v2::{param_item::ParamItem, table::TableState},
 };
 
 enum ParamField {
@@ -79,7 +79,7 @@ impl EditParamTablePopup {
         self.input_str.draw(inner_area, frame);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, table: &mut ParamsTable) {
+    pub fn handle_key(&mut self, key: KeyEvent, table: &mut TableState<ParamItem>) {
         let itm = table.current_mut().unwrap();
 
         match key.code {

@@ -21,7 +21,12 @@ use crate::{
 
 use super::{
     common::params_table::readonly_params,
-    state::{BodyContent, PaneState, ParamsTable, RequestItem, SectionFocus},
+    state_v2::{
+        collections::{BodyContent, RequestItem},
+        responses::{ReadonlyHeader, ResponseBody, ResponseStatus},
+        table::TableState,
+        PaneState, SectionFocus,
+    },
 };
 
 enum SectionTab {
@@ -129,25 +134,26 @@ impl ResponsesViewer {
         match state.responses.list.get(&req_id) {
             Some(response) => {
                 match response {
-                    super::state::ResponseStatus::Fetching => {
+                    ResponseStatus::Fetching => {
                         draw_center_span("Sending...".blue(), area, frame);
                     }
-                    super::state::ResponseStatus::Error(st) => {
+                    ResponseStatus::Error(st) => {
                         draw_center_span(st.as_str().red(), area, frame);
                     }
-                    super::state::ResponseStatus::Cancelled => {
+                    ResponseStatus::Cancelled => {
                         draw_center_span("Request cancelled".into(), area, frame);
                     }
-                    super::state::ResponseStatus::Success(res) => {
+                    ResponseStatus::Success(res) => {
                         //- Render line
                         let line = Line::from_iter([
                             Span::raw(&res.version),
                             Span::raw("   "),
                             Span::raw(res.status.to_string()),
-                            Span::raw("   "),
                             Span::raw(format!("{}", res.status_text)),
                             Span::raw("   "),
                             Span::raw(format!("{}", duration_as_str(res.duration))),
+                            Span::raw("   "),
+                            Span::raw(format!("{}", res.content_type)),
                         ]);
                         frame.render_widget(line, line_area);
 
@@ -177,11 +183,11 @@ impl ResponsesViewer {
                                 readonly_params(&res.headers).draw(content_area, frame);
                             }
                             SectionTab::Body => match &res.body {
-                                super::state::ResponseBody::Text(s) => {
+                                ResponseBody::Text(s) => {
                                     frame.render_widget(ratatui::text::Text::raw(s), content_area);
                                 }
-                                super::state::ResponseBody::Binary(_) => {}
-                                super::state::ResponseBody::Empty => {
+                                ResponseBody::Binary(_) => {}
+                                ResponseBody::Empty => {
                                     draw_center_span("Empty body O_O.".into(), content_area, frame);
                                 }
                             },
@@ -222,26 +228,26 @@ impl ResponsesViewer {
                 };
 
                 match res {
-                    super::state::ResponseStatus::Success(response) => match self.section.tab {
+                    ResponseStatus::Success(response) => match self.section.tab {
                         SectionTab::Headers => {
                             self.handle_params_key(key, &mut response.headers);
                         }
                         SectionTab::Body => {}
                     },
-                    super::state::ResponseStatus::Error(_) => todo!(),
+                    ResponseStatus::Error(_) => todo!(),
                     _ => {}
                 }
             }
         }
     }
 
-    fn handle_params_key(&mut self, key: KeyEvent, table: &mut ParamsTable) {
+    fn handle_params_key(&mut self, key: KeyEvent, table: &mut TableState<ReadonlyHeader>) {
         match key.code {
             crossterm::event::KeyCode::Char(ch) => match ch {
                 'j' => table.next_row(),
                 'k' => table.prev_row(),
-                'h' => table.prev_col(),
-                'l' => table.next_col(),
+                'h' => table.prev_cell(),
+                'l' => table.next_cell(),
                 _ => {}
             },
             _ => {}
@@ -266,7 +272,7 @@ fn from_req_state(req_state: &RequestItem) -> Option<reqwest::RequestBuilder> {
     };
 
     let mut headers = HeaderMap::new();
-    for header in req_state.headers.items.iter().filter(|i| i.enable) {
+    for header in req_state.headers.items().iter().filter(|i| i.enable) {
         let name = HeaderName::from_bytes(header.key.as_bytes()).unwrap();
         let value = HeaderValue::from_str(&header.value).unwrap();
         headers.insert(name, value);
@@ -279,7 +285,7 @@ fn from_req_state(req_state: &RequestItem) -> Option<reqwest::RequestBuilder> {
         BodyContent::Text(js) => builder.body(reqwest::Body::wrap(js.clone())),
         BodyContent::FormUrlEncoded(table) => {
             let mut map = HashMap::new();
-            for itm in table.items.iter().filter(|itm| itm.enable) {
+            for itm in table.items().iter().filter(|itm| itm.enable) {
                 map.insert(itm.key.clone(), itm.value.clone());
             }
 

@@ -14,7 +14,7 @@ use crate::{
             input::input_mode::InputMode,
             select_list::SelectList,
         },
-        pane::state::PaneState,
+        pane::state_v2::PaneState,
     },
     store::models::HttpMethod,
 };

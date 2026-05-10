@@ -6,7 +6,10 @@ use crate::programs::tui_v2::{
         elements::{ui_block, utils::center_area},
         input::input_mode::InputMode,
     },
-    pane::state::{CollectionItem, ListIdx, PaneState, RequestItem},
+    pane::state_v2::{
+        collections::{CollectionItem, ListIdx, RequestItem},
+        PaneState,
+    },
 };
 
 #[derive(PartialEq, Eq)]
@@ -75,14 +78,13 @@ impl UpertItemPopup {
                     UpsertItemAction::CreateCollection => {
                         match state.collections.idx {
                             ListIdx::None => {
-                                state.collections.items.push(CollectionItem::new(input));
+                                state.collections.add_item(CollectionItem::new(input));
                                 state.collections.idx = ListIdx::Group(0);
                             }
                             ListIdx::Group(i) | ListIdx::Item(i, _) => {
                                 state
                                     .collections
-                                    .items
-                                    .insert(i + 1, CollectionItem::new(input));
+                                    .insert_item(i + 1, CollectionItem::new(input));
                             }
                         };
                     }
@@ -90,25 +92,25 @@ impl UpertItemPopup {
                         match state.collections.idx {
                             ListIdx::None => {}
                             ListIdx::Group(i) => {
-                                state.collections.items[i]
-                                    .requests
-                                    .insert(0, RequestItem::new(input));
+                                state
+                                    .collections
+                                    .insert_req((i, 0), RequestItem::new(input));
                             }
                             ListIdx::Item(i, sub_i) => {
-                                state.collections.items[i]
-                                    .requests
-                                    .insert(sub_i + 1, RequestItem::new(input));
+                                state
+                                    .collections
+                                    .insert_req((i, sub_i + 1), RequestItem::new(input));
                             }
                         };
                     }
                     UpsertItemAction::EditCollection => {
                         if let ListIdx::Group(i) = state.collections.idx {
-                            state.collections.items[i].name = input;
+                            state.collections.get_mut_collection(i).unwrap().name = input;
                         }
                     }
                     UpsertItemAction::EditRequest => {
                         if let ListIdx::Item(i, sub_i) = state.collections.idx {
-                            state.collections.items[i].requests[sub_i].name = input;
+                            state.collections.get_mut_requests(i).unwrap()[sub_i].name = input;
                         }
                     }
                 }

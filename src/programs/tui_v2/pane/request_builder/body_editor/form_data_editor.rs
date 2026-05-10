@@ -13,7 +13,7 @@ use crate::programs::tui_v2::{
     events::DrawSignal,
     pane::{
         request_builder::edit_param_table::EditParamTablePopup,
-        state::{BodyForm, ParamItem},
+        state_v2::{collections::BodyForm, param_item::ParamItem},
     },
 };
 
@@ -53,7 +53,7 @@ impl FormDataEditor {
         )
         .with_rows(
             self.state
-                .items
+                .items()
                 .iter()
                 .enumerate()
                 .map(|(i, p)| {
@@ -73,7 +73,7 @@ impl FormDataEditor {
                 })
                 .collect(),
         )
-        .with_index(self.state.idx, Style::default().on_dark_gray())
+        .with_index(self.state.idx().as_cell(), Style::default().on_dark_gray())
         .draw(area, frame);
     }
 
@@ -96,7 +96,9 @@ impl FormDataEditor {
                         current.key = text;
                     } else {
                         current.value = text;
-                        self.state.are_files.remove(&self.state.idx.unwrap().0);
+                        self.state
+                            .are_files
+                            .remove(&self.state.idx().as_row().unwrap());
                     }
                     self.edit_text_field.hide();
                 }
@@ -119,7 +121,9 @@ impl FormDataEditor {
                     if path.is_file() {
                         let current = self.state.current_mut().unwrap();
                         current.value = path.to_str().unwrap().to_string();
-                        self.state.are_files.insert(self.state.idx.unwrap().0);
+                        self.state
+                            .are_files
+                            .insert(self.state.idx().as_row().unwrap());
 
                         self.edit_file.hide();
                     }
@@ -141,12 +145,12 @@ impl FormDataEditor {
                     'l' => table.next_col(),
                     'n' => table.add_item(ParamItem::empty()),
                     'd' => {
-                        table.delete_current();
+                        table.remove_current();
                     }
                     'e' => {
-                        let idx = table.idx.clone();
+                        let idx = table.idx();
                         if let Some(itm) = table.current_mut() {
-                            match idx.unwrap().1 {
+                            match idx.as_cell().unwrap().1 {
                                 0 => {
                                     itm.toggle_enable();
                                 }
@@ -161,9 +165,9 @@ impl FormDataEditor {
                         }
                     }
                     'f' => {
-                        let idx = table.idx.clone().unwrap();
+                        let idx = table.idx();
                         if let Some(itm) = table.current_mut() {
-                            match idx.1 {
+                            match idx.as_cell().unwrap().1 {
                                 2 => {
                                     self.edit_file.show(PathBuf::from(&itm.value));
                                 }

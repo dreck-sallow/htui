@@ -21,21 +21,6 @@ pub struct TuiApp {
 }
 
 impl TuiApp {
-    pub fn add_project(
-        &mut self,
-        project: ProjectModel,
-        draw_signal: DrawSignal,
-        task_sender: TaskSender,
-    ) {
-        let pane = Pane::from_project(project, draw_signal, task_sender);
-
-        self.panes.push(pane);
-
-        if self.selected.is_none() {
-            self.selected = Some(0);
-        }
-    }
-
     pub async fn add_project_v2(
         &mut self,
         project: ProjectModel,

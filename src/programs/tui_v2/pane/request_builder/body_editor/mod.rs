@@ -17,7 +17,7 @@ use crate::programs::tui_v2::{
         select_list::SelectList,
     },
     events::DrawSignal,
-    pane::state::{BodyContent, PaneState},
+    pane::state_v2::{collections::BodyContent, PaneState},
 };
 
 mod file_editor;

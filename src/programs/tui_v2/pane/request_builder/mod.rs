@@ -14,7 +14,12 @@ use crate::programs::tui_v2::{
 
 use super::{
     common::params_table::ParamsTableUi,
-    state::{BodyContent, ListIdx, PaneState, ParamsTable, SectionFocus},
+    state_v2::{
+        collections::{BodyContent, ListIdx},
+        param_item::ParamItem,
+        table::TableState,
+        PaneState, SectionFocus,
+    },
 };
 
 mod body_editor;
@@ -98,7 +103,7 @@ impl RequestBuilder {
 
         // render content
         if let ListIdx::Item(i, sub_i) = state.collections.idx {
-            let request = &state.collections.items[i].requests[sub_i];
+            let request = state.collections.get_request((i, sub_i)).unwrap();
 
             let tabs = Tabs::new([
                 format!("{} ({})", Section::Headers.as_str(), request.headers.len()),
@@ -176,7 +181,7 @@ impl RequestBuilder {
         }
     }
 
-    fn handle_table_key(&mut self, key: KeyEvent, table: &mut ParamsTable) {
+    fn handle_table_key(&mut self, key: KeyEvent, table: &mut TableState<ParamItem>) {
         self.params_table_ui.handle_table_key(key, table);
     }
 
