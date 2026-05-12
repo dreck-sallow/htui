@@ -22,7 +22,15 @@ impl TableIdx {
     }
 }
 
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub enum TableMode {
+    Row,
+    #[default]
+    Cell,
+}
+
 pub struct TableState<I> {
+    mode: TableMode,
     idx: TableIdx,
     items: Vec<I>,
 }
@@ -30,6 +38,7 @@ pub struct TableState<I> {
 impl<R: Clone> Clone for TableState<R> {
     fn clone(&self) -> Self {
         Self {
+            mode: self.mode,
             idx: self.idx,
             items: self.items.clone(),
         }
@@ -39,8 +48,23 @@ impl<R: Clone> Clone for TableState<R> {
 impl<R> TableState<R> {
     pub fn new() -> Self {
         Self {
+            mode: TableMode::default(),
             idx: TableIdx::None,
             items: Vec::new(),
+        }
+    }
+
+    pub fn set_mode(&mut self, mode: TableMode) {
+        self.mode = mode;
+
+        match (mode, self.idx) {
+            (TableMode::Cell, TableIdx::Row(row)) => {
+                self.idx = TableIdx::Cell(row, 0);
+            }
+            (TableMode::Row, TableIdx::Cell(row, _)) => {
+                self.idx = TableIdx::Row(row);
+            }
+            _ => {}
         }
     }
 
@@ -98,7 +122,10 @@ impl<R> TableState<R> {
         self.items.push(row);
 
         if self.items.len() == 1 {
-            self.idx = TableIdx::Row(1);
+            self.idx = match self.mode {
+                TableMode::Row => TableIdx::Row(0),
+                TableMode::Cell => TableIdx::Cell(0, 0),
+            };
         }
     }
 
@@ -157,6 +184,7 @@ impl<R> TableState<R> {
 impl<R> From<Vec<R>> for TableState<R> {
     fn from(value: Vec<R>) -> Self {
         Self {
+            mode: TableMode::default(),
             idx: if value.is_empty() {
                 TableIdx::None
             } else {
@@ -169,7 +197,7 @@ impl<R> From<Vec<R>> for TableState<R> {
 
 impl<R: TableRow> TableState<R> {
     pub fn next_cell(&mut self) {
-        if self.items.is_empty() {
+        if self.items.is_empty() || self.mode == TableMode::Row {
             return;
         }
 
@@ -189,7 +217,7 @@ impl<R: TableRow> TableState<R> {
     }
 
     pub fn prev_cell(&mut self) {
-        if self.items.is_empty() {
+        if self.items.is_empty() || self.mode == TableMode::Row {
             return;
         }
 
