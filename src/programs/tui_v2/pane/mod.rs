@@ -190,6 +190,23 @@ impl Pane {
                     headers.add_row(responses::ReadonlyHeader { key, value });
                 }
 
+                let mut cookies = table::TableState::new();
+
+                for cookie in res.cookies {
+                    cookies.add_row(responses::Cookie {
+                        name: cookie.name,
+                        value: cookie.value,
+                        domain: cookie.domain,
+                        expires: cookie.expires,
+                        max_ge: cookie.max_age,
+                        path: cookie.path,
+                        http_only: cookie.http_only,
+                        partitioned: cookie.partitioned,
+                        secure: cookie.secure,
+                        same_site: cookie.same_site,
+                    });
+                }
+
                 let response = responses::Response {
                     status: res.status,
                     status_text: res.status_text,
@@ -205,7 +222,7 @@ impl Pane {
                         }
                         super::app_event::Body::Empty => responses::ResponseBody::Empty,
                     },
-                    cookies: TableState::new(),
+                    cookies,
                 };
                 list.insert(req_id, responses::ResponseStatus::Success(response));
             }

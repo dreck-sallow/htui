@@ -13,7 +13,10 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use crate::{
     programs::tui_v2::{
         app_event::{AppTask, TaskSender},
-        common::elements::{draw_center_span, ui_block, ui_highlight},
+        common::{
+            elements::{draw_center_span, ui_block, ui_highlight},
+            table_grid::UiTableGrid,
+        },
         events::DrawSignal,
     },
     store::models::{HttpMethod, TimeId},
@@ -23,8 +26,8 @@ use super::{
     common::params_table::readonly_params,
     state_v2::{
         collections::{BodyContent, RequestItem},
-        responses::{ReadonlyHeader, ResponseBody, ResponseStatus},
-        table::TableState,
+        responses::{ResponseBody, ResponseStatus},
+        table::{TableRow, TableState},
         PaneState, SectionFocus,
     },
 };
@@ -32,6 +35,7 @@ use super::{
 enum SectionTab {
     Headers,
     Body,
+    Cookie,
 }
 
 impl SectionTab {
@@ -39,6 +43,7 @@ impl SectionTab {
         match self {
             SectionTab::Headers => "Headers",
             SectionTab::Body => "Body",
+            SectionTab::Cookie => "Cookie",
         }
     }
 }
@@ -56,8 +61,17 @@ impl Section {
 
     pub fn next(&mut self) {
         self.tab = match self.tab {
-            SectionTab::Headers => SectionTab::Body,
             SectionTab::Body => SectionTab::Headers,
+            SectionTab::Headers => SectionTab::Cookie,
+            SectionTab::Cookie => SectionTab::Body,
+        };
+    }
+
+    pub fn previous(&mut self) {
+        self.tab = match self.tab {
+            SectionTab::Headers => SectionTab::Body,
+            SectionTab::Body => SectionTab::Cookie,
+            SectionTab::Cookie => SectionTab::Headers,
         };
     }
 
@@ -65,6 +79,7 @@ impl Section {
         match self.tab {
             SectionTab::Body => 0,
             SectionTab::Headers => 1,
+            SectionTab::Cookie => 2,
         }
     }
 }
@@ -160,7 +175,12 @@ impl ResponsesViewer {
                         //- Render tabs
                         let tabs = Tabs::new([
                             format!("{}", SectionTab::Body.label()),
-                            format!("{} ({})", SectionTab::Headers.label(), res.headers.len()),
+                            format!(
+                                "{} ({})",
+                                SectionTab::Headers.label(),
+                                res.headers.len() + res.cookies.len()
+                            ),
+                            format!("{} ({})", SectionTab::Cookie.label(), res.cookies.len()),
                         ])
                         .select(self.section.idx() as usize)
                         .highlight_style(ui_highlight())
@@ -191,6 +211,42 @@ impl ResponsesViewer {
                                     draw_center_span("Empty body O_O.".into(), content_area, frame);
                                 }
                             },
+                            SectionTab::Cookie => {
+                                UiTableGrid::new(
+                                    [
+                                        "Name".blue(),
+                                        "Value".blue(),
+                                        "Domain".blue(),
+                                        "Path".blue(),
+                                    ],
+                                    [0.25, 0.25, 0.25, 0.25],
+                                )
+                                .with_rows(
+                                    res.cookies
+                                        .items()
+                                        .iter()
+                                        .map(|cookie| {
+                                            [
+                                                Span::raw(&cookie.name),
+                                                Span::raw(&cookie.value),
+                                                Span::raw(match cookie.domain {
+                                                    Some(ref domain) => domain.clone(),
+                                                    None => "-".to_string(),
+                                                }),
+                                                Span::raw(match cookie.path {
+                                                    Some(ref path) => path.clone(),
+                                                    None => "-".to_string(),
+                                                }),
+                                            ]
+                                        })
+                                        .collect(),
+                                )
+                                .with_index(
+                                    res.cookies.idx().as_cell(),
+                                    Style::default().on_dark_gray(),
+                                )
+                                .draw(content_area, frame);
+                            }
                         }
                     }
                 }
@@ -206,7 +262,7 @@ impl ResponsesViewer {
     pub fn handle_key(&mut self, key: KeyEvent, state: &mut PaneState) {
         match key.code {
             crossterm::event::KeyCode::Left => {
-                self.section.next();
+                self.section.previous();
             }
             crossterm::event::KeyCode::Right => {
                 self.section.next();
@@ -230,9 +286,12 @@ impl ResponsesViewer {
                 match res {
                     ResponseStatus::Success(response) => match self.section.tab {
                         SectionTab::Headers => {
-                            self.handle_params_key(key, &mut response.headers);
+                            self.handle_table_basic_keys(key, &mut response.headers);
                         }
                         SectionTab::Body => {}
+                        SectionTab::Cookie => {
+                            self.handle_table_basic_keys(key, &mut response.cookies);
+                        }
                     },
                     ResponseStatus::Error(_) => todo!(),
                     _ => {}
@@ -241,7 +300,7 @@ impl ResponsesViewer {
         }
     }
 
-    fn handle_params_key(&mut self, key: KeyEvent, table: &mut TableState<ReadonlyHeader>) {
+    fn handle_table_basic_keys<R: TableRow>(&mut self, key: KeyEvent, table: &mut TableState<R>) {
         match key.code {
             crossterm::event::KeyCode::Char(ch) => match ch {
                 'j' => table.next_row(),
