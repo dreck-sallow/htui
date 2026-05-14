@@ -200,9 +200,9 @@ impl Pane {
                         expires: cookie.expires,
                         max_ge: cookie.max_age,
                         path: cookie.path,
-                        http_only: cookie.http_only,
-                        partitioned: cookie.partitioned,
-                        secure: cookie.secure,
+                        http_only: cookie.http_only.unwrap_or(false),
+                        partitioned: cookie.partitioned.unwrap_or(false),
+                        secure: cookie.secure.unwrap_or(false),
                         same_site: cookie.same_site,
                     });
                 }

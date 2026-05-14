@@ -135,7 +135,9 @@ pub struct Cookie {
 
 impl Cookie {
     pub fn from_str(txt: &str) -> Option<Self> {
-        let mut parts = txt.split(";").filter_map(|st| st.split_once('='));
+        let mut parts = txt
+            .split(";")
+            .filter_map(|st| st.split_once('=').or(Some((st, st))));
 
         let (name, value) = {
             let cookie = parts.next()?;
@@ -160,7 +162,7 @@ impl Cookie {
 
             if key.eq_ignore_ascii_case("Domain") {
                 cookie.domain = Some(value.to_string());
-            } else if key.eq_ignore_ascii_case("Expiers") {
+            } else if key.eq_ignore_ascii_case("Expires") {
                 cookie.expires = Some(value.to_string());
             } else if key.eq_ignore_ascii_case("Max-Age") {
                 cookie.max_age = Some(value.to_string());

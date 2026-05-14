@@ -59,14 +59,14 @@ pub struct Cookie {
     pub expires: Option<String>,
     pub max_ge: Option<String>,
     pub path: Option<String>,
-    pub http_only: Option<bool>,
-    pub partitioned: Option<bool>,
-    pub secure: Option<bool>,
+    pub http_only: bool,
+    pub partitioned: bool,
+    pub secure: bool,
     pub same_site: Option<String>,
 }
 
 impl TableRow for Cookie {
     fn next_cell(&self, idx: Option<usize>) -> Option<usize> {
-        Self::next_with_limit(&self, idx, 4)
+        Self::next_with_limit(&self, idx, 6)
     }
 }

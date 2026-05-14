@@ -26,7 +26,7 @@ use super::{
     common::params_table::readonly_params,
     state_v2::{
         collections::{BodyContent, RequestItem},
-        responses::{ResponseBody, ResponseStatus},
+        responses::{Cookie, ResponseBody, ResponseStatus},
         table::{TableRow, TableState},
         PaneState, SectionFocus,
     },
@@ -212,40 +212,7 @@ impl ResponsesViewer {
                                 }
                             },
                             SectionTab::Cookie => {
-                                UiTableGrid::new(
-                                    [
-                                        "Name".blue(),
-                                        "Value".blue(),
-                                        "Domain".blue(),
-                                        "Path".blue(),
-                                    ],
-                                    [0.25, 0.25, 0.25, 0.25],
-                                )
-                                .with_rows(
-                                    res.cookies
-                                        .items()
-                                        .iter()
-                                        .map(|cookie| {
-                                            [
-                                                Span::raw(&cookie.name),
-                                                Span::raw(&cookie.value),
-                                                Span::raw(match cookie.domain {
-                                                    Some(ref domain) => domain.clone(),
-                                                    None => "-".to_string(),
-                                                }),
-                                                Span::raw(match cookie.path {
-                                                    Some(ref path) => path.clone(),
-                                                    None => "-".to_string(),
-                                                }),
-                                            ]
-                                        })
-                                        .collect(),
-                                )
-                                .with_index(
-                                    res.cookies.idx().as_cell(),
-                                    Style::default().on_dark_gray(),
-                                )
-                                .draw(content_area, frame);
+                                cookie_table(&res.cookies).draw(content_area, frame);
                             }
                         }
                     }
@@ -372,4 +339,70 @@ fn duration_as_str(d: Duration) -> String {
     }
 
     return format!("{:.4}m", minutes);
+}
+
+fn check_bool_as_txt(flag: bool, txt: &str) -> &str {
+    if flag {
+        txt
+    } else {
+        "-"
+    }
+}
+
+fn cookie_table(table: &TableState<Cookie>) -> UiTableGrid<'_, '_, 7> {
+    let flags = |cookie: &Cookie| {
+        format!(
+            "{} {} {}",
+            check_bool_as_txt(cookie.http_only, "H"),
+            check_bool_as_txt(cookie.secure, "S"),
+            check_bool_as_txt(cookie.partitioned, "P")
+        )
+    };
+
+    UiTableGrid::new(
+        [
+            "Name".blue(),            // 15
+            "Value".blue(),           // 15
+            "Domain".blue(),          // 15
+            "Path".blue(),            // 10
+            "Expires/Max-Age".blue(), // 25
+            "SameSite".blue(),        // 10
+            "H|S|P".blue(),           // 10
+        ],
+        [0.15, 0.15, 0.15, 0.10, 0.25, 0.10, 0.10],
+    )
+    .with_rows(
+        table
+            .items()
+            .iter()
+            .map(|cookie| {
+                [
+                    Span::raw(&cookie.name),
+                    Span::raw(&cookie.value),
+                    Span::raw(
+                        cookie
+                            .domain
+                            .as_ref()
+                            .map_or("-".to_string(), |d| d.clone()),
+                    ),
+                    Span::raw(match cookie.path {
+                        Some(ref path) => path.clone(),
+                        None => "-".to_string(),
+                    }),
+                    Span::raw(cookie.expires.as_ref().map_or_else(
+                        || cookie.max_ge.as_ref().map_or("".to_string(), |e| e.clone()),
+                        |e| e.clone(),
+                    )),
+                    Span::raw(
+                        cookie
+                            .same_site
+                            .as_ref()
+                            .map_or("-".to_string(), |e| e.clone()),
+                    ),
+                    Span::raw(flags(cookie)),
+                ]
+            })
+            .collect(),
+    )
+    .with_index(table.idx().as_cell(), Style::default().on_dark_gray())
 }
