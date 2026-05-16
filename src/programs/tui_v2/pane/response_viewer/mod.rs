@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Tabs},
     Frame,
 };
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::{HeaderName, HeaderValue};
 
 use crate::{
     programs::tui_v2::{
@@ -18,6 +18,7 @@ use crate::{
             table_grid::UiTableGrid,
         },
         events::DrawSignal,
+        HTTP_CLIENT,
     },
     store::models::{HttpMethod, TimeId},
 };
@@ -281,7 +282,7 @@ impl ResponsesViewer {
     }
 }
 
-fn from_req_state(req_state: &RequestItem) -> Option<reqwest::RequestBuilder> {
+fn from_req_state(req_state: &RequestItem) -> Option<reqwest::Request> {
     let method = match req_state.method {
         HttpMethod::Options => reqwest::Method::OPTIONS,
         HttpMethod::Get => reqwest::Method::GET,
@@ -297,31 +298,31 @@ fn from_req_state(req_state: &RequestItem) -> Option<reqwest::RequestBuilder> {
         return None;
     };
 
-    let mut headers = HeaderMap::new();
+    let mut req_builder = HTTP_CLIENT.get().unwrap().request(method, url);
+
     for header in req_state.headers.items().iter().filter(|i| i.enable) {
         let name = HeaderName::from_bytes(header.key.as_bytes()).unwrap();
         let value = HeaderValue::from_str(&header.value).unwrap();
-        headers.insert(name, value);
+
+        req_builder = req_builder.header(name, value);
     }
 
-    let mut builder = reqwest::Client::new().request(method, url).headers(headers);
-
-    builder = match &req_state.body {
-        BodyContent::None => builder.body(reqwest::Body::default()),
-        BodyContent::Text(js) => builder.body(reqwest::Body::wrap(js.clone())),
+    req_builder = match &req_state.body {
+        BodyContent::None => req_builder.body(reqwest::Body::default()),
+        BodyContent::Text(js) => req_builder.body(reqwest::Body::wrap(js.clone())),
         BodyContent::FormUrlEncoded(table) => {
             let mut map = HashMap::new();
             for itm in table.items().iter().filter(|itm| itm.enable) {
                 map.insert(itm.key.clone(), itm.value.clone());
             }
 
-            builder.form(&map)
+            req_builder.form(&map)
         }
-        BodyContent::FormData(_) => builder,
-        BodyContent::File(_) => builder,
+        BodyContent::FormData(_) => req_builder,
+        BodyContent::File(_) => req_builder,
     };
 
-    Some(builder)
+    Some(req_builder.build().unwrap())
 }
 
 fn duration_as_str(d: Duration) -> String {

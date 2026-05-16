@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, sync::OnceLock};
 
 use app::TuiApp;
 use app_event::create_background_tasks;
@@ -12,7 +12,17 @@ mod common;
 mod events;
 mod pane;
 
+static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
 pub async fn run(project_name: Option<String>) -> io::Result<()> {
+    let client = reqwest::ClientBuilder::new().build();
+    match client {
+        Ok(client) => {
+            HTTP_CLIENT.get_or_init(move || client);
+        }
+        Err(_e) => return Err(io::Error::other("http not supported?")),
+    }
+
     let project = load_project(project_name).await.unwrap();
 
     let (mut events, draw_signal) = create_events();

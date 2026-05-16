@@ -6,6 +6,8 @@ use tokio::sync::mpsc;
 
 use crate::store::models::TimeId;
 
+use super::HTTP_CLIENT;
+
 pub type EventReceiver = mpsc::Receiver<AppEvent>;
 
 pub struct AppEvent {
@@ -29,7 +31,7 @@ pub struct AppTask {
 }
 
 impl AppTask {
-    pub fn for_request(pane_id: TimeId, request_id: TimeId, req: reqwest::RequestBuilder) -> Self {
+    pub fn for_request(pane_id: TimeId, request_id: TimeId, req: reqwest::Request) -> Self {
         Self {
             pane_id,
             task: Task::Request {
@@ -43,7 +45,7 @@ impl AppTask {
 pub enum Task {
     Request {
         request_id: TimeId,
-        request: reqwest::RequestBuilder,
+        request: reqwest::Request,
     },
 }
 
@@ -183,9 +185,9 @@ impl Cookie {
     }
 }
 
-pub async fn process_request(req: reqwest::RequestBuilder) -> ReqResponse {
+pub async fn process_request(req: reqwest::Request) -> ReqResponse {
     let timer = tokio::time::Instant::now();
-    let result = req.send().await;
+    let result = HTTP_CLIENT.get().unwrap().execute(req).await;
     let duration = timer.elapsed();
 
     let res = match result {
