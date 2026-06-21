@@ -1,6 +1,5 @@
 use app_project::store::{LocalStore, Store};
 use clap::Parser;
-use programs::tui;
 mod app_project;
 mod paths;
 mod programs;
