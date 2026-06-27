@@ -1,6 +1,7 @@
 use app_project::store::{LocalStore, Store};
 use clap::Parser;
 mod app_project;
+mod http;
 mod paths;
 mod programs;
 mod store;
@@ -30,12 +31,5 @@ async fn main() {
         if let Err(_err) = programs::tui_v2::run(cli.project).await {
             std::process::exit(1)
         }
-        // if let Err(err) = tui::run_tui(cli.project).await {
-        //     match err {
-        //         tui::TuiError::Io(error) => eprintln!("IO_ERROR: {:?}", error),
-        //         tui::TuiError::Config(error) => eprintln!("CONFIG_ERROR: {:?}", error),
-        //     }
-        //     std::process::exit(1)
-        // }
     }
 }
