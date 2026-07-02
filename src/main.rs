@@ -1,6 +1,5 @@
-use app_project::store::{LocalStore, Store};
 use clap::Parser;
-mod app_project;
+use store::Store;
 mod http;
 mod paths;
 mod programs;
@@ -21,8 +20,8 @@ async fn main() {
     let cli = CliOptions::parse();
 
     if cli.list_projects {
-        let local_store = LocalStore::new();
-        let project_list = local_store.project_list().unwrap();
+        let local_store = Store::new();
+        let project_list = local_store.list_projects().await.unwrap();
 
         for project in project_list {
             println!("{} - {}", project.id, project.name);

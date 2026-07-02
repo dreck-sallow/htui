@@ -1,9 +1,6 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use crate::{
-    app_project::models::time_as_id,
-    store::models::{HttpMethod, TimeId},
-};
+use crate::store::models::{time_as_id, HttpMethod, TimeId};
 
 use super::{
     param_item::ParamItem,
