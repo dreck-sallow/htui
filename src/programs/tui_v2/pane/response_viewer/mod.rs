@@ -11,6 +11,7 @@ use ratatui::{
 use reqwest::header::{HeaderName, HeaderValue};
 
 use crate::{
+    http::{get_http_client, request, send_req},
     programs::tui_v2::{
         app_event::{AppTask, TaskSender},
         common::{
@@ -18,7 +19,6 @@ use crate::{
             table_grid::UiTableGrid,
         },
         events::DrawSignal,
-        HTTP_CLIENT,
     },
     store::models::{HttpMethod, TimeId},
 };
@@ -98,33 +98,37 @@ impl ResponsesViewer {
         }
     }
 
+    pub async fn send_req(
+        &mut self,
+        pane_id: TimeId,
+        req_itm: &RequestItem,
+        task_sender: TaskSender,
+    ) {
+        let Some(req) = to_http_req(req_itm) else {
+            return;
+        };
+        let req_id = req_itm.id().to_string();
+
+        // let _ = task_sender
+        //     .send(AppTask::for_request(pane_id, req_id, req))
+        //     .await;
+    }
+
     pub async fn send_req_v2(
         &mut self,
         pane_id: TimeId,
         req_itm: &RequestItem,
         task_sender: TaskSender,
     ) {
-        let Some(req) = from_req_state(req_itm) else {
+        let Some(req) = to_http_req(req_itm) else {
             return;
         };
         let req_id = req_itm.id().to_string();
 
-        let _ = task_sender
-            .send(AppTask::for_request(pane_id, req_id, req))
-            .await;
+        // let _ = task_sender
+        //     .send(AppTask::for_request(pane_id, req_id, req))
+        //     .await;
     }
-
-    // pub fn cancel_req(&mut self, req_id: String, st: &Responses) {
-    //     // we need abort the previous task
-    //     if let Some(t) = self.tasks.remove(&req_id) {
-    //         t.abort();
-    //     }
-
-    //     st.map
-    //         .write()
-    //         .unwrap()
-    //         .insert(req_id, super::state::ResponseStatus::Cancelled);
-    // }
 }
 
 impl ResponsesViewer {
@@ -282,8 +286,8 @@ impl ResponsesViewer {
     }
 }
 
-fn from_req_state(req_state: &RequestItem) -> Option<reqwest::Request> {
-    let method = match req_state.method {
+fn to_http_req(req_item: &RequestItem) -> Option<request::HttpRequest> {
+    let method = match req_item.method {
         HttpMethod::Options => reqwest::Method::OPTIONS,
         HttpMethod::Get => reqwest::Method::GET,
         HttpMethod::Post => reqwest::Method::POST,
@@ -294,35 +298,32 @@ fn from_req_state(req_state: &RequestItem) -> Option<reqwest::Request> {
         HttpMethod::Custom(ref t) => reqwest::Method::from_bytes(t.as_bytes()).unwrap(),
     };
 
-    let Ok(url) = reqwest::Url::parse(&req_state.url) else {
+    let Ok(url) = reqwest::Url::parse(&req_item.url) else {
         return None;
     };
 
-    let mut req_builder = HTTP_CLIENT.get().unwrap().request(method, url);
+    let mut req = request::HttpRequest::new(method, url);
 
-    for header in req_state.headers.items().iter().filter(|i| i.enable) {
+    for header in req_item.headers.items().iter().filter(|i| i.enable) {
         let name = HeaderName::from_bytes(header.key.as_bytes()).unwrap();
         let value = HeaderValue::from_str(&header.value).unwrap();
-
-        req_builder = req_builder.header(name, value);
+        req.add_header(name, value);
     }
 
-    req_builder = match &req_state.body {
-        BodyContent::None => req_builder.body(reqwest::Body::default()),
-        BodyContent::Text(js) => req_builder.body(reqwest::Body::wrap(js.clone())),
-        BodyContent::FormUrlEncoded(table) => {
-            let mut map = HashMap::new();
-            for itm in table.items().iter().filter(|itm| itm.enable) {
-                map.insert(itm.key.clone(), itm.value.clone());
-            }
-
-            req_builder.form(&map)
+    match &req_item.body {
+        BodyContent::Text(txt) => {
+            req.set_body_text(Vec::from(txt.as_bytes()));
         }
-        BodyContent::FormData(_) => req_builder,
-        BodyContent::File(_) => req_builder,
+        BodyContent::File(file_info) => match file_info {
+            super::state_v2::collections::FileContent::None => {}
+            super::state_v2::collections::FileContent::Content { path, .. } => {
+                req.set_body_file(path.clone());
+            }
+        },
+        _ => {}
     };
 
-    Some(req_builder.build().unwrap())
+    Some(req)
 }
 
 fn duration_as_str(d: Duration) -> String {

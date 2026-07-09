@@ -12,7 +12,10 @@ use super::{
     app_event::{ReqResponse, TaskSender},
     events::DrawSignal,
     pane::{new_pane, Pane},
+    task::TaskResult,
 };
+
+pub type TaskGroupKey = String;
 
 #[derive(Default)]
 pub struct TuiApp {
@@ -83,6 +86,19 @@ impl TuiApp {
         for pane in &mut self.panes {
             if pane.id() == pane_id {
                 pane.handle_response(req_id, res);
+                break;
+            }
+        }
+    }
+
+    pub fn handle_task(&mut self, task: TaskResult<TaskGroupKey>) {
+        for pane in &mut self.panes {
+            if pane.id() == &task.group_key {
+                match task.result {
+                    super::task::TaskResultType::HttpResponse { req_id, res } => {
+                        pane.handle_response_v2(req_id, res);
+                    }
+                }
                 break;
             }
         }

@@ -1,32 +1,30 @@
-use std::{io, sync::OnceLock};
+use std::io;
 
-use app::TuiApp;
+use app::{TaskGroupKey, TuiApp};
 use app_event::create_background_tasks;
 use events::create_events;
+use task::Tasks;
 
-use crate::store::{self, models::ProjectModel, Store, StoreError};
+use crate::{
+    http::set_http_client,
+    store::{self, models::ProjectModel, Store, StoreError},
+};
 
 mod app;
 mod app_event;
 mod common;
 mod events;
 mod pane;
-
-static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+mod task;
 
 pub async fn run(project_name: Option<String>) -> io::Result<()> {
-    let client = reqwest::ClientBuilder::new().build();
-    match client {
-        Ok(client) => {
-            HTTP_CLIENT.get_or_init(move || client);
-        }
-        Err(_e) => return Err(io::Error::other("http not supported?")),
-    }
+    set_http_client();
 
     let project = load_project(project_name).await.unwrap();
 
     let (mut events, draw_signal) = create_events();
-    let (sender_tasks, mut bg_tasks) = create_background_tasks();
+    // let (sender_tasks, mut bg_tasks) = create_background_tasks();
+    let (rx_tasks, mut tasks) = Tasks::<TaskGroupKey>::setup();
 
     let mut terminal = ratatui::init();
 
@@ -61,15 +59,11 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
                 }
 
             }
-            Some(ev) = bg_tasks.next_event() => {
-                match ev.event {
-                    app_event::Event::Response { req_id, response } => {
-                    let should_continue = app.handle_response(ev.pane_id, req_id, response);
-                        terminal.draw(|frame| {
-                           app.handle_draw(frame);
-                        })?;
-                    },
-                }
+            Some(task) = rx_tasks.recv() => {
+                app.handle_task(task);
+                terminal.draw(|frame| {
+                    app.handle_draw(frame);
+                })?;
             }
             else => {
                 break;
@@ -77,7 +71,7 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
         }
     }
 
-    bg_tasks.stop();
+    // tasks.stop();
 
     events.finish();
 

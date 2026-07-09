@@ -25,7 +25,10 @@ use state_v2::{
 //     ParamsTable, RequestItem,
 // };
 
-use crate::store::models::{ProjectModel, TimeId};
+use crate::{
+    http::response::HttpResponse,
+    store::models::{ProjectModel, TimeId},
+};
 
 use super::{
     app_event::{ReqResponse, TaskSender},
@@ -37,7 +40,6 @@ mod common;
 mod request_bar;
 mod request_builder;
 mod response_viewer;
-// mod state;
 mod state_v2;
 
 pub struct Pane {
@@ -227,6 +229,64 @@ impl Pane {
                 list.insert(req_id, responses::ResponseStatus::Success(response));
             }
         }
+    }
+
+    pub fn handle_response_v2(&mut self, req_id: TimeId, response: HttpResponse) {
+        let mut headers = table::TableState::new();
+
+        for (key, value) in response.headers {
+            headers.add_row(responses::ReadonlyHeader { key, value });
+        }
+
+        let mut cookies = table::TableState::new();
+
+        for cookie in response.cookies {
+            cookies.add_row(responses::Cookie {
+                name: cookie.name,
+                value: cookie.value,
+                domain: cookie.domain,
+                expires: cookie.expires,
+                max_ge: cookie.max_age,
+                path: cookie.path,
+                http_only: cookie.http_only.unwrap_or(false),
+                partitioned: cookie.partitioned.unwrap_or(false),
+                secure: cookie.secure.unwrap_or(false),
+                same_site: cookie.same_site,
+            });
+        }
+
+        let response_body = match response.body {
+            crate::http::response::HttpResBody::Contained(http_body_content) => {
+                match http_body_content {
+                    crate::http::response::HttpBodyContent::Text(s) => {
+                        responses::ResponseBody::Text(s)
+                    }
+                    crate::http::response::HttpBodyContent::Bytes(items) => {
+                        responses::ResponseBody::Binary(items)
+                    }
+                }
+            }
+            crate::http::response::HttpResBody::DiskFile(_) => {
+                responses::ResponseBody::Binary(vec![])
+            }
+        };
+
+        let response = responses::Response {
+            status: response.status,
+            status_text: response.status_text,
+            version: response.version,
+            duration: response.duration,
+            size_bytes: 10,
+            content_type: response.content_type,
+            headers,
+            cookies,
+            body: response_body,
+        };
+
+        self.state
+            .responses
+            .list
+            .insert(req_id, responses::ResponseStatus::Success(response));
     }
 }
 

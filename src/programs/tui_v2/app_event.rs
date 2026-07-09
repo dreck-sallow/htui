@@ -4,9 +4,7 @@ use mime::Mime;
 use reqwest::header::{self, CONTENT_TYPE};
 use tokio::sync::mpsc;
 
-use crate::store::models::TimeId;
-
-use super::HTTP_CLIENT;
+use crate::{http::get_http_client, store::models::TimeId};
 
 pub type EventReceiver = mpsc::Receiver<AppEvent>;
 
@@ -120,6 +118,7 @@ pub struct Response {
 pub enum Body {
     Text(String),
     Binary(Vec<u8>),
+    // FormUrlEncoded(Vec<(String, String)>),
     Empty,
 }
 pub struct Cookie {
@@ -187,7 +186,7 @@ impl Cookie {
 
 pub async fn process_request(req: reqwest::Request) -> ReqResponse {
     let timer = tokio::time::Instant::now();
-    let result = HTTP_CLIENT.get().unwrap().execute(req).await;
+    let result = get_http_client().execute(req).await;
     let duration = timer.elapsed();
 
     let res = match result {
