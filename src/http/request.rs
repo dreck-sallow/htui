@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 
 pub struct HttpRequest {
     pub(crate) method: reqwest::Method,
-    pub(crate) url: String,
+    pub(crate) url: reqwest::Url,
     pub(crate) headers: HeaderMap,
     pub(crate) body: HttpBody,
 }
 
 impl HttpRequest {
-    pub fn new(method: reqwest::Method, url: String) -> Self {
+    pub fn new(method: reqwest::Method, url: reqwest::Url) -> Self {
         Self {
             method,
             url,

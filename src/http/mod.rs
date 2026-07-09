@@ -8,8 +8,8 @@ use tokio::io::AsyncWriteExt;
 
 use crate::store::models::time_as_id;
 
-mod request;
-mod response;
+pub mod request;
+pub mod response;
 
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
@@ -21,6 +21,12 @@ pub enum Error {
 
 pub fn set_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| reqwest::Client::new())
+}
+
+pub fn get_http_client() -> &'static reqwest::Client {
+    HTTP_CLIENT
+        .get()
+        .expect("Set the HTTP client before to get the instance")
 }
 
 enum HttpBodyWriter {
@@ -112,9 +118,11 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
                     String::from_utf8(items).unwrap_or("Error parsing".into()),
                 ))
             }
-            val if val == Some(&mime::APPLICATION_JSON) => HttpResBody::Contained(
-                HttpBodyContent::Text(String::from_utf8(items).unwrap_or("Error parsing".into())),
-            ),
+            val if val == Some(&mime::APPLICATION_JSON) => {
+                HttpResBody::Contained(HttpBodyContent::Text(
+                    serde_json::to_string_pretty(&items).unwrap_or("Error parsing".into()),
+                ))
+            }
             _ => HttpResBody::Contained(HttpBodyContent::Bytes(items)),
         },
         HttpBodyWriter::OnDisk { path, mut file, .. } => {
@@ -137,7 +145,7 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
     })
 }
 
-pub async fn into_request(req: HttpRequest) -> Option<reqwest::Request> {
+async fn into_request(req: HttpRequest) -> Option<reqwest::Request> {
     let client = HTTP_CLIENT.get().unwrap();
     let mut request_builder = client.request(req.method, req.url).headers(req.headers);
 
