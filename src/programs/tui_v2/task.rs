@@ -21,7 +21,7 @@ pub struct TaskResult<K> {
     pub result: TaskResultType,
 }
 
-type SenderTask<Key> = tokio::sync::mpsc::Sender<Task<Key>>;
+pub type SenderTask<Key> = tokio::sync::mpsc::Sender<Task<Key>>;
 type SenderResult<Key> = tokio::sync::mpsc::Sender<TaskResult<Key>>;
 
 pub struct Tasks<Key> {
@@ -41,7 +41,7 @@ impl<K: Send + 'static> Tasks<K> {
                         let result_sender = rx.clone();
                         tokio::spawn(async move {
                             let res = send_req(req).await.unwrap();
-                            result_sender
+                            let _ = result_sender
                                 .send(TaskResult {
                                     group_key,
                                     result: TaskResultType::HttpResponse { req_id: id, res },
@@ -70,6 +70,10 @@ impl<K: Send + 'static> Tasks<K> {
             sender: self.tx.clone(),
         }
     }
+
+    pub fn stop(&self) {
+        self._jh.abort();
+    }
 }
 
 pub struct TaskSender<K> {
@@ -79,7 +83,8 @@ pub struct TaskSender<K> {
 
 impl<K: Clone> TaskSender<K> {
     pub async fn send(&self, task: TaskType) {
-        self.sender
+        let _ = self
+            .sender
             .send(Task {
                 group_key: self.group_key.clone(),
                 task,

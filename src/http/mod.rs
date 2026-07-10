@@ -23,18 +23,18 @@ pub fn set_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| reqwest::Client::new())
 }
 
-pub fn get_http_client() -> &'static reqwest::Client {
-    HTTP_CLIENT
-        .get()
-        .expect("Set the HTTP client before to get the instance")
-}
+// pub fn get_http_client() -> &'static reqwest::Client {
+//     HTTP_CLIENT
+//         .get()
+//         .expect("Set the HTTP client before to get the instance")
+// }
 
 enum HttpBodyWriter {
     InMemory(Vec<u8>),
     OnDisk {
         path: PathBuf,
         bytes_count: usize,
-        file: tokio::fs::File,
+        file: tokio::io::BufWriter<tokio::fs::File>,
     },
 }
 
@@ -72,39 +72,39 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
         headers.push((header_name.to_string(), header_value.to_string()));
     }
 
-    let mut body_writer = HttpBodyWriter::InMemory(Vec::new());
-    while let Ok(chunk_opt) = response.chunk().await {
-        if let Some(chunk) = chunk_opt {
-            match body_writer {
-                HttpBodyWriter::InMemory(ref mut content) => {
-                    if content.len() + chunk.len() > MAX_BODY_SIZE {
-                        let temp_file = format!(
-                            "{}/kai_request_{}.tmp",
-                            env::temp_dir().display(),
-                            time_as_id()
-                        );
+    let mut body_writer = HttpBodyWriter::InMemory(Vec::with_capacity(1024 * 5));
+    while let Ok(Some(chunk)) = response.chunk().await {
+        match body_writer {
+            HttpBodyWriter::InMemory(ref mut content) => {
+                if content.len() + chunk.len() > MAX_BODY_SIZE {
+                    let temp_file = format!(
+                        "{}/kai_request_{}.tmp",
+                        env::temp_dir().display(),
+                        time_as_id()
+                    );
 
-                        let mut file = tokio::fs::File::create(&temp_file).await.ok()?;
-                        file.write_all(content).await.ok()?;
-                        file.write_all(&chunk).await.ok()?;
+                    let mut file =
+                        tokio::io::BufWriter::new(tokio::fs::File::create(&temp_file).await.ok()?);
 
-                        body_writer = HttpBodyWriter::OnDisk {
-                            path: PathBuf::from(temp_file),
-                            bytes_count: content.len() + chunk.len(),
-                            file,
-                        }
-                    } else {
-                        content.extend(chunk.to_vec());
-                    }
-                }
-                HttpBodyWriter::OnDisk {
-                    ref mut bytes_count,
-                    ref mut file,
-                    ..
-                } => {
+                    file.write_all(content).await.ok()?;
                     file.write_all(&chunk).await.ok()?;
-                    *bytes_count += chunk.len();
+
+                    body_writer = HttpBodyWriter::OnDisk {
+                        path: PathBuf::from(temp_file),
+                        bytes_count: content.len() + chunk.len(),
+                        file,
+                    }
+                } else {
+                    content.extend_from_slice(&chunk);
                 }
+            }
+            HttpBodyWriter::OnDisk {
+                ref mut bytes_count,
+                ref mut file,
+                ..
+            } => {
+                file.write_all(&chunk).await.ok()?;
+                *bytes_count += chunk.len();
             }
         }
     }
