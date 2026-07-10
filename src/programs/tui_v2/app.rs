@@ -10,6 +10,7 @@ use crate::store::models::{ProjectModel, TimeId};
 
 use super::{
     app_event::{ReqResponse, TaskSender},
+    ctx::InitialCtx,
     events::DrawSignal,
     pane::{new_pane, Pane},
     task::TaskResult,
@@ -17,25 +18,18 @@ use super::{
 
 pub type TaskGroupKey = String;
 
-#[derive(Default)]
 pub struct TuiApp {
     panes: Vec<Pane>,
     selected: Option<usize>,
 }
 
 impl TuiApp {
-    pub async fn add_project_v2(
-        &mut self,
-        project: ProjectModel,
-        draw_signal: DrawSignal,
-        task_sender: TaskSender,
-    ) {
-        let pane = new_pane(project, draw_signal, task_sender).await;
+    pub async fn new_from_project(project: ProjectModel, ctx: InitialCtx) -> Self {
+        let pane = new_pane(project, ctx).await;
 
-        self.panes.push(pane);
-
-        if self.selected.is_none() {
-            self.selected = Some(0);
+        Self {
+            panes: vec![pane],
+            selected: Some(0),
         }
     }
 }
@@ -79,16 +73,6 @@ impl TuiApp {
         }
 
         true
-    }
-
-    pub fn handle_response(&mut self, pane_id: TimeId, req_id: TimeId, res: ReqResponse) {
-        // Draw the current selected pane
-        for pane in &mut self.panes {
-            if pane.id() == pane_id {
-                pane.handle_response(req_id, res);
-                break;
-            }
-        }
     }
 
     pub fn handle_task(&mut self, task: TaskResult<TaskGroupKey>) {

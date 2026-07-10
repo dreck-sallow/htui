@@ -13,12 +13,13 @@ use reqwest::header::{HeaderName, HeaderValue};
 use crate::{
     http::{get_http_client, request, send_req},
     programs::tui_v2::{
-        app_event::{AppTask, TaskSender},
+        app::TaskGroupKey,
         common::{
             elements::{draw_center_span, ui_block, ui_highlight},
             table_grid::UiTableGrid,
         },
         events::DrawSignal,
+        task::SenderTask,
     },
     store::models::{HttpMethod, TimeId},
 };
@@ -98,36 +99,19 @@ impl ResponsesViewer {
         }
     }
 
-    pub async fn send_req(
-        &mut self,
-        pane_id: TimeId,
-        req_itm: &RequestItem,
-        task_sender: TaskSender,
-    ) {
-        let Some(req) = to_http_req(req_itm) else {
-            return;
-        };
-        let req_id = req_itm.id().to_string();
-
-        // let _ = task_sender
-        //     .send(AppTask::for_request(pane_id, req_id, req))
-        //     .await;
-    }
-
     pub async fn send_req_v2(
         &mut self,
-        pane_id: TimeId,
         req_itm: &RequestItem,
-        task_sender: TaskSender,
+        task_sender: &crate::programs::tui_v2::task::TaskSender<TaskGroupKey>,
     ) {
         let Some(req) = to_http_req(req_itm) else {
             return;
         };
         let req_id = req_itm.id().to_string();
 
-        // let _ = task_sender
-        //     .send(AppTask::for_request(pane_id, req_id, req))
-        //     .await;
+        let _ = task_sender
+            .send(crate::programs::tui_v2::task::TaskType::HttpRequest { id: req_id, req })
+            .await;
     }
 }
 

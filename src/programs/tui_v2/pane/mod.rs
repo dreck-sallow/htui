@@ -1,5 +1,7 @@
-use std::os::unix::fs::MetadataExt;
-
+use crate::{
+    http::response::HttpResponse,
+    store::models::{ProjectModel, TimeId},
+};
 use actions::EffectsCollector;
 use collections::CollectionsSidebar;
 use crossterm::event::{KeyEvent, KeyModifiers};
@@ -11,29 +13,13 @@ use request_bar::RequestBar;
 use request_builder::RequestBuilder;
 use response_viewer::ResponsesViewer;
 use state_v2::{
-    collections::{
-        BodyContent, BodyForm, CollectionItem, CollectionsList, FileContent, FileInfo, ListIdx,
-        RequestItem,
-    },
-    param_item,
+    collections::ListIdx,
+    from_project_model,
     responses::{self, ResponseStatus},
-    table::{self, TableState},
-    PaneState, SectionFocus,
-};
-// use state::{
-//     BodyContent, BodyForm, CollectionItem, CollectionsList, Environments, FileInfo, PaneState,
-//     ParamsTable, RequestItem,
-// };
-
-use crate::{
-    http::response::HttpResponse,
-    store::models::{ProjectModel, TimeId},
+    table, PaneState, SectionFocus,
 };
 
-use super::{
-    app_event::{ReqResponse, TaskSender},
-    events::DrawSignal,
-};
+use super::{app::TaskGroupKey, ctx::InitialCtx, task::TaskSender};
 mod actions;
 mod collections;
 mod common;
@@ -50,34 +36,16 @@ pub struct Pane {
     request_bar: RequestBar,
     request_builder: RequestBuilder,
     response_viewer: ResponsesViewer,
-    _task_sender: TaskSender,
+    _task_sender: TaskSender<TaskGroupKey>,
 }
 
 type ProjectDetails = (String, String);
 
 impl Pane {
-    // pub fn from_project(
-    //     project: ProjectModel,
-    //     draw_signal: DrawSignal,
-    //     task_sender: TaskSender,
-    // ) -> Self {
-    //     Self::new(
-    //         (project.id, project.name),
-    //         PaneState::from_parts(
-    //             project.collections,
-    //             project.environments,
-    //             project.selected_env_context,
-    //         ),
-    //         draw_signal,
-    //         task_sender,
-    //     )
-    // }
-
     pub fn new(
         (project_id, project_name): ProjectDetails,
         state: PaneState,
-        draw_signal: DrawSignal,
-        task_sender: TaskSender,
+        ctx: InitialCtx,
     ) -> Self {
         Self {
             project_id,
@@ -85,9 +53,9 @@ impl Pane {
             state,
             collection_sidebar: CollectionsSidebar::new(),
             request_bar: RequestBar::new(),
-            request_builder: RequestBuilder::new(draw_signal.clone()),
-            response_viewer: ResponsesViewer::new(draw_signal),
-            _task_sender: task_sender,
+            request_builder: RequestBuilder::new(ctx.draw_signal.clone()),
+            response_viewer: ResponsesViewer::new(ctx.draw_signal),
+            _task_sender: ctx.task_sender,
         }
     }
 
@@ -142,7 +110,7 @@ impl Pane {
                     .insert(req.id().to_string(), ResponseStatus::Fetching);
 
                 self.response_viewer
-                    .send_req_v2(self.project_id.to_string(), req, self._task_sender.clone())
+                    .send_req_v2(req, &self._task_sender)
                     .await;
                 return true;
             }
@@ -178,58 +146,58 @@ impl Pane {
         true
     }
 
-    pub fn handle_response(&mut self, req_id: TimeId, req_res: ReqResponse) {
-        let list = &mut self.state.responses.list;
+    // pub fn handle_response(&mut self, req_id: TimeId, req_res: ReqResponse) {
+    //     let list = &mut self.state.responses.list;
 
-        match req_res {
-            ReqResponse::Err(txt) => {
-                list.insert(req_id, ResponseStatus::Error(txt));
-            }
-            ReqResponse::Sucess(res) => {
-                let mut headers = table::TableState::new();
+    //     match req_res {
+    //         ReqResponse::Err(txt) => {
+    //             list.insert(req_id, ResponseStatus::Error(txt));
+    //         }
+    //         ReqResponse::Sucess(res) => {
+    //             let mut headers = table::TableState::new();
 
-                for (key, value) in res.headers {
-                    headers.add_row(responses::ReadonlyHeader { key, value });
-                }
+    //             for (key, value) in res.headers {
+    //                 headers.add_row(responses::ReadonlyHeader { key, value });
+    //             }
 
-                let mut cookies = table::TableState::new();
+    //             let mut cookies = table::TableState::new();
 
-                for cookie in res.cookies {
-                    cookies.add_row(responses::Cookie {
-                        name: cookie.name,
-                        value: cookie.value,
-                        domain: cookie.domain,
-                        expires: cookie.expires,
-                        max_ge: cookie.max_age,
-                        path: cookie.path,
-                        http_only: cookie.http_only.unwrap_or(false),
-                        partitioned: cookie.partitioned.unwrap_or(false),
-                        secure: cookie.secure.unwrap_or(false),
-                        same_site: cookie.same_site,
-                    });
-                }
+    //             for cookie in res.cookies {
+    //                 cookies.add_row(responses::Cookie {
+    //                     name: cookie.name,
+    //                     value: cookie.value,
+    //                     domain: cookie.domain,
+    //                     expires: cookie.expires,
+    //                     max_ge: cookie.max_age,
+    //                     path: cookie.path,
+    //                     http_only: cookie.http_only.unwrap_or(false),
+    //                     partitioned: cookie.partitioned.unwrap_or(false),
+    //                     secure: cookie.secure.unwrap_or(false),
+    //                     same_site: cookie.same_site,
+    //                 });
+    //             }
 
-                let response = responses::Response {
-                    status: res.status,
-                    status_text: res.status_text,
-                    version: res.version,
-                    duration: res.duration,
-                    size_bytes: 10,
-                    content_type: res.content_type,
-                    headers,
-                    body: match res.body {
-                        super::app_event::Body::Text(s) => responses::ResponseBody::Text(s),
-                        super::app_event::Body::Binary(items) => {
-                            responses::ResponseBody::Binary(items)
-                        }
-                        super::app_event::Body::Empty => responses::ResponseBody::Empty,
-                    },
-                    cookies,
-                };
-                list.insert(req_id, responses::ResponseStatus::Success(response));
-            }
-        }
-    }
+    //             let response = responses::Response {
+    //                 status: res.status,
+    //                 status_text: res.status_text,
+    //                 version: res.version,
+    //                 duration: res.duration,
+    //                 size_bytes: 10,
+    //                 content_type: res.content_type,
+    //                 headers,
+    //                 body: match res.body {
+    //                     super::app_event::Body::Text(s) => responses::ResponseBody::Text(s),
+    //                     super::app_event::Body::Binary(items) => {
+    //                         responses::ResponseBody::Binary(items)
+    //                     }
+    //                     super::app_event::Body::Empty => responses::ResponseBody::Empty,
+    //                 },
+    //                 cookies,
+    //             };
+    //             list.insert(req_id, responses::ResponseStatus::Success(response));
+    //         }
+    //     }
+    // }
 
     pub fn handle_response_v2(&mut self, req_id: TimeId, response: HttpResponse) {
         let mut headers = table::TableState::new();
@@ -290,107 +258,8 @@ impl Pane {
     }
 }
 
-pub async fn new_pane(
-    project: ProjectModel,
-    draw_signal: DrawSignal,
-    task_sender: TaskSender,
-) -> Pane {
-    let mut list = Vec::new();
-
-    for coll in project.collections {
-        let mut reqs = Vec::new();
-
-        for req in coll.requests {
-            let body = match req.body {
-                crate::store::models::RequestBody::None => BodyContent::None,
-                crate::store::models::RequestBody::Text(st) => BodyContent::Text(st),
-                crate::store::models::RequestBody::Json(v) => BodyContent::Text(v.to_string()),
-                crate::store::models::RequestBody::FormUrlEncoded(m) => {
-                    let mut list = Vec::new();
-                    for param in m {
-                        list.push(param_item::ParamItem {
-                            enable: param.enable,
-                            key: param.key,
-                            value: param.value,
-                        });
-                    }
-
-                    BodyContent::FormUrlEncoded(TableState::from(list))
-                }
-                crate::store::models::RequestBody::FormData(m) => {
-                    let mut list = Vec::new();
-                    for param in m {
-                        list.push((
-                            param.is_file,
-                            param_item::ParamItem {
-                                enable: param.enable,
-                                key: param.key,
-                                value: param.value,
-                            },
-                        ));
-                    }
-
-                    BodyContent::FormData(BodyForm::from(list))
-                }
-                crate::store::models::RequestBody::File(path) => {
-                    if path.is_file() {
-                        match tokio::fs::metadata(&path).await {
-                            Ok(m) => {
-                                let name = path.file_name().unwrap().to_str().unwrap().to_string();
-                                let path_str = path.to_str().unwrap().to_string();
-
-                                BodyContent::File(FileContent::Content {
-                                    path,
-                                    info: FileInfo {
-                                        name,
-                                        size: m.size().to_string(),
-                                        path: path_str,
-                                    },
-                                })
-                            }
-                            Err(_) => BodyContent::File(FileContent::None),
-                        }
-                    } else {
-                        BodyContent::File(FileContent::None)
-                    }
-                }
-            };
-
-            let headers = {
-                let mut table = TableState::new();
-                for header in req.headers {
-                    table.add_row(param_item::ParamItem {
-                        enable: header.enable,
-                        key: header.key,
-                        value: header.value,
-                    });
-                }
-                table
-            };
-
-            let params = {
-                let mut table = TableState::new();
-                for param in req.params {
-                    table.add_row(param_item::ParamItem {
-                        enable: param.enable,
-                        key: param.key,
-                        value: param.value,
-                    });
-                }
-                table
-            };
-
-            reqs.push(RequestItem::new_v2(
-                req.id, req.name, req.url, headers, params, req.method, body,
-            ));
-        }
-        list.push(CollectionItem::new_v2(coll.id, coll.name).with_reqs(reqs));
-    }
-
-    Pane::new(
-        (project.id, project.name),
-        PaneState::new(CollectionsList::new().with_collections(list)),
-        draw_signal,
-        task_sender,
-    )
+pub async fn new_pane(project: ProjectModel, ctx: InitialCtx) -> Pane {
+    let project_parts = (project.id.clone(), project.name.clone());
+    let pane_state = from_project_model(project).await;
+    Pane::new(project_parts, pane_state, ctx)
 }

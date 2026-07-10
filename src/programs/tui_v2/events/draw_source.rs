@@ -88,7 +88,7 @@ mod tests {
         let (tx, rx) = tokio::sync::mpsc::channel(10);
 
         let mut draw_source = DrawSource::new();
-        let mut draw_signal = draw_source.signal();
+        let draw_signal = draw_source.signal();
 
         draw_source.start(tx);
 

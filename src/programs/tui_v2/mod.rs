@@ -1,7 +1,6 @@
 use std::io;
 
 use app::{TaskGroupKey, TuiApp};
-use app_event::create_background_tasks;
 use events::create_events;
 use task::Tasks;
 
@@ -13,6 +12,7 @@ use crate::{
 mod app;
 mod app_event;
 mod common;
+mod ctx;
 mod events;
 mod pane;
 mod task;
@@ -23,14 +23,16 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
     let project = load_project(project_name).await.unwrap();
 
     let (mut events, draw_signal) = create_events();
-    // let (sender_tasks, mut bg_tasks) = create_background_tasks();
-    let (rx_tasks, mut tasks) = Tasks::<TaskGroupKey>::setup();
+    let (mut rx_tasks, tasks) = Tasks::<TaskGroupKey>::setup();
 
     let mut terminal = ratatui::init();
 
-    let mut app = TuiApp::default();
-    app.add_project_v2(project, draw_signal.clone(), sender_tasks)
-        .await;
+    let ctx = ctx::InitialCtx {
+        draw_signal: draw_signal.clone(),
+        task_sender: tasks.sender_for_group(project.id.clone()),
+    };
+
+    let mut app = TuiApp::new_from_project(project, ctx).await;
 
     events.start();
 
@@ -71,7 +73,7 @@ pub async fn run(project_name: Option<String>) -> io::Result<()> {
         }
     }
 
-    // tasks.stop();
+    tasks.stop();
 
     events.finish();
 
