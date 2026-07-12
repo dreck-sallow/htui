@@ -164,8 +164,8 @@ impl ResponsesViewer {
             }
             SectionTab::Body => match &res.body {
                 ResponseBody::InMemory(body) => match body {
-                    Body::Text(s) => {
-                        frame.render_widget(ratatui::text::Text::raw(s), content_area);
+                    Body::Text(editor) => {
+                        frame.render_widget(editor, content_area);
                     }
                     Body::Binary(_) => {}
                 },
@@ -245,7 +245,13 @@ impl ResponsesViewer {
                         SectionTab::Headers => {
                             self.handle_table_basic_keys(key, &mut response.headers);
                         }
-                        SectionTab::Body => {}
+                        SectionTab::Body => match &mut response.body {
+                            ResponseBody::InMemory(body) => match body {
+                                Body::Text(text_editor) => text_editor.handle_key(key),
+                                Body::Binary(_) => {}
+                            },
+                            ResponseBody::OnDisk(_) => {}
+                        },
                         SectionTab::Cookie => {
                             self.handle_table_basic_keys(key, &mut response.cookies);
                         }

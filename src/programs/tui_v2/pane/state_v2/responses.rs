@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
-use crate::store::models::TimeId;
+use crate::{programs::tui_v2::common::text_editor::TextEditor, store::models::TimeId};
 
 use super::table::{TableRow, TableState};
 
@@ -41,7 +41,7 @@ pub enum ResponseBody {
 }
 
 pub enum Body {
-    Text(String),
+    Text(TextEditor),
     Binary(Vec<u8>),
     // Empty,
 }

@@ -1,5 +1,6 @@
 use crate::{
     http::{response::HttpResponse, Error as HttpError},
+    programs::tui_v2::common::text_editor::TextEditor,
     store::models::{ProjectModel, TimeId},
 };
 use actions::EffectsCollector;
@@ -173,7 +174,11 @@ impl Pane {
         let response_body = match response.body {
             crate::http::response::HttpResBody::Contained(http_body_content) => {
                 let body = match http_body_content {
-                    crate::http::response::HttpBodyContent::Text(s) => responses::Body::Text(s),
+                    crate::http::response::HttpBodyContent::Text(s) => {
+                        let mut editor = TextEditor::new(false);
+                        editor.insert_str(&s);
+                        responses::Body::Text(editor)
+                    }
                     crate::http::response::HttpBodyContent::Bytes(items) => {
                         responses::Body::Binary(items)
                     }
