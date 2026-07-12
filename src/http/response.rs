@@ -9,6 +9,7 @@ pub struct HttpResponse {
     pub headers: Vec<(String, String)>,
     pub cookies: Vec<Cookie>,
     pub body: HttpResBody,
+    pub body_bytes: usize,
 }
 
 pub enum HttpResBody {

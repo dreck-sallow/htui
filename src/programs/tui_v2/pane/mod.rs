@@ -1,5 +1,5 @@
 use crate::{
-    http::response::HttpResponse,
+    http::{response::HttpResponse, Error as HttpError},
     store::models::{ProjectModel, TimeId},
 };
 use actions::EffectsCollector;
@@ -146,59 +146,6 @@ impl Pane {
         true
     }
 
-    // pub fn handle_response(&mut self, req_id: TimeId, req_res: ReqResponse) {
-    //     let list = &mut self.state.responses.list;
-
-    //     match req_res {
-    //         ReqResponse::Err(txt) => {
-    //             list.insert(req_id, ResponseStatus::Error(txt));
-    //         }
-    //         ReqResponse::Sucess(res) => {
-    //             let mut headers = table::TableState::new();
-
-    //             for (key, value) in res.headers {
-    //                 headers.add_row(responses::ReadonlyHeader { key, value });
-    //             }
-
-    //             let mut cookies = table::TableState::new();
-
-    //             for cookie in res.cookies {
-    //                 cookies.add_row(responses::Cookie {
-    //                     name: cookie.name,
-    //                     value: cookie.value,
-    //                     domain: cookie.domain,
-    //                     expires: cookie.expires,
-    //                     max_ge: cookie.max_age,
-    //                     path: cookie.path,
-    //                     http_only: cookie.http_only.unwrap_or(false),
-    //                     partitioned: cookie.partitioned.unwrap_or(false),
-    //                     secure: cookie.secure.unwrap_or(false),
-    //                     same_site: cookie.same_site,
-    //                 });
-    //             }
-
-    //             let response = responses::Response {
-    //                 status: res.status,
-    //                 status_text: res.status_text,
-    //                 version: res.version,
-    //                 duration: res.duration,
-    //                 size_bytes: 10,
-    //                 content_type: res.content_type,
-    //                 headers,
-    //                 body: match res.body {
-    //                     super::app_event::Body::Text(s) => responses::ResponseBody::Text(s),
-    //                     super::app_event::Body::Binary(items) => {
-    //                         responses::ResponseBody::Binary(items)
-    //                     }
-    //                     super::app_event::Body::Empty => responses::ResponseBody::Empty,
-    //                 },
-    //                 cookies,
-    //             };
-    //             list.insert(req_id, responses::ResponseStatus::Success(response));
-    //         }
-    //     }
-    // }
-
     pub fn handle_response_v2(&mut self, req_id: TimeId, response: HttpResponse) {
         let mut headers = table::TableState::new();
 
@@ -225,18 +172,15 @@ impl Pane {
 
         let response_body = match response.body {
             crate::http::response::HttpResBody::Contained(http_body_content) => {
-                match http_body_content {
-                    crate::http::response::HttpBodyContent::Text(s) => {
-                        responses::ResponseBody::Text(s)
-                    }
+                let body = match http_body_content {
+                    crate::http::response::HttpBodyContent::Text(s) => responses::Body::Text(s),
                     crate::http::response::HttpBodyContent::Bytes(items) => {
-                        responses::ResponseBody::Binary(items)
+                        responses::Body::Binary(items)
                     }
-                }
+                };
+                responses::ResponseBody::InMemory(body)
             }
-            crate::http::response::HttpResBody::DiskFile(_) => {
-                responses::ResponseBody::Binary(vec![])
-            }
+            crate::http::response::HttpResBody::DiskFile(p) => responses::ResponseBody::OnDisk(p),
         };
 
         let response = responses::Response {
@@ -244,7 +188,7 @@ impl Pane {
             status_text: response.status_text,
             version: response.version,
             duration: response.duration,
-            size_bytes: 10,
+            size_bytes: response.body_bytes,
             content_type: response.content_type,
             headers,
             cookies,
@@ -255,6 +199,16 @@ impl Pane {
             .responses
             .list
             .insert(req_id, responses::ResponseStatus::Success(response));
+    }
+
+    pub fn handle_http_error(&mut self, req_id: TimeId, error: HttpError) {
+        self.state.responses.list.insert(
+            req_id,
+            responses::ResponseStatus::Error {
+                title: error.title,
+                desc: error.description,
+            },
+        );
     }
 }
 

@@ -1,17 +1,15 @@
-use std::{collections::HashMap, time::Duration};
-
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span},
+    text::Span,
     widgets::{Block, BorderType, Borders, Tabs},
     Frame,
 };
 use reqwest::header::{HeaderName, HeaderValue};
 
 use crate::{
-    http::{get_http_client, request, send_req},
+    http::request,
     programs::tui_v2::{
         app::TaskGroupKey,
         common::{
@@ -19,9 +17,12 @@ use crate::{
             table_grid::UiTableGrid,
         },
         events::DrawSignal,
-        task::SenderTask,
+        pane::{
+            response_viewer::status_line::draw_line,
+            state_v2::responses::{Body, Response},
+        },
     },
-    store::models::{HttpMethod, TimeId},
+    store::models::HttpMethod,
 };
 
 use super::{
@@ -33,6 +34,8 @@ use super::{
         PaneState, SectionFocus,
     },
 };
+
+mod status_line;
 
 enum SectionTab {
     Headers,
@@ -116,94 +119,92 @@ impl ResponsesViewer {
 }
 
 impl ResponsesViewer {
-    pub fn draw(&self, area: Rect, frame: &mut Frame, state: &PaneState) {
-        let Some(req_id) = state.collections.current_req().map(|r| r.id().to_string()) else {
-            return;
-        };
-
-        let is_focus = state.focus == SectionFocus::ResponseViewer;
-        let block = ui_block("", is_focus);
-
-        let inner_area = block.inner(area);
+    fn draw_response(&self, res: &Response, area: Rect, frame: &mut Frame, is_focus: bool) {
         let (line_area, tabs_area, content_area) = {
             let [line_status, tabs, content] = Layout::vertical([
                 Constraint::Length(1),
                 Constraint::Length(3),
                 Constraint::Fill(1),
             ])
-            .areas(inner_area);
+            .areas(area);
             (line_status, tabs, content)
         };
 
+        draw_line(res, line_area, frame);
+
+        //- Render tabs
+        let tabs = Tabs::new([
+            format!("{}", SectionTab::Body.label()),
+            format!(
+                "{} ({})",
+                SectionTab::Headers.label(),
+                res.headers.len() + res.cookies.len()
+            ),
+            format!("{} ({})", SectionTab::Cookie.label(), res.cookies.len()),
+        ])
+        .select(self.section.idx() as usize)
+        .highlight_style(ui_highlight())
+        .block(
+            Block::bordered()
+                .border_type(if is_focus {
+                    BorderType::Thick
+                } else {
+                    BorderType::Plain
+                })
+                .borders(Borders::BOTTOM | Borders::TOP)
+                .border_style(
+                    Style::default().fg(is_focus.then_some(Color::Blue).unwrap_or(Color::DarkGray)),
+                ),
+        );
+        frame.render_widget(tabs, tabs_area);
+
+        match self.section.tab {
+            SectionTab::Headers => {
+                readonly_params(&res.headers).draw(content_area, frame);
+            }
+            SectionTab::Body => match &res.body {
+                ResponseBody::InMemory(body) => match body {
+                    Body::Text(s) => {
+                        frame.render_widget(ratatui::text::Text::raw(s), content_area);
+                    }
+                    Body::Binary(_) => {}
+                },
+                ResponseBody::OnDisk(path_buf) => {
+                    draw_center_span(
+                        format!("Content stored in {:?}", path_buf).into(),
+                        area,
+                        frame,
+                    );
+                }
+            },
+            SectionTab::Cookie => {
+                cookie_table(&res.cookies).draw(content_area, frame);
+            }
+        }
+    }
+
+    pub fn draw(&self, area: Rect, frame: &mut Frame, state: &PaneState) {
+        let Some(req_id) = state.collections.current_req().map(|r| r.id().to_string()) else {
+            return;
+        };
+
+        let is_focus = state.focus == SectionFocus::ResponseViewer;
+
         match state.responses.list.get(&req_id) {
             Some(response) => {
+                let block = ui_block("", is_focus);
                 match response {
                     ResponseStatus::Fetching => {
                         draw_center_span("Sending...".blue(), area, frame);
                     }
-                    ResponseStatus::Error(st) => {
-                        draw_center_span(st.as_str().red(), area, frame);
+                    ResponseStatus::Error { title, .. } => {
+                        draw_center_span(title.as_str().red(), area, frame);
                     }
                     ResponseStatus::Cancelled => {
                         draw_center_span("Request cancelled".into(), area, frame);
                     }
                     ResponseStatus::Success(res) => {
-                        //- Render line
-                        let line = Line::from_iter([
-                            Span::raw(&res.version),
-                            Span::raw("   "),
-                            Span::raw(res.status.to_string()),
-                            Span::raw(format!("{}", res.status_text)),
-                            Span::raw("   "),
-                            Span::raw(format!("{}", duration_as_str(res.duration))),
-                            Span::raw("   "),
-                            Span::raw(format!("{}", res.content_type)),
-                        ]);
-                        frame.render_widget(line, line_area);
-
-                        //- Render tabs
-                        let tabs = Tabs::new([
-                            format!("{}", SectionTab::Body.label()),
-                            format!(
-                                "{} ({})",
-                                SectionTab::Headers.label(),
-                                res.headers.len() + res.cookies.len()
-                            ),
-                            format!("{} ({})", SectionTab::Cookie.label(), res.cookies.len()),
-                        ])
-                        .select(self.section.idx() as usize)
-                        .highlight_style(ui_highlight())
-                        .block(
-                            Block::bordered()
-                                .border_type(if is_focus {
-                                    BorderType::Thick
-                                } else {
-                                    BorderType::Plain
-                                })
-                                .borders(Borders::BOTTOM | Borders::TOP)
-                                .border_style(Style::default().fg(
-                                    is_focus.then_some(Color::Blue).unwrap_or(Color::DarkGray),
-                                )),
-                        );
-                        frame.render_widget(tabs, tabs_area);
-
-                        match self.section.tab {
-                            SectionTab::Headers => {
-                                readonly_params(&res.headers).draw(content_area, frame);
-                            }
-                            SectionTab::Body => match &res.body {
-                                ResponseBody::Text(s) => {
-                                    frame.render_widget(ratatui::text::Text::raw(s), content_area);
-                                }
-                                ResponseBody::Binary(_) => {}
-                                ResponseBody::Empty => {
-                                    draw_center_span("Empty body O_O.".into(), content_area, frame);
-                                }
-                            },
-                            SectionTab::Cookie => {
-                                cookie_table(&res.cookies).draw(content_area, frame);
-                            }
-                        }
+                        self.draw_response(res, block.inner(area), frame, is_focus);
                     }
                 }
 
@@ -249,7 +250,7 @@ impl ResponsesViewer {
                             self.handle_table_basic_keys(key, &mut response.cookies);
                         }
                     },
-                    ResponseStatus::Error(_) => todo!(),
+                    ResponseStatus::Error { .. } => todo!(),
                     _ => {}
                 }
             }
@@ -308,23 +309,6 @@ fn to_http_req(req_item: &RequestItem) -> Option<request::HttpRequest> {
     };
 
     Some(req)
-}
-
-fn duration_as_str(d: Duration) -> String {
-    let millis = d.as_millis();
-    let secs = d.as_secs_f64();
-
-    if secs < 1_f64 {
-        return format!("{:.3}ms", millis);
-    }
-
-    let minutes = secs / 60_f64;
-
-    if minutes < 1_f64 {
-        return format!("{:.3}s", secs);
-    }
-
-    return format!("{:.4}m", minutes);
 }
 
 fn check_bool_as_txt(flag: bool, txt: &str) -> &str {

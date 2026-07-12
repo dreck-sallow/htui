@@ -1,5 +1,5 @@
 use crate::{
-    http::{request::HttpRequest, response::HttpResponse, send_req},
+    http::{request::HttpRequest, response::HttpResponse, send_req, Error as HttpError},
     store::models::TimeId,
 };
 
@@ -9,6 +9,7 @@ pub enum TaskType {
 
 pub enum TaskResultType {
     HttpResponse { req_id: TimeId, res: HttpResponse },
+    HttpExecError { req_id: TimeId, error: HttpError },
 }
 
 pub struct Task<K> {
@@ -40,13 +41,30 @@ impl<K: Send + 'static> Tasks<K> {
                     TaskType::HttpRequest { id, req } => {
                         let result_sender = rx.clone();
                         tokio::spawn(async move {
-                            let res = send_req(req).await.unwrap();
-                            let _ = result_sender
-                                .send(TaskResult {
-                                    group_key,
-                                    result: TaskResultType::HttpResponse { req_id: id, res },
-                                })
-                                .await;
+                            match send_req(req).await {
+                                Ok(res) => {
+                                    let _ = result_sender
+                                        .send(TaskResult {
+                                            group_key,
+                                            result: TaskResultType::HttpResponse {
+                                                req_id: id,
+                                                res,
+                                            },
+                                        })
+                                        .await;
+                                }
+                                Err(e) => {
+                                    let _ = result_sender
+                                        .send(TaskResult {
+                                            group_key,
+                                            result: TaskResultType::HttpExecError {
+                                                req_id: id,
+                                                error: e,
+                                            },
+                                        })
+                                        .await;
+                                }
+                            }
                         });
                     }
                 }

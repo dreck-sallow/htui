@@ -15,19 +15,27 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 const MAX_BODY_SIZE: usize = 1024 * 1024 * 5;
 
-pub enum Error {
-    Io(std::io::Error),
+pub struct Error {
+    pub kind: ErrorKind,
+    pub title: String,
+    pub description: String,
+}
+
+pub enum ErrorKind {
+    FileEror,
+    BuildRequest,
+    SendReq,
 }
 
 pub fn set_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| reqwest::Client::new())
 }
 
-// pub fn get_http_client() -> &'static reqwest::Client {
-//     HTTP_CLIENT
-//         .get()
-//         .expect("Set the HTTP client before to get the instance")
-// }
+pub fn get_http_client() -> &'static reqwest::Client {
+    HTTP_CLIENT
+        .get()
+        .expect("Set the HTTP client before to get the instance")
+}
 
 enum HttpBodyWriter {
     InMemory(Vec<u8>),
@@ -38,7 +46,12 @@ enum HttpBodyWriter {
     },
 }
 
-pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
+// pub enum HttpResult {
+//     Response(HttpResponse),
+//     Err(Error),
+// }
+
+pub async fn send_req(req: HttpRequest) -> Result<HttpResponse, Error> {
     let request = into_request(req).await?;
 
     let start = Instant::now();
@@ -47,7 +60,11 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
 
     let status = response.status().as_u16();
     let version = format!("{:?}", response.version());
-    let status_text = response.status().as_str().to_string();
+    let status_text = response
+        .status()
+        .canonical_reason()
+        .unwrap_or("unknown")
+        .to_string();
 
     let mut content_type: Option<Mime> = None;
     let mut headers = Vec::new();
@@ -83,11 +100,26 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
                         time_as_id()
                     );
 
-                    let mut file =
-                        tokio::io::BufWriter::new(tokio::fs::File::create(&temp_file).await.ok()?);
+                    let mut file = tokio::io::BufWriter::new(
+                        tokio::fs::File::create(&temp_file)
+                            .await
+                            .map_err(|e| Error {
+                                kind: ErrorKind::FileEror,
+                                title: "Failed to create file for save request response".into(),
+                                description: e.to_string(),
+                            })?,
+                    );
 
-                    file.write_all(content).await.ok()?;
-                    file.write_all(&chunk).await.ok()?;
+                    file.write_all(content).await.map_err(|e| Error {
+                        kind: ErrorKind::FileEror,
+                        title: "Failed to write file".into(),
+                        description: e.to_string(),
+                    })?;
+                    file.write_all(&chunk).await.map_err(|e| Error {
+                        kind: ErrorKind::FileEror,
+                        title: "Failed to write file".into(),
+                        description: e.to_string(),
+                    })?;
 
                     body_writer = HttpBodyWriter::OnDisk {
                         path: PathBuf::from(temp_file),
@@ -103,11 +135,20 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
                 ref mut file,
                 ..
             } => {
-                file.write_all(&chunk).await.ok()?;
+                file.write_all(&chunk).await.map_err(|e| Error {
+                    kind: ErrorKind::FileEror,
+                    title: "Failed to write file".into(),
+                    description: e.to_string(),
+                })?;
                 *bytes_count += chunk.len();
             }
         }
     }
+
+    let body_size = match body_writer {
+        HttpBodyWriter::InMemory(ref items) => items.len(),
+        HttpBodyWriter::OnDisk { bytes_count, .. } => bytes_count,
+    };
 
     let body = match body_writer {
         HttpBodyWriter::InMemory(items) => match content_type.as_ref() {
@@ -123,7 +164,10 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
                     serde_json::to_string_pretty(&items).unwrap_or("Error parsing".into()),
                 ))
             }
-            _ => HttpResBody::Contained(HttpBodyContent::Bytes(items)),
+            _ => HttpResBody::Contained(HttpBodyContent::Text(
+                String::from_utf8(items).unwrap_or("Parsing error".into()),
+            )),
+            // _ => HttpResBody::Contained(HttpBodyContent::Bytes(items)),
         },
         HttpBodyWriter::OnDisk { path, mut file, .. } => {
             let _ = file.flush().await;
@@ -131,7 +175,7 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
         }
     };
 
-    Some(HttpResponse {
+    Ok(HttpResponse {
         status,
         status_text,
         version,
@@ -142,10 +186,11 @@ pub async fn send_req(req: HttpRequest) -> Option<HttpResponse> {
         headers,
         cookies,
         body,
+        body_bytes: body_size,
     })
 }
 
-async fn into_request(req: HttpRequest) -> Option<reqwest::Request> {
+async fn into_request(req: HttpRequest) -> Result<reqwest::Request, Error> {
     let client = HTTP_CLIENT.get().unwrap();
     let mut request_builder = client.request(req.method, req.url).headers(req.headers);
 
@@ -154,11 +199,21 @@ async fn into_request(req: HttpRequest) -> Option<reqwest::Request> {
             request_builder = request_builder.body(bytes);
         }
         request::HttpBody::File(path_buf) => {
-            let content = tokio::fs::read(path_buf).await.ok()?;
+            let content = tokio::fs::read(path_buf).await.map_err(|e| Error {
+                kind: ErrorKind::FileEror,
+                title: "Failed to read the path content".into(),
+                description: e.to_string(),
+            })?;
             request_builder = request_builder.body(reqwest::Body::from(content));
         }
         request::HttpBody::Empty => {}
     }
 
-    request_builder.build().ok()
+    let req = request_builder.build().map_err(|e| Error {
+        kind: ErrorKind::BuildRequest,
+        title: "Failed to build request".into(),
+        description: e.to_string(),
+    })?;
+
+    Ok(req)
 }

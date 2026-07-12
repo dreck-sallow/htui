@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use crate::store::models::TimeId;
 
@@ -19,7 +19,7 @@ impl Responses {
 pub enum ResponseStatus {
     Fetching,
     Success(Response),
-    Error(String),
+    Error { title: String, desc: String },
     Cancelled,
 }
 
@@ -36,9 +36,14 @@ pub struct Response {
 }
 
 pub enum ResponseBody {
+    InMemory(Body),
+    OnDisk(PathBuf),
+}
+
+pub enum Body {
     Text(String),
     Binary(Vec<u8>),
-    Empty,
+    // Empty,
 }
 
 pub struct ReadonlyHeader {

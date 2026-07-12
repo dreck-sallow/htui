@@ -6,12 +6,10 @@ use ratatui::{
     Frame,
 };
 
-use crate::store::models::{ProjectModel, TimeId};
+use crate::store::models::ProjectModel;
 
 use super::{
-    app_event::{ReqResponse, TaskSender},
     ctx::InitialCtx,
-    events::DrawSignal,
     pane::{new_pane, Pane},
     task::TaskResult,
 };
@@ -81,6 +79,9 @@ impl TuiApp {
                 match task.result {
                     super::task::TaskResultType::HttpResponse { req_id, res } => {
                         pane.handle_response_v2(req_id, res);
+                    }
+                    super::task::TaskResultType::HttpExecError { req_id, error } => {
+                        pane.handle_http_error(req_id, error);
                     }
                 }
                 break;
